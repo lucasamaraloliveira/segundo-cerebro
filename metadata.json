@@ -1,0 +1,6 @@
+{
+  "name": "Mente+ Segundo Cérebro",
+  "description": "Seu segundo cérebro para anotações, ideias e organização inteligente com sincronização em tempo real.",
+  "requestFramePermissions": ["notifications"],
+  "majorCapabilities": []
+}

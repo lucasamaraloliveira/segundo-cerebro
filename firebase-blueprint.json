@@ -1,0 +1,31 @@
+{
+  "entities": {
+    "Note": {
+      "title": "Note",
+      "description": "Uma nota ou ideia capturada pelo usuário.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "tags": { 
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "reminder": { "type": "string", "format": "date-time" },
+        "expiryDate": { "type": "string", "format": "date-time" },
+        "isBookmarked": { "type": "boolean" },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "content", "userId", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/notes/{noteId}": {
+      "schema": "Note",
+      "description": "Coleção primária para armazenar notas dos usuários."
+    }
+  }
+}
