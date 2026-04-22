@@ -90,7 +90,7 @@ export default function RichTextEditor({ content, onChange, placeholder }: RichT
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-lg dark:prose-invert max-w-none focus:outline-none min-h-[500px]',
+        class: 'prose prose-sm md:prose-lg dark:prose-invert max-w-none focus:outline-none min-h-[500px]',
       },
     },
   });
@@ -101,7 +101,7 @@ export default function RichTextEditor({ content, onChange, placeholder }: RichT
       editor.setOptions({
         editorProps: {
           attributes: {
-            class: `prose prose-lg dark:prose-invert max-w-none focus:outline-none min-h-[500px] ${noteFont}`,
+            class: `prose prose-sm md:prose-lg dark:prose-invert max-w-none focus:outline-none min-h-[500px] ${noteFont}`,
           },
           handlePaste(view, event) {
             const text = event.clipboardData?.getData('text/plain') || '';
@@ -150,7 +150,7 @@ export default function RichTextEditor({ content, onChange, placeholder }: RichT
         onClick();
       }}
       title={title}
-      className={`p-2 rounded-md transition-all ${
+      className={`p-1.5 md:p-2 rounded-md transition-all ${
         isActive 
           ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' 
           : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60 hover:opacity-100'
@@ -160,195 +160,281 @@ export default function RichTextEditor({ content, onChange, placeholder }: RichT
     </button>
   );
 
+  const ToolbarGroup = ({ children }: { children: React.ReactNode }) => (
+    <div className="flex items-center gap-0.5 bg-[var(--muted)]/30 p-0.5 rounded-md border border-[var(--border)]/20 mx-0.5">
+      {children}
+    </div>
+  );
+
+  const StyledSelect = ({ 
+    options, 
+    value, 
+    onChange, 
+    icon: Icon,
+    label 
+  }: { 
+    options: { label: string, value: string }[], 
+    value: string, 
+    onChange: (value: string) => void,
+    icon: any,
+    label: string
+  }) => (
+    <div className="relative flex items-center">
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[var(--muted)]/50 text-[var(--foreground)] border border-[var(--border)] transition-all min-w-[80px]">
+        <Icon className="w-3.5 h-3.5 opacity-60" />
+        <span className="text-[9px] font-bold uppercase tracking-widest whitespace-nowrap overflow-hidden text-ellipsis max-w-[50px]">
+          {options.find(opt => opt.value === value)?.label || label}
+        </span>
+      </div>
+      <select 
+        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          // Reset value to avoid sticking if needed, but for headings it's fine
+        }}
+      >
+        <option value="" disabled>{label}</option>
+        {options.map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+
   return (
     <div className="flex flex-col w-full">
       {/* Toolbar */}
-      <div className="flex flex-nowrap items-center gap-1 p-2 bg-[var(--background)] border-b border-[var(--border)] overflow-x-auto no-scrollbar sticky top-0 z-10">
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          isActive={editor.isActive('bold')}
-          title="Negrito"
-        >
-          <Bold className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          isActive={editor.isActive('italic')}
-          title="Itálico"
-        >
-          <Italic className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
-          isActive={editor.isActive('underline')}
-          title="Sublinhado"
-        >
-          <UnderlineIcon className="w-4 h-4" />
-        </ToolbarButton>
-        
-        <div className="w-[1px] h-4 bg-[var(--border)] mx-1 flex-shrink-0" />
-
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-          isActive={editor.isActive('heading', { level: 1 })}
-          title="Título Grande"
-        >
-          <Heading1 className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          isActive={editor.isActive('heading', { level: 2 })}
-          title="Título Médio"
-        >
-          <Heading2 className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-          isActive={editor.isActive('heading', { level: 3 })}
-          title="Título Pequeno"
-        >
-          <Heading3 className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()}
-          isActive={editor.isActive('heading', { level: 4 })}
-          title="Título Extra Pequeno"
-        >
-          <Heading4 className="w-4 h-4" />
-        </ToolbarButton>
-
-        <div className="w-[1px] h-4 bg-[var(--border)] mx-1 flex-shrink-0" />
-
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          isActive={editor.isActive('bulletList')}
-          title="Lista de Marcadores"
-        >
-          <List className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          isActive={editor.isActive('orderedList')}
-          title="Lista Numerada"
-        >
-          <ListOrdered className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleTaskList().run()}
-          isActive={editor.isActive('taskList')}
-          title="Lista de Tarefas"
-        >
-          <CheckSquare className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleCode().run()}
-          isActive={editor.isActive('code')}
-          title="Código Inline"
-        >
-          <Code className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-          isActive={editor.isActive('codeBlock')}
-          title="Bloco de Código"
-        >
-          <SquareCode className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          isActive={editor.isActive('blockquote')}
-          title="Citação"
-        >
-          <Quote className="w-4 h-4" />
-        </ToolbarButton>
-
-        <div className="w-[1px] h-4 bg-[var(--border)] mx-1 flex-shrink-0" />
-
-        <ToolbarButton
-          onClick={() => editor.chain().focus().setTextAlign('left').run()}
-          isActive={editor.isActive({ textAlign: 'left' })}
-          title="Alinhar à Esquerda"
-        >
-          <AlignLeft className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().setTextAlign('center').run()}
-          isActive={editor.isActive({ textAlign: 'center' })}
-          title="Centralizar"
-        >
-          <AlignCenter className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().setTextAlign('right').run()}
-          isActive={editor.isActive({ textAlign: 'right' })}
-          title="Alinhar à Direita"
-        >
-          <AlignRight className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().setTextAlign('justify').run()}
-          isActive={editor.isActive({ textAlign: 'justify' })}
-          title="Justificar"
-        >
-          <AlignJustify className="w-4 h-4" />
-        </ToolbarButton>
-
-        <div className="w-[1px] h-4 bg-[var(--border)] mx-1 flex-shrink-0" />
-
-        <div className="flex items-center gap-2">
-          <Type className="w-3 h-3 opacity-30 text-[var(--foreground)]" />
-          <select 
-            onChange={(e) => setNoteFont(e.target.value)}
-            className="bg-transparent text-[10px] font-bold uppercase tracking-wider outline-none p-1 border-b border-[var(--border)] cursor-pointer max-w-[100px] text-[var(--foreground)]"
-            value={noteFont}
-            title="Fonte da Nota"
+      <div className="flex flex-wrap items-center gap-y-2 gap-x-1 p-2 bg-[var(--background)] border-b border-[var(--border)] sticky top-0 z-10">
+        <ToolbarGroup>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().undo().run()}
+            title="Desfazer"
           >
-            <option value="font-sans">Inter (Sans)</option>
-            <option value="font-serif">Garamond (Serif)</option>
-            <option value="font-mono">JetBrains (Mono)</option>
-          </select>
-        </div>
+            <Undo className="w-3.5 h-3.5" />
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().redo().run()}
+            title="Refazer"
+          >
+            <Redo className="w-3.5 h-3.5" />
+          </ToolbarButton>
+        </ToolbarGroup>
 
-        <div className="w-[1px] h-6 bg-[var(--border)] mx-1" />
+        <ToolbarGroup>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleBold().run()}
+            isActive={editor.isActive('bold')}
+            title="Negrito"
+          >
+            <Bold className="w-4 h-4" />
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleItalic().run()}
+            isActive={editor.isActive('italic')}
+            title="Itálico"
+          >
+            <Italic className="w-4 h-4" />
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleUnderline().run()}
+            isActive={editor.isActive('underline')}
+            title="Sublinhado"
+          >
+            <UnderlineIcon className="w-4 h-4" />
+          </ToolbarButton>
+        </ToolbarGroup>
+        
+        <ToolbarGroup>
+          {/* Heading Dropdown (Mobile Only) */}
+          <div className="flex md:hidden">
+            <StyledSelect 
+              label="Estilo"
+              icon={Heading1}
+              value={
+                editor.isActive('heading', { level: 1 }) ? 'h1' :
+                editor.isActive('heading', { level: 2 }) ? 'h2' :
+                editor.isActive('heading', { level: 3 }) ? 'h3' :
+                editor.isActive('heading', { level: 4 }) ? 'h4' : 'p'
+              }
+              onChange={(val) => {
+                if (val === 'p') editor.chain().focus().setParagraph().run();
+                else editor.chain().focus().toggleHeading({ level: parseInt(val.replace('h', '')) as any }).run();
+              }}
+              options={[
+                { label: 'Parágrafo', value: 'p' },
+                { label: 'Título 1', value: 'h1' },
+                { label: 'Título 2', value: 'h2' },
+                { label: 'Título 3', value: 'h3' },
+                { label: 'Título 4', value: 'h4' },
+              ]}
+            />
+          </div>
 
-        <select 
-          onChange={(e) => {
-            if (e.target.value === 'auto') {
-              editor.chain().focus().unsetColor().run();
-            } else {
-              editor.chain().focus().setColor(e.target.value).run();
-            }
-          }}
-          className="bg-transparent text-[10px] font-bold uppercase tracking-wider outline-none p-1 border-b border-[var(--border)] cursor-pointer text-[var(--foreground)]"
-          title="Cor do Texto"
-        >
-          <option value="auto">Automático</option>
-          <option value="#ef4444">Vermelho</option>
-          <option value="#3b82f6">Azul</option>
-          <option value="#10b981">Verde</option>
-          <option value="#f59e0b">Amarelo</option>
-        </select>
+          {/* Heading Individual (Desktop Only) */}
+          <div className="hidden md:flex items-center gap-0.5">
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+              isActive={editor.isActive('heading', { level: 1 })}
+              title="Título Grande"
+            >
+              <Heading1 className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+              isActive={editor.isActive('heading', { level: 2 })}
+              title="Título Médio"
+            >
+              <Heading2 className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+              isActive={editor.isActive('heading', { level: 3 })}
+              title="Título Pequeno"
+            >
+              <Heading3 className="w-4 h-4" />
+            </ToolbarButton>
+          </div>
+        </ToolbarGroup>
+
+        <ToolbarGroup>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleBulletList().run()}
+            isActive={editor.isActive('bulletList')}
+            title="Lista de Marcadores"
+          >
+            <List className="w-4 h-4" />
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleOrderedList().run()}
+            isActive={editor.isActive('orderedList')}
+            title="Lista Numerada"
+          >
+            <ListOrdered className="w-4 h-4" />
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleTaskList().run()}
+            isActive={editor.isActive('taskList')}
+            title="Lista de Tarefas"
+          >
+            <CheckSquare className="w-4 h-4" />
+          </ToolbarButton>
+        </ToolbarGroup>
+
+        <ToolbarGroup>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleCode().run()}
+            isActive={editor.isActive('code')}
+            title="Código Inline"
+          >
+            <Code className="w-4 h-4" />
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+            isActive={editor.isActive('codeBlock')}
+            title="Bloco de Código"
+          >
+            <SquareCode className="w-4 h-4" />
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleBlockquote().run()}
+            isActive={editor.isActive('blockquote')}
+            title="Citação"
+          >
+            <Quote className="w-4 h-4" />
+          </ToolbarButton>
+        </ToolbarGroup>
+
+        <ToolbarGroup>
+          {/* Alignment Dropdown (Mobile Only) */}
+          <div className="flex md:hidden">
+            <StyledSelect 
+              label="Alinhamento"
+              icon={AlignLeft}
+              value={
+                editor.isActive({ textAlign: 'center' }) ? 'center' :
+                editor.isActive({ textAlign: 'right' }) ? 'right' :
+                editor.isActive({ textAlign: 'justify' }) ? 'justify' : 'left'
+              }
+              onChange={(val) => editor.chain().focus().setTextAlign(val).run()}
+              options={[
+                { label: 'Esquerda', value: 'left' },
+                { label: 'Centro', value: 'center' },
+                { label: 'Direita', value: 'right' },
+                { label: 'Justificado', value: 'justify' },
+              ]}
+            />
+          </div>
+
+          {/* Alignment Individual (Desktop Only) */}
+          <div className="hidden md:flex items-center gap-0.5">
+            <ToolbarButton
+              onClick={() => editor.chain().focus().setTextAlign('left').run()}
+              isActive={editor.isActive({ textAlign: 'left' })}
+              title="Alinhar à Esquerda"
+            >
+              <AlignLeft className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().setTextAlign('center').run()}
+              isActive={editor.isActive({ textAlign: 'center' })}
+              title="Centralizar"
+            >
+              <AlignCenter className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().setTextAlign('right').run()}
+              isActive={editor.isActive({ textAlign: 'right' })}
+              title="Alinhar à Direita"
+            >
+              <AlignRight className="w-4 h-4" />
+            </ToolbarButton>
+          </div>
+        </ToolbarGroup>
+
+        <ToolbarGroup>
+          <div className="flex items-center gap-1 px-1">
+            <Type className="w-3 h-3 opacity-30 text-[var(--foreground)]" />
+            <select 
+              onChange={(e) => setNoteFont(e.target.value)}
+              className="bg-transparent text-[9px] font-bold uppercase tracking-wider outline-none cursor-pointer max-w-[70px] text-[var(--foreground)]"
+              value={noteFont}
+              title="Fonte"
+            >
+              <option value="font-sans">Sans</option>
+              <option value="font-serif">Serif</option>
+              <option value="font-mono">Mono</option>
+            </select>
+          </div>
+          <div className="w-[1px] h-3 bg-[var(--border)] mx-1" />
+          <div className="flex items-center gap-1 px-1">
+            <Palette className="w-3 h-3 opacity-30 text-[var(--foreground)]" />
+            <select 
+              onChange={(e) => {
+                if (e.target.value === 'auto') editor.chain().focus().unsetColor().run();
+                else editor.chain().focus().setColor(e.target.value).run();
+              }}
+              className="bg-transparent text-[9px] font-bold uppercase tracking-wider outline-none cursor-pointer text-[var(--foreground)]"
+              title="Cor"
+            >
+              <option value="auto">Auto</option>
+              <option value="#ef4444">Red</option>
+              <option value="#3b82f6">Blue</option>
+              <option value="#10b981">Green</option>
+            </select>
+          </div>
+        </ToolbarGroup>
 
         <div className="flex-1" />
 
-        <ToolbarButton
-          onClick={() => editor.chain().focus().undo().run()}
-          title="Desfazer"
-        >
-          <Undo className="w-3 h-3" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().redo().run()}
-          title="Refazer"
-        >
-          <Redo className="w-3 h-3" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}
-          title="Limpar Formatação"
-        >
-          <Eraser className="w-3 h-3" />
-        </ToolbarButton>
+        <ToolbarGroup>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}
+            title="Limpar Formatação"
+          >
+            <Eraser className="w-3.5 h-3.5" />
+          </ToolbarButton>
+        </ToolbarGroup>
       </div>
 
       <div className={noteFont}>

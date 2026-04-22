@@ -1,29 +1,29 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  collection, 
-  query, 
-  where, 
-  onSnapshot, 
-  orderBy, 
-  addDoc, 
-  updateDoc, 
-  doc, 
-  deleteDoc, 
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  orderBy,
+  addDoc,
+  updateDoc,
+  doc,
+  deleteDoc,
   serverTimestamp,
-  Timestamp 
+  Timestamp
 } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, db, signIn, logOut } from '@/lib/firebase';
 import { Note } from '@/lib/types';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Plus, 
-  Search as SearchIcon, 
-  LogOut, 
-  MoreVertical, 
-  Tag as TagIcon, 
+import {
+  Plus,
+  Search as SearchIcon,
+  LogOut,
+  MoreVertical,
+  Tag as TagIcon,
   ArrowLeft,
   Settings,
   Layers,
@@ -50,7 +50,7 @@ import jsPDF from 'jspdf';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 
-const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), { 
+const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), {
   ssr: false,
   loading: () => <div className="h-[60vh] w-full animate-pulse bg-black/5 rounded-xl" />
 });
@@ -78,8 +78,16 @@ export default function Home() {
   const [view, setView] = useState<'all' | 'favorites'>('all');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isTagModalOpen, setIsTagModalOpen] = useState(false);
+  const [isMobileTagsModalOpen, setIsMobileTagsModalOpen] = useState(false);
   const [newTagInput, setNewTagInput] = useState('');
 
+
+  // Sidebar responsiveness
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
+  }, []);
 
   // Theme Toggle Effect
   useEffect(() => {
@@ -99,7 +107,7 @@ export default function Home() {
     localStorage.setItem('theme', newTheme);
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
   };
-  
+
   // Local state for editing to avoid "jumping" when typing
   const [localTitle, setLocalTitle] = useState('');
   const [localContent, setLocalContent] = useState('');
@@ -110,7 +118,7 @@ export default function Home() {
       setUser(u);
       setLoading(false);
       if (!u) setNotes([]);
-      
+
       if (u && "Notification" in window) {
         Notification.requestPermission();
       }
@@ -165,7 +173,7 @@ export default function Home() {
 
   const filteredNotes = useMemo(() => {
     return notes.filter(note => {
-      const matchesSearch = 
+      const matchesSearch =
         note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         note.content.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesTag = activeTag ? note.tags?.includes(activeTag) : true;
@@ -178,7 +186,7 @@ export default function Home() {
 
   const relatedNotes = useMemo(() => {
     if (!activeNote || !activeNote.tags?.length) return [];
-    
+
     return notes
       .filter(n => n.id !== activeNote.id)
       .map(n => ({
@@ -204,7 +212,7 @@ export default function Home() {
   // Debounced update for Title
   useEffect(() => {
     if (!activeNote || localTitle === activeNote.title) return;
-    
+
     const timeout = setTimeout(() => {
       updateNote(activeNote.id, { title: localTitle });
     }, 1000);
@@ -216,7 +224,7 @@ export default function Home() {
   // Actually, RichTextEditor should handle its own content
   useEffect(() => {
     if (!activeNote || localContent === activeNote.content) return;
-    
+
     const timeout = setTimeout(() => {
       updateNote(activeNote.id, { content: localContent });
     }, 1000);
@@ -231,8 +239,8 @@ export default function Home() {
       const response = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          prompt: `Analise esta nota e sugira tags (separadas por vírgula) e um resumo curto de 2 frases. Texto: ${note.content}` 
+        body: JSON.stringify({
+          prompt: `Analise esta nota e sugira tags (separadas por vírgula) e um resumo curto de 2 frases. Texto: ${note.content}`
         }),
       });
       const data = await response.json();
@@ -289,7 +297,7 @@ export default function Home() {
 
   const exportAsTXT = (note: Note) => {
     const element = document.createElement("a");
-    const file = new Blob([note.content], {type: 'text/plain'});
+    const file = new Blob([note.content], { type: 'text/plain' });
     element.href = URL.createObjectURL(file);
     element.download = `${note.title}.txt`;
     document.body.appendChild(element);
@@ -299,8 +307,8 @@ export default function Home() {
   if (loading) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-[var(--background)]">
-        <motion.div 
-          animate={{ scale: [1, 1.1, 1] }} 
+        <motion.div
+          animate={{ scale: [1, 1.1, 1] }}
           transition={{ repeat: Infinity, duration: 2 }}
           className="text-[var(--accent)] font-bold text-2xl"
         >
@@ -314,9 +322,9 @@ export default function Home() {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-[var(--background)] px-4 text-center">
         <motion.div
-           initial={{ opacity: 0, y: 20 }}
-           animate={{ opacity: 1, y: 0 }}
-           className="max-w-md"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-md"
         >
           <div className="bg-accent/10 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-8">
             <Sparkles className="text-accent w-10 h-10" />
@@ -325,7 +333,7 @@ export default function Home() {
           <p className="text-muted-foreground mb-10 text-lg">
             Organize suas ideias, notas e planos de forma inteligente e sincronizada.
           </p>
-          <button 
+          <button
             onClick={signIn}
             className="w-full bg-[#1a1a1a] text-white py-4 px-6 rounded-2xl font-medium hover:bg-black transition-all flex items-center justify-center gap-2 group shadow-xl"
           >
@@ -339,27 +347,29 @@ export default function Home() {
 
   return (
     <div className={`flex h-screen overflow-hidden bg-[var(--background)] ${isFullscreen ? 'p-0' : ''}`}>
-      {/* SIDEBAR - Hidden on mobile if editor is open */}
+      {/* SIDEBAR - Hidden on mobile by default, toggled via menu */}
       <AnimatePresence>
         {isSidebarOpen && !isFullscreen && (
-          <motion.aside 
+          <motion.aside
             initial={{ x: -300 }}
             animate={{ x: 0 }}
             exit={{ x: -300 }}
-            className={`w-64 border-r border-[var(--border)] bg-[var(--sidebar-bg)] flex flex-col z-20 p-8 ${mobileView === 'editor' ? 'hidden md:flex' : 'flex'}`}
+            className={`w-64 border-r border-[var(--border)] bg-[var(--sidebar-bg)] hidden md:flex flex-col z-30 p-8 
+              ${isFullscreen ? 'hidden' : ''} 
+              relative h-full`}
           >
             <div className="mb-10 flex items-center justify-between">
               <h2 className="font-serif italic text-3xl tracking-tight flex items-center gap-2">
                 Cérebro²
               </h2>
-              <button 
+              <button
                 onClick={toggleTheme}
                 className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-colors text-[var(--foreground)] opacity-60 hover:opacity-100"
                 title="Trocar Tema"
               >
                 {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
               </button>
-              <button 
+              <button
                 onClick={() => setIsSidebarOpen(false)}
                 className="lg:hidden p-2 hover:bg-muted rounded-lg"
               >
@@ -368,7 +378,7 @@ export default function Home() {
             </div>
 
             <div className="mb-10">
-               <button 
+              <button
                 onClick={createNewNote}
                 className="w-full bg-[#1a1a1a] dark:bg-white text-white dark:text-black py-4 px-4 text-xs font-bold uppercase tracking-widest hover:bg-black/80 transition-colors"
               >
@@ -380,7 +390,7 @@ export default function Home() {
               <div className="space-y-4">
                 <p className="text-[10px] uppercase tracking-widest text-[var(--foreground)]/40 font-bold">Principal</p>
                 <div className="space-y-1">
-                  <button 
+                  <button
                     onClick={() => {
                       setView('all');
                       setActiveTag(null);
@@ -393,7 +403,7 @@ export default function Home() {
                     </div>
                     <span className="text-[10px] opacity-40 font-mono">{notes.length}</span>
                   </button>
-                  <button 
+                  <button
                     onClick={() => {
                       setView('favorites');
                       setActiveTag(null);
@@ -407,13 +417,13 @@ export default function Home() {
                     <span className="text-[10px] opacity-40 font-mono">{notes.filter(n => n.isBookmarked).length}</span>
                   </button>
                 </div>
-                <button 
+                <button
                   className="block w-full text-left text-sm font-medium transition-all hover:italic hover:pl-2 text-[var(--foreground)] flex items-center gap-2"
                 >
                   <Bell className="w-4 h-4 opacity-40" />
                   Lembretes
                 </button>
-                <a 
+                <a
                   href="/dashboard"
                   className="block w-full text-left text-sm font-medium transition-all hover:italic hover:pl-2 text-accent flex items-center gap-2"
                 >
@@ -429,7 +439,7 @@ export default function Home() {
                     <p className="text-xs text-muted-foreground italic">Nenhuma tag ainda</p>
                   ) : (
                     allTags.map(tag => (
-                      <button 
+                      <button
                         key={tag}
                         onClick={() => setActiveTag(tag === activeTag ? null : tag)}
                         className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${activeTag === tag ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'bg-[var(--muted)] hover:bg-black/10 dark:hover:bg-white/10 text-[var(--foreground)]'}`}
@@ -448,8 +458,8 @@ export default function Home() {
                 <span className="text-[11px] font-bold uppercase tracking-wider">Sincronizado</span>
               </div>
               <div className="flex items-center gap-3">
-                <Image 
-                  src={user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} 
+                <Image
+                  src={user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`}
                   width={32}
                   height={32}
                   className="rounded-full border border-border"
@@ -459,7 +469,7 @@ export default function Home() {
                 <div className="flex-1 min-w-0">
                   <p className="text-[11px] font-bold truncate uppercase tracking-widest">{user.displayName || 'Usuário'}</p>
                 </div>
-                <button 
+                <button
                   onClick={logOut}
                   className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)] rounded-lg transition-colors"
                 >
@@ -471,6 +481,19 @@ export default function Home() {
         )}
       </AnimatePresence>
 
+      {/* Mobile Overlay for Sidebar */}
+      <AnimatePresence>
+        {isSidebarOpen && !isFullscreen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsSidebarOpen(false)}
+            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-20 md:hidden"
+          />
+        )}
+      </AnimatePresence>
+
       {/* NOTE LIST - Hidden on mobile if editor is open */}
       <section className={`w-full md:w-80 border-r border-[var(--border)] bg-[var(--background)] flex flex-col relative z-10 
         ${isFullscreen ? 'hidden' : ''} 
@@ -479,31 +502,42 @@ export default function Home() {
         {!isSidebarOpen && (
           <button 
             onClick={() => setIsSidebarOpen(true)}
-            className="absolute -left-3 top-6 bg-[var(--background)] border border-[var(--border)] rounded-full p-1.5 shadow-sm hover:scale-110 transition-all text-[var(--foreground)]"
+            className="hidden md:block absolute -left-3 top-6 bg-[var(--background)] border border-[var(--border)] rounded-full p-1.5 shadow-sm hover:scale-110 transition-all text-[var(--foreground)]"
           >
             <Plus className="w-3 h-3 rotate-45" />
           </button>
         )}
-        
-        <div className="p-8">
-          <div className="relative mb-6">
+
+        {/* Mobile Header for List View */}
+        <div className="md:hidden flex items-center justify-between p-6 pb-0 bg-[var(--background)]">
+          <h2 className="font-serif italic text-2xl tracking-tight">Cérebro²</h2>
+          <button 
+            onClick={logOut}
+            className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 rounded-lg transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6 md:p-8 pt-4 md:pt-8">
+          <div className="relative mb-2 md:mb-6">
             <SearchIcon className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4 opacity-30" />
             <input 
               type="text" 
-              placeholder="Buscar no cérebro..."
+              placeholder="Buscar..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-transparent pl-8 pr-4 py-2 outline-none text-sm font-serif italic text-lg text-[var(--foreground)] placeholder:text-[var(--foreground)]/20"
+              className="w-full bg-transparent pl-8 pr-4 py-1 outline-none text-sm font-serif italic text-base md:text-lg text-[var(--foreground)] placeholder:text-[var(--foreground)]/20"
             />
           </div>
-          <div className="flex items-center justify-between text-[11px] opacity-40 font-bold uppercase tracking-widest">
+          <div className="flex items-center justify-between text-[10px] opacity-40 font-bold uppercase tracking-widest">
             <span>{filteredNotes.length} Notas</span>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 custom-scrollbar space-y-4">
           {filteredNotes.map(note => (
-            <motion.div 
+            <motion.div
               layout
               key={note.id}
               onClick={() => {
@@ -518,7 +552,7 @@ export default function Home() {
                 </p>
                 {note.isBookmarked && <Bookmark className="w-3 h-3 fill-[var(--accent)] text-[var(--accent)] opacity-30" />}
               </div>
-              <h3 className="font-serif text-lg leading-tight mb-2 line-clamp-2 text-[var(--foreground)]">{note.title || 'Sem título'}</h3>
+              <h3 className="font-serif text-base md:text-lg leading-tight mb-2 line-clamp-3 text-[var(--foreground)]">{note.title || 'Sem título'}</h3>
               <p className="text-xs opacity-60 line-clamp-2 leading-relaxed text-[var(--foreground)]">
                 {stripHtml(note.content) || 'Sem conteúdo...'}
               </p>
@@ -529,21 +563,28 @@ export default function Home() {
               <p className="text-sm text-muted-foreground">Nenhuma nota encontrada</p>
             </div>
           )}
+          <div className="h-16 md:hidden"></div> {/* Spacer for mobile navbar */}
         </div>
       </section>
 
       {/* EDITOR - Full screen or mobile controlled */}
       <main className={`flex-1 bg-[var(--background)] flex flex-col overflow-hidden relative ${mobileView === 'list' ? 'hidden md:flex' : 'flex'}`}>
         {/* Mobile Header */}
-        <div className="md:hidden flex items-center justify-between p-4 border-b border-[var(--border)] bg-[var(--background)]">
-           <button onClick={() => setMobileView('list')} className="flex items-center gap-1 text-sm font-bold uppercase text-[var(--foreground)]">
-             <ArrowLeft className="w-4 h-4" /> Voltar
-           </button>
-           <span className="font-serif italic text-[var(--foreground)]">Editando</span>
-        </div>
+         <div className="md:hidden flex items-center justify-between p-4 border-b border-[var(--border)] bg-[var(--background)]">
+            <button onClick={() => setMobileView('list')} className="flex items-center gap-1 text-sm font-bold uppercase text-[var(--foreground)]">
+              <ArrowLeft className="w-4 h-4" /> Voltar
+            </button>
+            <span className="font-serif italic text-[var(--foreground)]">Editando</span>
+            <button 
+              onClick={logOut}
+              className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 rounded-lg transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+         </div>
         <AnimatePresence mode="wait">
           {activeNote ? (
-            <motion.div 
+            <motion.div
               key={activeNote.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -553,7 +594,7 @@ export default function Home() {
               {/* Toolbar */}
               <div className="px-4 md:px-12 py-4 md:py-6 border-b border-[var(--border)] flex items-center justify-between bg-[var(--background)]/80 backdrop-blur-sm sticky top-0 z-20">
                 <div className="flex items-center gap-3 md:gap-6">
-                   <button 
+                  <button
                     onClick={() => updateNote(activeNote.id, { isBookmarked: !activeNote.isBookmarked })}
                     className={`p-1.5 transition-all ${activeNote.isBookmarked ? 'bg-[var(--accent)] text-[var(--accent-foreground)] rounded-md' : 'text-[var(--foreground)]/40 hover:text-[var(--foreground)]'}`}
                     title="Favoritar"
@@ -566,7 +607,7 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 md:gap-6 h-8 overflow-x-auto no-scrollbar flex-nowrap pr-4">
-                  <button 
+                  <button
                     onClick={() => handleAiAction(activeNote)}
                     disabled={isAiLoading}
                     className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter hover:text-[var(--foreground)] transition-all group text-[var(--foreground)]"
@@ -574,10 +615,10 @@ export default function Home() {
                     <Sparkles className={`w-3.5 h-3.5 ${isAiLoading ? 'animate-pulse text-blue-500' : 'text-blue-400 group-hover:text-blue-600'}`} />
                     <span className="whitespace-nowrap">{isAiLoading ? 'Pensando...' : 'Assistente IA'}</span>
                   </button>
-                  
+
                   <div className="flex-shrink-0 w-[1px] h-3 bg-[var(--border)] hidden md:block" />
 
-                  <button 
+                  <button
                     onClick={() => exportAsPDF(activeNote)}
                     className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter hover:text-[var(--foreground)] transition-all group text-[var(--foreground)]"
                   >
@@ -585,7 +626,7 @@ export default function Home() {
                     <span className="whitespace-nowrap">Exportar</span>
                   </button>
 
-                  <button 
+                  <button
                     onClick={() => setIsFullscreen(!isFullscreen)}
                     className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter hover:text-[var(--foreground)] transition-all group text-[var(--foreground)]"
                   >
@@ -593,7 +634,7 @@ export default function Home() {
                     <span className="whitespace-nowrap">{isFullscreen ? 'Sair Foco' : 'Modo Foco'}</span>
                   </button>
 
-                  <button 
+                  <button
                     onClick={() => deleteNote(activeNote.id)}
                     className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter text-red-400 hover:text-red-600 transition-all group"
                   >
@@ -604,7 +645,7 @@ export default function Home() {
               </div>
 
               {/* Editor Content */}
-              <div className="flex-1 overflow-y-auto p-12 custom-scrollbar">
+              <div className="flex-1 overflow-y-auto p-6 md:p-12 custom-scrollbar">
                 <div className="max-w-5xl mx-auto w-full">
                   <div className="mb-10 flex justify-between items-end border-b border-[var(--border)] pb-6">
                     <div className="space-y-4">
@@ -612,7 +653,7 @@ export default function Home() {
                         {activeNote.tags?.map(tag => (
                           <span key={tag} className="px-2 py-1 bg-[var(--muted)] text-[var(--foreground)] text-[10px] font-bold uppercase tracking-widest rounded flex items-center gap-1 group">
                             #{tag}
-                            <button 
+                            <button
                               onClick={() => updateNote(activeNote.id, { tags: activeNote.tags.filter(t => t !== tag) })}
                               className="opacity-0 group-hover:opacity-100 transition-opacity"
                             >
@@ -620,7 +661,7 @@ export default function Home() {
                             </button>
                           </span>
                         ))}
-                         <button 
+                        <button
                           onClick={() => {
                             setNewTagInput('');
                             setIsTagModalOpen(true);
@@ -632,35 +673,35 @@ export default function Home() {
                       </div>
                     </div>
                     <div className="text-right">
-                       <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Atualizado em</p>
-                       <p className="text-sm font-serif italic">
-                         {activeNote.updatedAt ? format(activeNote.updatedAt.toDate(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : 'Agora'}
-                       </p>
+                      <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Atualizado em</p>
+                      <p className="text-sm font-serif italic">
+                        {activeNote.updatedAt ? format(activeNote.updatedAt.toDate(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : 'Agora'}
+                      </p>
                     </div>
                   </div>
 
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={localTitle}
                     placeholder="Título da nota"
                     onChange={(e) => setLocalTitle(e.target.value)}
-                    className="w-full text-6xl font-serif tracking-tighter leading-none bg-transparent border-none focus:outline-none mb-10 placeholder:text-[var(--foreground)]/40 text-[var(--foreground)]"
+                    className="w-full text-3xl md:text-6xl font-serif tracking-tighter leading-none bg-transparent border-none focus:outline-none mb-10 placeholder:text-[var(--foreground)]/40 text-[var(--foreground)]"
                   />
 
                   <div className="grid grid-cols-2 gap-8 mb-10 pb-8 border-b border-[var(--border)]">
                     <div className="space-y-1">
-                       <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Lembrete</p>
-                       <input 
-                        type="datetime-local" 
+                      <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Lembrete</p>
+                      <input
+                        type="datetime-local"
                         className="w-full bg-[var(--muted)] text-[var(--foreground)] px-3 py-2 text-xs font-bold uppercase tracking-wider rounded border-none focus:outline-none"
                         value={activeNote.reminder ? format(activeNote.reminder.toDate(), "yyyy-MM-dd'T'HH:mm") : ''}
                         onChange={(e) => updateNote(activeNote.id, { reminder: e.target.value ? Timestamp.fromDate(new Date(e.target.value)) : null })}
                       />
                     </div>
                     <div className="space-y-1">
-                       <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Vencimento</p>
-                       <input 
-                        type="date" 
+                      <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Vencimento</p>
+                      <input
+                        type="date"
                         className="w-full bg-[var(--muted)] text-[var(--foreground)] px-3 py-2 text-xs font-bold uppercase tracking-wider rounded border-none focus:outline-none"
                         value={activeNote.expiryDate ? format(activeNote.expiryDate.toDate(), 'yyyy-MM-dd') : ''}
                         onChange={(e) => updateNote(activeNote.id, { expiryDate: e.target.value ? Timestamp.fromDate(new Date(e.target.value)) : null })}
@@ -668,7 +709,7 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <RichTextEditor 
+                  <RichTextEditor
                     content={localContent}
                     onChange={(html) => setLocalContent(html)}
                   />
@@ -682,7 +723,7 @@ export default function Home() {
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {relatedNotes.map(note => (
-                          <motion.div 
+                          <motion.div
                             key={note.id}
                             whileHover={{ y: -5 }}
                             onClick={() => {
@@ -709,19 +750,20 @@ export default function Home() {
                       </div>
                     </div>
                   )}
+                  <div className="h-20 md:hidden"></div> {/* Spacer for mobile navbar */}
                 </div>
               </div>
             </motion.div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-               <div className="bg-muted w-24 h-24 rounded-full flex items-center justify-center mb-6">
+              <div className="bg-muted w-24 h-24 rounded-full flex items-center justify-center mb-6">
                 <Plus className="text-muted-foreground w-8 h-8 opacity-20" />
               </div>
               <h3 className="text-xl font-bold mb-2">Selecione uma nota</h3>
               <p className="text-muted-foreground max-w-xs">
                 Escolha uma nota ao lado ou crie uma nova para começar a capturar seus pensamentos.
               </p>
-              <button 
+              <button
                 onClick={createNewNote}
                 className="mt-8 text-accent font-bold hover:underline"
               >
@@ -732,25 +774,142 @@ export default function Home() {
         </AnimatePresence>
       </main>
 
+      {/* MOBILE NAVBAR */}
+      {!isFullscreen && (
+        <>
+          <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-[var(--background)]/80 backdrop-blur-xl border-t border-[var(--border)] flex items-center justify-around z-40 px-6 pb-1">
+            <button 
+              onClick={() => { setView('all'); setMobileView('list'); setActiveTag(null); }}
+              className={`flex flex-col items-center gap-1 transition-all ${view === 'all' && !activeTag ? 'text-[var(--foreground)] scale-105' : 'text-[var(--foreground)]/30'}`}
+              title="Notas"
+            >
+              <FileText className={`w-4.5 h-4.5 ${view === 'all' && !activeTag ? 'opacity-100' : 'opacity-40'}`} />
+              <span className="text-[8px] font-bold uppercase tracking-widest">Notas</span>
+            </button>
+            
+            <button 
+              onClick={() => { setView('favorites'); setMobileView('list'); setActiveTag(null); }}
+              className={`flex flex-col items-center gap-1 transition-all ${view === 'favorites' ? 'text-[var(--foreground)] scale-105' : 'text-[var(--foreground)]/30'}`}
+              title="Favoritos"
+            >
+              <Star className={`w-4.5 h-4.5 ${view === 'favorites' ? 'fill-current opacity-100' : 'opacity-40'}`} />
+              <span className="text-[8px] font-bold uppercase tracking-widest">Favoritos</span>
+            </button>
+
+            <div className="w-10"></div> {/* Center space for FAB */}
+
+            <a 
+              href="/dashboard"
+              className="flex flex-col items-center gap-1 text-[var(--foreground)]/30 hover:text-[var(--foreground)] transition-all"
+              title="Dashboard"
+            >
+              <Layers className="w-4.5 h-4.5 opacity-40" />
+              <span className="text-[8px] font-bold uppercase tracking-widest">Dash</span>
+            </a>
+
+            <button 
+              onClick={() => setIsMobileTagsModalOpen(true)}
+              className={`flex flex-col items-center gap-1 transition-all ${activeTag ? 'text-[var(--foreground)] scale-105' : 'text-[var(--foreground)]/30'}`}
+              title="Tags"
+            >
+              <TagIcon className={`w-4.5 h-4.5 ${activeTag ? 'opacity-100' : 'opacity-40'}`} />
+              <span className="text-[8px] font-bold uppercase tracking-widest">{activeTag ? `#${activeTag}` : 'Tags'}</span>
+            </button>
+          </div>
+
+          {/* FLOATING ACTION BUTTON (FAB) */}
+          <motion.button 
+            whileHover={{ scale: 1.1, rotate: 90 }}
+            whileTap={{ scale: 0.9 }}
+            initial={{ scale: 0, y: 100 }}
+            animate={{ scale: 1, y: 0 }}
+            onClick={createNewNote}
+            className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-12 h-12 bg-[#1a1a1a] dark:bg-white text-white dark:text-black rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.3)] flex items-center justify-center z-50 border-4 border-[var(--background)] group"
+          >
+            <Plus className="w-6 h-6 transition-transform group-active:rotate-180" />
+          </motion.button>
+        </>
+      )}
+
+      {/* MOBILE TAGS SELECTION MODAL */}
+      <AnimatePresence>
+        {isMobileTagsModalOpen && (
+          <div className="fixed inset-0 z-[60] flex items-end md:hidden">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileTagsModalOpen(false)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="relative bg-[var(--background)] rounded-t-[2.5rem] shadow-2xl p-8 pt-10 w-full border-t border-[var(--border)] max-h-[80vh] overflow-y-auto"
+            >
+              <div className="w-12 h-1.5 bg-[var(--border)] rounded-full mx-auto mb-8 opacity-50" />
+              
+              <div className="mb-8">
+                <h3 className="text-3xl font-serif mb-2 tracking-tight">Filtrar por Tags</h3>
+                <p className="text-[10px] text-[var(--foreground)]/40 uppercase font-bold tracking-[0.2em]">Selecione uma etiqueta para filtrar</p>
+              </div>
+
+              <div className="flex flex-wrap gap-3 mb-10">
+                <button 
+                  onClick={() => {
+                    setActiveTag(null);
+                    setIsMobileTagsModalOpen(false);
+                  }}
+                  className={`px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all ${!activeTag ? 'bg-[var(--foreground)] text-[var(--background)]' : 'bg-[var(--muted)] text-[var(--foreground)] opacity-60'}`}
+                >
+                  Todas as Notas
+                </button>
+                {allTags.map(tag => (
+                  <button 
+                    key={tag}
+                    onClick={() => {
+                      setActiveTag(tag === activeTag ? null : tag);
+                      setIsMobileTagsModalOpen(false);
+                    }}
+                    className={`px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all ${activeTag === tag ? 'bg-[var(--accent)] text-[var(--accent-foreground)] shadow-lg' : 'bg-[var(--muted)] text-[var(--foreground)]'}`}
+                  >
+                    #{tag}
+                  </button>
+                ))}
+              </div>
+
+              <button 
+                onClick={() => setIsMobileTagsModalOpen(false)}
+                className="w-full py-5 bg-[var(--muted)] text-[var(--foreground)] rounded-2xl font-bold uppercase text-[10px] tracking-[0.3em] hover:opacity-90 transition-all"
+              >
+                Fechar
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* TAG MODAL */}
       <AnimatePresence>
         {isTagModalOpen && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsTagModalOpen(false)}
               className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             />
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="relative bg-[var(--background)] rounded-2xl shadow-2xl p-8 max-w-sm w-full border border-[var(--border)] overflow-hidden"
             >
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500" />
-              
+
               <div className="mb-6">
                 <h3 className="text-2xl font-serif mb-2 tracking-tight text-[var(--foreground)]">Nova Etiqueta</h3>
                 <p className="text-xs text-[var(--foreground)]/40 uppercase font-bold tracking-widest">Organize seu pensamento</p>
@@ -758,9 +917,9 @@ export default function Home() {
 
               <div className="relative mb-8">
                 <TagIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--foreground)]/30" />
-                <input 
+                <input
                   autoFocus
-                  type="text" 
+                  type="text"
                   placeholder="Ex: Projetos, Estudo..."
                   value={newTagInput}
                   onChange={(e) => setNewTagInput(e.target.value)}
@@ -778,13 +937,13 @@ export default function Home() {
               </div>
 
               <div className="flex gap-3">
-                <button 
+                <button
                   onClick={() => setIsTagModalOpen(false)}
                   className="flex-1 py-4 text-[10px] font-bold uppercase tracking-widest text-[var(--foreground)]/40 hover:text-[var(--foreground)] transition-colors"
                 >
                   Cancelar
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     if (newTagInput.trim()) {
                       const tag = newTagInput.trim();
