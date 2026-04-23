@@ -38,10 +38,17 @@ import {
   Trash2,
   Calendar,
   Search,
+  Menu,
+  Command,
   Filter,
   Bookmark,
   Sun,
-  Moon
+  Moon,
+  Layout,
+  ArrowRight,
+  Undo2,
+  AlertTriangle,
+  RotateCcw
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -49,11 +56,14 @@ import jsPDF from 'jspdf';
 // Removido import do SDK do Google no frontend por segurança
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
+import Link from 'next/link';
 
 const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), {
   ssr: false,
   loading: () => <div className="h-[60vh] w-full animate-pulse bg-black/5 rounded-none" />
 });
+
+const CommandPalette = dynamic(() => import('@/components/CommandPalette'), { ssr: false });
 
 // Helper to strip HTML for previews
 const stripHtml = (html: string) => {
@@ -113,7 +123,14 @@ const TagButton = React.memo(({
 
 TagButton.displayName = 'TagButton';
 
-const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isAiLoading, handleAiAction, exportAsPDF, deleteNote, setIsFullscreen, setIsTagModalOpen, setNewTagInput }: any) => {
+const TEMPLATES = [
+  { id: 'meeting', label: 'Ata de Reunião', icon: '📅', content: '<h2>📅 Detalhes</h2><p><b>Data:</b> ' + new Date().toLocaleDateString('pt-BR') + '</p><p><b>Participantes:</b> </p><hr><h2>📝 Pauta</h2><ul><li></li></ul><hr><h2>✅ Decisões</h2><ul><li></li></ul><hr><h2>🚀 Próximos Passos</h2><ul><li></li></ul>' },
+  { id: 'project', label: 'Plano de Projeto', icon: '🎯', content: '<h2>🎯 Objetivos</h2><p></p><hr><h2>📦 Entregáveis</h2><ul><li></li></ul><hr><h2>⏳ Cronograma</h2><ul><li>Fase 1: </li></ul>' },
+  { id: 'diary', label: 'Diário', icon: '🧠', content: '<h2>🧠 Reflexões do Dia</h2><p></p><hr><h2>🙏 Gratidão</h2><ul><li></li></ul><hr><h2>📅 Para Amanhã</h2><ul><li></li></ul>' },
+  { id: 'study', label: 'Estudo', icon: '📖', content: '<h2>📖 Assunto Principal</h2><p></p><hr><h2>💡 Pontos Chave</h2><ul><li></li></ul><hr><h2>❓ Dúvidas / Revisar</h2><p></p>' },
+];
+
+const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isAiLoading, handleAiAction, exportAsPDF, deleteNote, setIsFullscreen, setIsTagModalOpen, setNewTagInput, relatedNotes, setActiveNoteId, setIsTemplateModalOpen }: any) => {
   const [localTitle, setLocalTitle] = useState(activeNote.title || '');
   const [localContent, setLocalContent] = useState(activeNote.content || '');
 
@@ -162,12 +179,11 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
         </div>
         <div className="flex items-center gap-3 md:gap-6 h-8 overflow-x-auto no-scrollbar flex-nowrap pr-4">
           <button
-            onClick={() => handleAiAction(activeNote)}
-            disabled={isAiLoading}
+            onClick={() => setIsTemplateModalOpen(true)}
             className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter hover:text-[var(--foreground)] transition-all group text-[var(--foreground)]"
           >
-            <Sparkles className={`w-3.5 h-3.5 ${isAiLoading ? 'animate-pulse text-blue-500' : 'text-blue-400 group-hover:text-blue-600'}`} />
-            <span className="whitespace-nowrap">{isAiLoading ? 'Pensando...' : 'Assistente IA'}</span>
+            <Layout className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100" />
+            <span className="whitespace-nowrap">Modelos</span>
           </button>
           <div className="flex-shrink-0 w-[1px] h-3 bg-[var(--border)] hidden md:block" />
           <button
@@ -259,6 +275,36 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
             onChange={(html: string) => setLocalContent(html)}
             isFocusMode={isFullscreen}
           />
+
+          {/* Related Notes (AI Auto-Linker) */}
+          {relatedNotes && relatedNotes.length > 0 && (
+            <div className="mt-20 pt-10 border-t border-[var(--border)] pb-20">
+              <div className="flex items-center gap-3 mb-8">
+                <Brain className="w-5 h-5 text-[var(--accent)]" />
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--foreground)] opacity-40">Conexões Sugeridas pela IA</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {relatedNotes.map((note: any) => (
+                  <button
+                    key={note.id}
+                    onClick={() => setActiveNoteId(note.id)}
+                    className="group relative p-6 bg-[var(--muted)]/20 border border-[var(--border)] hover:border-[var(--accent)] transition-all text-left"
+                  >
+                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <ArrowRight className="w-3 h-3 text-[var(--accent)]" />
+                    </div>
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--foreground)] opacity-20 mb-3">Nota Relacionada</p>
+                    <h4 className="text-sm font-serif italic mb-4 leading-snug group-hover:text-[var(--accent)] transition-colors">{note.title || 'Sem título'}</h4>
+                    <div className="flex flex-wrap gap-1.5">
+                      {note.tags?.slice(0, 3).map((tag: string) => (
+                        <span key={tag} className="text-[8px] font-bold uppercase tracking-tighter opacity-30 group-hover:opacity-60">#{tag}</span>
+                      ))}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </motion.div>
@@ -271,9 +317,18 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSemanticSearch, setIsSemanticSearch] = useState(false);
+  const [semanticKeywords, setSemanticKeywords] = useState<string[]>([]);
+  const [isSemanticLoading, setIsSemanticLoading] = useState(false);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [noteToDelete, setNoteToDelete] = useState<Note | null>(null);
+  const [showUndoToast, setShowUndoToast] = useState(false);
+  const [lastDeletedNote, setLastDeletedNote] = useState<Note | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mobileView, setMobileView] = useState<'list' | 'editor'>('list');
   const [view, setView] = useState<'all' | 'favorites'>('all');
@@ -345,6 +400,18 @@ export default function Home() {
     return () => unsubscribe();
   }, [user]);
 
+  // Command Palette Shortcut (Ctrl+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Handle note selection from URL (Dashboard redirect) - Run only once or when URL changes
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -367,16 +434,58 @@ export default function Home() {
     return Array.from(tags).sort();
   }, [notes]);
 
+  // Semantic Search Expansion
+  useEffect(() => {
+    if (!isSemanticSearch || !searchQuery || searchQuery.length < 3) {
+      setSemanticKeywords([]);
+      return;
+    }
+
+    const timeout = setTimeout(async () => {
+      setIsSemanticLoading(true);
+      try {
+        const response = await fetch('/api/ai/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: `Expanda a busca conceitual para: "${searchQuery}". Retorne apenas as 5 palavras-chave mais relacionadas semanticamente (ex: se for "projetos", retorne "planos metas objetivos iniciativas cronograma"). Responda apenas com as palavras separadas por espaço.`
+          }),
+        });
+        const data = await response.json();
+        if (data.text) {
+          const keywords = data.text.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2);
+          setSemanticKeywords(keywords);
+        }
+      } catch (e) {
+        console.error('Erro na expansão semântica:', e);
+      } finally {
+        setIsSemanticLoading(false);
+      }
+    }, 800);
+
+    return () => clearTimeout(timeout);
+  }, [searchQuery, isSemanticSearch]);
+
   const filteredNotes = useMemo(() => {
+    const queryLower = searchQuery.toLowerCase();
     return notes.filter(note => {
-      const matchesSearch =
-        note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        note.content.toLowerCase().includes(searchQuery.toLowerCase());
+      const titleLower = note.title.toLowerCase();
+      const contentLower = note.content.toLowerCase();
+      
+      const matchesKeyword = 
+        titleLower.includes(queryLower) || 
+        contentLower.includes(queryLower);
+      
+      const matchesSemantic = isSemanticSearch && semanticKeywords.some(kw => 
+        titleLower.includes(kw) || contentLower.includes(kw)
+      );
+
+      const matchesSearch = matchesKeyword || matchesSemantic;
       const matchesTag = activeTag ? note.tags?.includes(activeTag) : true;
       const matchesView = view === 'favorites' ? note.isBookmarked : true;
       return matchesSearch && matchesTag && matchesView;
     });
-  }, [notes, searchQuery, activeTag, view]);
+  }, [notes, searchQuery, activeTag, view, isSemanticSearch, semanticKeywords]);
 
   const activeNote = useMemo(() => notes.find(n => n.id === activeNoteId), [notes, activeNoteId]);
 
@@ -417,6 +526,27 @@ export default function Home() {
   };
 
   // Actions
+  const handleCommandAction = (action: string, payload?: any) => {
+    switch (action) {
+      case 'create':
+        createNewNote();
+        break;
+      case 'dashboard':
+        window.location.href = '/dashboard';
+        break;
+      case 'theme':
+        toggleTheme();
+        break;
+      case 'tag':
+        if (activeNoteId) setIsTagModalOpen(true);
+        break;
+      case 'open_note':
+        setActiveNoteId(payload);
+        setMobileView('editor');
+        break;
+    }
+  };
+
   const createNewNote = async () => {
     if (!user) return;
     const newNote = {
@@ -440,10 +570,41 @@ export default function Home() {
     });
   };
 
-  const deleteNote = async (id: string) => {
-    if (confirm('Tem certeza que deseja excluir esta nota?')) {
-      await deleteDoc(doc(db, 'notes', id));
-      if (activeNoteId === id) setActiveNoteId(null);
+  const deleteNote = (id: string) => {
+    const note = notes.find(n => n.id === id);
+    if (note) {
+      setNoteToDelete(note);
+      setIsDeleteModalOpen(true);
+    }
+  };
+
+  const executeDelete = async () => {
+    if (!noteToDelete) return;
+    try {
+      setLastDeletedNote(noteToDelete);
+      await deleteDoc(doc(db, 'notes', noteToDelete.id));
+      if (activeNoteId === noteToDelete.id) setActiveNoteId(null);
+      setIsDeleteModalOpen(false);
+      setNoteToDelete(null);
+      setShowUndoToast(true);
+      setTimeout(() => setShowUndoToast(false), 5000);
+    } catch (e) {
+      console.error("Erro ao deletar:", e);
+    }
+  };
+
+  const undoDelete = async () => {
+    if (!lastDeletedNote || !user) return;
+    try {
+      const { id, ...data } = lastDeletedNote;
+      await addDoc(collection(db, 'notes'), {
+        ...data,
+        updatedAt: serverTimestamp()
+      });
+      setShowUndoToast(false);
+      setLastDeletedNote(null);
+    } catch (e) {
+      console.error("Erro ao desfazer:", e);
     }
   };
 
@@ -585,13 +746,13 @@ export default function Home() {
                   <Bell className="w-4 h-4 opacity-40" />
                   Lembretes
                 </button>
-                <a
+                <Link
                   href="/dashboard"
                   className="block w-full text-left text-sm font-medium transition-all hover:italic hover:pl-2 text-accent flex items-center gap-2"
                 >
-                  <Layers className="w-4 h-4 opacity-40" />
+                  <Brain className="w-4 h-4 opacity-40" />
                   Dashboard Neural
-                </a>
+                </Link>
               </div>
 
               <div className="">
@@ -674,19 +835,22 @@ export default function Home() {
           <h2 className="font-serif italic text-2xl tracking-tight text-[var(--foreground)]">Cérebro²</h2>
           <div className="flex items-center gap-1">
             <button 
-              onClick={() => {
-                const newTheme = theme === 'light' ? 'dark' : 'light';
-                setTheme(newTheme);
-                localStorage.setItem('theme', newTheme);
-                document.documentElement.classList.toggle('dark');
-              }}
-              className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 rounded-none transition-colors"
+              onClick={() => setIsCommandPaletteOpen(true)}
+              className="p-2 bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 shadow-[2px_2px_0px_rgba(0,0,0,0.05)] transition-all active:scale-95"
+              title="Terminal Neural"
+            >
+              <Command className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={toggleTheme}
+              className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 transition-colors"
             >
               {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
             </button>
             <button 
               onClick={logOut}
-              className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 rounded-none transition-colors"
+              className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 transition-colors"
+              title="Sair"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -695,17 +859,32 @@ export default function Home() {
 
         <div className="p-4 md:p-8 pt-2 md:pt-8">
           <div className="relative mb-2 md:mb-6">
-            <SearchIcon className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4 opacity-30" />
+            <SearchIcon className={`absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${isSemanticSearch ? 'text-[var(--accent)] opacity-100' : 'opacity-30'}`} />
             <input 
               type="text" 
-              placeholder="Buscar..."
+              placeholder={isSemanticSearch ? "Busca Semântica ativa..." : "Buscar..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-transparent pl-8 pr-4 py-1 outline-none text-sm font-serif italic text-base md:text-lg text-[var(--foreground)] placeholder:text-[var(--foreground)]/20"
+              className={`w-full bg-transparent pl-8 pr-12 py-1 outline-none text-sm font-serif italic text-base md:text-lg text-[var(--foreground)] placeholder:text-[var(--foreground)]/20 transition-all ${isSemanticSearch ? 'text-[var(--accent)]' : ''}`}
             />
+            <button
+              onClick={() => setIsSemanticSearch(!isSemanticSearch)}
+              className={`absolute right-0 top-1/2 -translate-y-1/2 px-2 py-1 text-[10px] font-bold uppercase tracking-widest border transition-all ${isSemanticSearch ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-[2px_2px_0px_rgba(0,0,0,0.1)]' : 'border-[var(--border)] opacity-40 hover:opacity-100'}`}
+              title="Ativar Busca Semântica"
+            >
+              {isSemanticLoading ? '...' : '✨'}
+            </button>
           </div>
           <div className="flex items-center justify-between text-[10px] opacity-40 font-bold uppercase tracking-widest">
-            <span>{filteredNotes.length} Notas</span>
+            <div className="flex gap-2 items-center">
+              <span>{filteredNotes.length} Notas</span>
+              {isSemanticSearch && semanticKeywords.length > 0 && (
+                <div className="flex items-center gap-1 text-[var(--accent)] text-[7px] animate-pulse">
+                   <div className="w-1 h-1 bg-[var(--accent)]" />
+                   CONCEITOS: {semanticKeywords.join(' · ')}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -745,19 +924,21 @@ export default function Home() {
             </button>
             <div className="flex items-center gap-1">
               <button 
-                onClick={() => {
-                  const newTheme = theme === 'light' ? 'dark' : 'light';
-                  setTheme(newTheme);
-                  localStorage.setItem('theme', newTheme);
-                  document.documentElement.classList.toggle('dark');
-                }}
-                className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 rounded-none transition-colors"
+                onClick={() => setIsCommandPaletteOpen(true)}
+                className="p-2 bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 active:scale-95 transition-all"
+                title="Terminal Neural"
+              >
+                <Command className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={toggleTheme}
+                className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 transition-colors"
               >
                 {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
               </button>
               <button 
                 onClick={logOut}
-                className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 rounded-none transition-colors"
+                className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 transition-colors"
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -779,6 +960,7 @@ export default function Home() {
               setNewTagInput={setNewTagInput}
               relatedNotes={relatedNotes}
               setActiveNoteId={setActiveNoteId}
+              setIsTemplateModalOpen={setIsTemplateModalOpen}
             />
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
@@ -824,14 +1006,14 @@ export default function Home() {
 
             <div className="w-10"></div> {/* Center space for FAB */}
 
-            <a 
+            <Link 
               href="/dashboard"
               className="flex flex-col items-center gap-1 text-[var(--foreground)]/30 hover:text-[var(--foreground)] transition-all"
-              title="Dashboard"
+              title="Dashboard Neural"
             >
-              <Layers className="w-4.5 h-4.5 opacity-40" />
+              <Brain className="w-4.5 h-4.5 opacity-40" />
               <span className="text-[8px] font-bold uppercase tracking-widest">Dash</span>
-            </a>
+            </Link>
 
             <button 
               onClick={() => setIsMobileTagsModalOpen(true)}
@@ -941,7 +1123,7 @@ export default function Home() {
                 <p className="text-xs text-[var(--foreground)]/40 uppercase font-bold tracking-widest">Organize seu pensamento</p>
               </div>
 
-              <div className="relative mb-8">
+              <div className="relative mb-6">
                 <TagIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--foreground)]/30" />
                 <input
                   autoFocus
@@ -960,6 +1142,33 @@ export default function Home() {
                   }}
                   className="w-full bg-[var(--muted)] text-[var(--foreground)] rounded-none py-4 pl-12 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/10 transition-all placeholder:text-[var(--foreground)]/20"
                 />
+              </div>
+
+              {/* Suggestions */}
+              <div className="mb-8">
+                <p className="text-[9px] text-[var(--foreground)]/40 uppercase font-bold tracking-widest mb-3">Sugeridas ou Existentes</p>
+                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto custom-scrollbar pr-2">
+                  {allTags
+                    .filter(tag => !activeNote?.tags?.includes(tag))
+                    .map(tag => (
+                      <button
+                        key={tag}
+                        onClick={() => {
+                          if (activeNote) {
+                            updateNote(activeNote.id, { tags: [...(activeNote.tags || []), tag] });
+                            setIsTagModalOpen(false);
+                          }
+                        }}
+                        className="px-2 py-1 bg-[var(--muted)] hover:bg-[var(--accent)] hover:text-white text-[10px] font-bold uppercase tracking-widest transition-all border border-transparent hover:border-black/5"
+                      >
+                        #{tag}
+                      </button>
+                    ))
+                  }
+                  {allTags.filter(tag => !activeNote?.tags?.includes(tag)).length === 0 && (
+                    <p className="text-[9px] opacity-20 italic">Nenhuma tag nova para sugerir</p>
+                  )}
+                </div>
               </div>
 
               <div className="flex gap-3">
@@ -986,6 +1195,120 @@ export default function Home() {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+      <CommandPalette 
+        isOpen={isCommandPaletteOpen} 
+        onClose={() => setIsCommandPaletteOpen(false)} 
+        notes={notes}
+        onAction={handleCommandAction}
+      />
+
+      {/* CUSTOM DELETE MODAL */}
+      <AnimatePresence>
+        {isDeleteModalOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setIsDeleteModalOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="relative w-full max-w-sm bg-[var(--background)] border border-red-500/30 p-8 shadow-[20px_20px_0px_rgba(239,68,68,0.1)]"
+            >
+              <div className="flex items-center gap-3 text-red-500 mb-6">
+                <AlertTriangle className="w-6 h-6" />
+                <h2 className="text-xl font-bold uppercase tracking-widest">Excluir Nota?</h2>
+              </div>
+              <p className="text-sm text-[var(--foreground)]/60 mb-8 leading-relaxed">
+                Você está prestes a apagar permanentemente esta nota. Esta ação não pode ser desfeita após o período de restauração.
+              </p>
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setIsDeleteModalOpen(false)}
+                  className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest border border-[var(--border)] hover:bg-[var(--muted)] transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={executeDelete}
+                  className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest bg-red-500 text-white hover:bg-red-600 shadow-[4px_4px_0px_rgba(0,0,0,0.2)] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* TEMPLATE SELECTOR MODAL */}
+      <AnimatePresence>
+        {isTemplateModalOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setIsTemplateModalOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="relative w-full max-w-2xl bg-[var(--background)] border border-[var(--border)] p-10 shadow-[30px_30px_0px_rgba(0,0,0,0.1)]"
+            >
+              <div className="flex items-center justify-between mb-10">
+                <div>
+                  <h2 className="text-2xl font-serif italic mb-1">Escolher Modelo</h2>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40">Estruture seu pensamento</p>
+                </div>
+                <button onClick={() => setIsTemplateModalOpen(false)} className="opacity-40 hover:opacity-100 transition-opacity text-2xl">×</button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {TEMPLATES.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => {
+                      if (activeNote) {
+                        const newContent = t.content + (activeNote.content ? '<hr>' + activeNote.content : '');
+                        const newTitle = t.label + ': ' + (activeNote.title === 'Nova Nota' ? '' : activeNote.title);
+                        updateNote(activeNote.id, { content: newContent, title: newTitle });
+                        setIsTemplateModalOpen(false);
+                      }
+                    }}
+                    className="p-6 border border-[var(--border)] bg-[var(--muted)]/20 hover:bg-[var(--accent)]/5 hover:border-[var(--accent)] transition-all text-left group"
+                  >
+                    <div className="text-3xl mb-4 group-hover:scale-110 transition-transform origin-left">{t.icon}</div>
+                    <h4 className="text-sm font-bold uppercase tracking-widest mb-2 group-hover:text-[var(--accent)] transition-colors">{t.label}</h4>
+                    <p className="text-[10px] opacity-40 leading-relaxed">Clique para aplicar este formato à sua nota atual.</p>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* UNDO TOAST */}
+      <AnimatePresence>
+        {showUndoToast && (
+          <motion.div 
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[120] bg-black text-white px-6 py-4 flex items-center gap-6 shadow-2xl border border-white/10"
+          >
+            <div className="flex items-center gap-3">
+              <Trash2 className="w-4 h-4 text-red-400" />
+              <span className="text-xs font-bold uppercase tracking-widest">Nota excluída</span>
+            </div>
+            <button 
+              onClick={undoDelete}
+              className="flex items-center gap-2 text-accent text-xs font-bold uppercase tracking-widest hover:underline"
+            >
+              <RotateCcw className="w-3 h-3" /> Desfazer
+            </button>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

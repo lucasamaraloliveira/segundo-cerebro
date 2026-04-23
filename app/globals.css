@@ -230,3 +230,13 @@ select option {
 .tiptap pre code {
   @apply bg-transparent text-inherit p-0 rounded-none text-sm;
 }
+
+.bg-dot-matrix {
+  background-image: radial-gradient(var(--foreground) 1.2px, transparent 1.2px);
+  background-size: 32px 32px;
+}
+
+.bg-dot-matrix-subtle {
+  background-image: radial-gradient(var(--foreground) 0.8px, transparent 0.8px);
+  background-size: 16px 16px;
+}

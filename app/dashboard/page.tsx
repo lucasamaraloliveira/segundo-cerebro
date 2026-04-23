@@ -6,18 +6,25 @@ import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Note } from '@/lib/types';
 import dynamic from 'next/dynamic';
-import { ArrowLeft, Brain, Layers } from 'lucide-react';
+import { ArrowLeft, Brain, Layers, Tag as TagIcon, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
-import { forceCollide } from 'd3-force';
 
-// Dynamically import the graph to avoid SSR issues
-const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false });
+// Dynamically import our unified KnowledgeGraph component
+const KnowledgeGraph = dynamic(() => import('@/components/KnowledgeGraph'), { 
+  ssr: false,
+  loading: () => (
+    <div className="h-full w-full flex items-center justify-center">
+      <div className="text-[10px] font-bold uppercase tracking-[0.3em] animate-pulse opacity-40">
+        Iniciando Matriz Neural...
+      </div>
+    </div>
+  )
+});
 
 export default function Dashboard() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
@@ -31,14 +38,6 @@ export default function Dashboard() {
     updateDimensions();
     window.addEventListener('resize', updateDimensions);
     return () => window.removeEventListener('resize', updateDimensions);
-  }, []);
-
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark';
-    if (savedTheme) {
-      setTheme(savedTheme);
-      document.documentElement.classList.toggle('dark', savedTheme === 'dark');
-    }
   }, []);
 
   useEffect(() => {
@@ -69,54 +68,30 @@ export default function Dashboard() {
     return () => unsubscribeAuth();
   }, []);
 
-  const graphData = useMemo(() => {
-    const nodes = notes.map((note, index) => {
-      const colors = theme === 'dark' 
-        ? ['#60a5fa', '#34d399', '#fbbf24', '#f87171', '#a78bfa', '#f472b6']
-        : ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
-      return {
-        id: note.id,
-        name: note.title,
-        val: (note.content?.length || 0) / 100 + 5,
-        color: colors[index % colors.length]
-      };
-    });
+  const stats = useMemo(() => {
+    const allTags = notes.flatMap(n => n.tags || []);
+    const tagCounts = allTags.reduce((acc: any, tag) => {
+      acc[tag] = (acc[tag] || 0) + 1;
+      return acc;
+    }, {});
+    
+    const topTags = Object.entries(tagCounts)
+      .sort(([, a]: any, [, b]: any) => b - a)
+      .slice(0, 5);
 
-    const links: { source: string; target: string }[] = [];
-
-    // Simple connection logic: shared tags
-    notes.forEach((noteA, i) => {
-      notes.slice(i + 1).forEach(noteB => {
-        const sharedTags = noteA.tags?.filter(tag => noteB.tags?.includes(tag));
-        if (sharedTags && sharedTags.length > 0) {
-          links.push({
-            source: noteA.id,
-            target: noteB.id
-          });
-        }
-      });
-    });
-
-    return { nodes, links };
-  }, [notes, theme]);
-
-  const fgRef = React.useRef<any>(null);
-
-  useEffect(() => {
-    if (fgRef.current) {
-      // Configura as forças quando o grafo carrega
-      fgRef.current.d3Force('link').distance(200);
-      fgRef.current.d3Force('charge').strength(-500);
-      fgRef.current.d3Force('collide', forceCollide((node: any) => node.val + 20));
-    }
-  }, [graphData]);
+    return {
+      totalNotes: notes.length,
+      totalTags: Object.keys(tagCounts).length,
+      topTags
+    };
+  }, [notes]);
 
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-[var(--background)]">
         <div className="animate-pulse flex flex-col items-center gap-4 text-[var(--foreground)]">
-          <Brain className="w-12 h-12 opacity-20" />
-          <p className="font-serif italic opacity-40 text-xl">Mapeando conexões...</p>
+          <Brain className="w-12 h-12 opacity-20 text-[var(--accent)]" />
+          <p className="font-serif italic opacity-40 text-xl">Sincronizando Sinapses...</p>
         </div>
       </div>
     );
@@ -124,10 +99,13 @@ export default function Dashboard() {
 
   if (!user) {
     return (
-      <div className="h-screen flex items-center justify-center bg-[var(--background)]">
-        <div className="text-center text-[var(--foreground)]">
-          <h1 className="text-2xl font-serif italic mb-4">Acesso Negado</h1>
-          <Link href="/" className="underline opacity-60 hover:opacity-100">Voltar para Home</Link>
+      <div className="h-screen flex items-center justify-center bg-[var(--background)] p-8">
+        <div className="text-center text-[var(--foreground)] max-w-sm">
+          <h1 className="text-3xl font-serif italic mb-6">Matriz Bloqueada</h1>
+          <p className="text-sm opacity-60 mb-8 leading-relaxed">Acesse sua conta para visualizar o mapeamento neural de seus pensamentos.</p>
+          <Link href="/" className="px-8 py-4 bg-[var(--accent)] text-white text-[10px] font-bold uppercase tracking-widest hover:opacity-90 transition-all">
+            Ir para Login
+          </Link>
         </div>
       </div>
     );
@@ -135,59 +113,97 @@ export default function Dashboard() {
 
   return (
     <div className="h-screen flex flex-col bg-[var(--background)] overflow-hidden text-[var(--foreground)]">
-      {/* Header */}
-      <header className="p-4 md:p-6 border-b border-[var(--border)] bg-[var(--background)] flex items-center justify-between z-10">
-        <div className="flex items-center gap-3 md:gap-4">
-          <Link href="/" className="p-2 hover:bg-[var(--muted)] rounded-full transition-all">
-            <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
+      {/* Header HUD */}
+      <header className="px-8 py-6 border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur-md flex items-center justify-between z-30">
+        <div className="flex items-center gap-6">
+          <Link href="/" className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] hover:text-[var(--accent)] transition-colors group">
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            Voltar
           </Link>
+          <div className="w-[1px] h-4 bg-[var(--border)]" />
           <div>
-            <h1 className="font-serif italic text-xl md:text-3xl tracking-tight flex items-center gap-2">
-              <Layers className="w-5 h-5 md:w-6 md:h-6" /> Dashboard Neural
+            <h1 className="font-serif italic text-2xl tracking-tight flex items-center gap-3">
+              <Layers className="w-6 h-6 text-[var(--accent)]" /> Dashboard Neural
             </h1>
-            <p className="text-[9px] md:text-xs font-bold uppercase tracking-widest opacity-40">Visualização de Vínculos</p>
           </div>
         </div>
-        <div className="text-right hidden sm:block">
-          <p className="text-xs md:text-sm font-medium">{notes.length} Notas Mapeadas</p>
-          <p className="text-[10px] md:text-xs opacity-40">{graphData.links.length} Conexões por Tags</p>
+
+        <div className="hidden md:flex items-center gap-12">
+          <div className="text-right">
+            <p className="text-[10px] font-bold uppercase tracking-widest opacity-30">Total de Notas</p>
+            <p className="text-xl font-serif italic">{stats.totalNotes}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] font-bold uppercase tracking-widest opacity-30">Etiquetas Ativas</p>
+            <p className="text-xl font-serif italic">{stats.totalTags}</p>
+          </div>
         </div>
       </header>
 
-      {/* Graph Area */}
-      <div className="flex-1 relative bg-[var(--background)]">
-        {notes.length === 0 ? (
-          <div className="absolute inset-0 flex items-center justify-center text-center p-8">
-            <p className="font-serif italic text-2xl opacity-20 max-w-md">
-              Sua rede neural ainda está vazia. Adicione tags às suas notas para criar vínculos.
-            </p>
-          </div>
-        ) : (
-          <ForceGraph2D
-            ref={fgRef}
-            width={dimensions.width}
-            height={dimensions.height}
-            graphData={graphData}
-            nodeLabel="name"
-            nodeColor={(node: any) => node.color}
-            linkColor={() => theme === 'dark' ? '#333333' : '#e5e5e5'}
-            linkWidth={1.5}
-            backgroundColor={theme === 'dark' ? '#000000' : '#ffffff'}
-            nodeRelSize={1} // Usamos o val do nó para o tamanho
-            onNodeClick={(node: any) => {
-              window.location.href = `/?note=${node.id}`;
-            }}
-            cooldownTicks={100}
-            d3AlphaDecay={0.02}
-            d3VelocityDecay={0.3}
-          />
-        )}
-      </div>
+      <main className="flex-1 relative flex">
+        {/* Background Grid Layer */}
+        <div className="absolute inset-0 bg-dot-matrix opacity-10 pointer-events-none" />
 
-      {/* Instructions */}
-      <div className="absolute bottom-4 md:bottom-8 left-4 md:left-8 bg-[var(--accent)] text-[var(--accent-foreground)] p-3 md:p-4 rounded-lg shadow-2xl z-20 max-w-[200px] md:max-w-xs pointer-events-none">
-        <p className="text-[9px] md:text-xs font-bold uppercase tracking-wider mb-1 md:mb-2 opacity-60">Como ler o mapa:</p>
-        <p className="text-xs md:text-sm leading-tight">As linhas conectam notas com **Tags comuns**. Nós maiores têm mais conteúdo.</p>
+        {/* Decorative Coordinate Markers */}
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 text-[8px] font-mono opacity-20 pointer-events-none uppercase tracking-widest hidden md:block">
+          Grid System // Lat: 0.00 Lon: 0.00
+        </div>
+        
+        {/* Left Stats Sidebar (HUD Style) */}
+        <div className="absolute top-10 left-10 z-20 hidden lg:block pointer-events-none">
+          <div className="space-y-10">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 opacity-40">
+                <BarChart3 className="w-4 h-4" />
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Principais Tópicos</p>
+              </div>
+              <div className="space-y-3">
+                {stats.topTags.map(([tag, count]: any) => (
+                  <div key={tag} className="flex items-center gap-4">
+                    <div className="w-2 h-2 bg-[var(--accent)]" />
+                    <div>
+                      <p className="text-sm font-serif italic leading-none">{tag}</p>
+                      <p className="text-[9px] font-bold uppercase tracking-tighter opacity-30">{count} conexões</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-4 border-t border-[var(--border)] pt-8 max-w-[200px]">
+              <div className="flex items-center gap-2 opacity-40">
+                <TagIcon className="w-4 h-4" />
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Guia de Leitura</p>
+              </div>
+              <p className="text-xs leading-relaxed opacity-60">
+                Cada nodo representa uma nota. O tamanho indica a densidade do conteúdo. Linhas conectam notas que compartilham etiquetas.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Graph Area */}
+        <div className="flex-1 relative">
+          {notes.length === 0 ? (
+            <div className="absolute inset-0 flex items-center justify-center text-center p-8">
+              <p className="font-serif italic text-2xl opacity-20 max-w-md">
+                Aguardando a primeira sinapse... Adicione tags às suas notas para gerar o mapeamento.
+              </p>
+            </div>
+          ) : (
+            <KnowledgeGraph 
+              notes={notes} 
+              width={dimensions.width} 
+              height={dimensions.height} 
+            />
+          )}
+        </div>
+      </main>
+
+      {/* Footer Branding */}
+      <div className="px-8 py-3 border-t border-[var(--border)] flex justify-between items-center text-[8px] font-mono font-bold uppercase tracking-[0.3em] opacity-20">
+        <span>Neural Interface v2.0 // Mente+</span>
+        <span>Localize: {user?.uid.slice(0, 8)}...</span>
       </div>
     </div>
   );
