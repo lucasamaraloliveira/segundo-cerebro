@@ -54,6 +54,8 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+
 // Removido import do SDK do Google no frontend por segurança
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
@@ -164,7 +166,8 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
       exit={{ opacity: 0, y: -10 }}
       className="flex-1 flex flex-col h-full overflow-hidden"
     >
-      <div className="px-4 md:px-12 py-4 md:py-6 border-b border-[var(--border)] flex items-center justify-between bg-[var(--background)]/80 backdrop-blur-sm sticky top-0 z-20">
+      {!isFullscreen && (
+        <div className="px-4 md:px-12 py-4 md:py-6 border-b border-[var(--border)] flex items-center justify-between bg-[var(--background)]/80 backdrop-blur-sm sticky top-0 z-20">
         <div className="flex items-center gap-3 md:gap-6">
           <button
             onClick={() => updateNote(activeNote.id, { isBookmarked: !activeNote.isBookmarked })}
@@ -210,8 +213,23 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
           </button>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 lg:p-12 custom-scrollbar">
-        <div className="max-w-5xl mx-auto w-full">
+      )}
+
+      {/* Floating Exit Focus Button (Top Right) - Only visible in Fullscreen */}
+      {isFullscreen && (
+        <div className="fixed top-6 right-8 z-[100] animate-in fade-in zoom-in duration-300">
+          <button
+            onClick={() => setIsFullscreen(false)}
+            className="flex items-center gap-2 px-4 py-2 bg-[var(--background)]/80 backdrop-blur-md border border-[var(--border)] shadow-xl hover:bg-[var(--accent)] hover:text-white transition-all rounded-full text-[10px] font-bold uppercase tracking-widest group"
+          >
+            <Maximize2 className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+            <span>Sair Foco</span>
+          </button>
+        </div>
+      )}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-12 lg:p-20 bg-[var(--muted)]/30 custom-scrollbar">
+        <div className="max-w-[850px] mx-auto w-full bg-[var(--background)] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] min-h-[1100px] border border-[var(--border)] overflow-visible">
+          <div className="px-8 md:px-16 lg:px-24 py-8 md:py-16 lg:py-20">
           <div className="mb-6 md:mb-10 flex justify-between items-end border-b border-[var(--border)] pb-4 md:pb-6">
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
@@ -271,7 +289,8 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
               />
             </div>
           </div>
-          <RichTextEditor
+        </div>
+        <RichTextEditor
             content={localContent}
             onChange={(html: string) => setLocalContent(html)}
             isFocusMode={isFullscreen}
@@ -279,7 +298,7 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
 
           {/* Related Notes (AI Auto-Linker) */}
           {relatedNotes && relatedNotes.length > 0 && (
-            <div className="mt-20 pt-10 border-t border-[var(--border)] pb-20">
+            <div className="mt-20 pt-10 border-t border-[var(--border)] pb-20 px-8 md:px-16 lg:px-24">
               <div className="flex items-center gap-3 mb-8">
                 <Brain className="w-5 h-5 text-[var(--accent)]" />
                 <h3 className="text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--foreground)] opacity-40">Conexões Sugeridas pela IA</h3>
@@ -306,8 +325,8 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
               </div>
             </div>
           )}
+          </div>
         </div>
-      </div>
     </motion.div>
   );
 });
@@ -408,9 +427,18 @@ export default function Home() {
         e.preventDefault();
         setIsCommandPaletteOpen(prev => !prev);
       }
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
     };
+
+    const handleExitFocus = () => setIsFullscreen(false);
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('exit-focus-mode', handleExitFocus);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('exit-focus-mode', handleExitFocus);
+    };
   }, []);
 
   // Handle note selection from URL (Dashboard redirect) - Run only once or when URL changes
@@ -609,15 +637,164 @@ export default function Home() {
     }
   };
 
-  const exportAsPDF = (note: Note) => {
-    const doc = new jsPDF();
-    doc.setFontSize(22);
-    doc.text(note.title, 20, 20);
-    doc.setFontSize(12);
-    const splitContent = doc.splitTextToSize(note.content, 170);
-    doc.text(splitContent, 20, 40);
-    doc.save(`${note.title}.pdf`);
+  const exportAsPDF = async (note: Note) => {
+    const element = document.createElement('div');
+    // Definimos uma largura fixa robusta para o renderizador
+    element.style.width = '800px'; 
+    element.style.padding = '60px';
+    element.style.backgroundColor = '#ffffff';
+    element.style.color = '#000000';
+    element.style.position = 'absolute';
+    element.style.left = '-9999px';
+    element.style.top = '0';
+    
+    const dateStr = note.updatedAt 
+      ? format(note.updatedAt.toDate(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) 
+      : 'Agora';
+
+    element.innerHTML = `
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Playfair+Display:ital,wght@0,700;1,700&display=swap');
+        
+        .pdf-container { 
+          font-family: 'Inter', sans-serif; 
+          width: 100%; 
+          box-sizing: border-box;
+        }
+        .pdf-title { 
+          font-family: 'Playfair Display', serif; 
+          font-size: 36pt; 
+          margin: 0; 
+          font-weight: 700; 
+          line-height: 1.2; 
+          color: #000;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          margin-bottom: 20pt;
+          display: block;
+          width: 100%;
+        }
+        .pdf-header { 
+          border-bottom: 3pt solid #000; 
+          padding-bottom: 20pt; 
+          margin-bottom: 40pt; 
+          display: block;
+          width: 100%;
+        }
+        .pdf-content { 
+          font-family: 'Georgia', serif; 
+          font-size: 12pt; 
+          line-height: 1.6; 
+          color: #111; 
+          width: 100%;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+        }
+        .pdf-content p, .pdf-content li, .pdf-content h1, .pdf-content h2, .pdf-content h3, 
+        .pdf-content h4, .pdf-content blockquote, .pdf-content pre { 
+          margin-bottom: 15pt;
+          max-width: 100%;
+        }
+        .pdf-content h1, .pdf-content h2, .pdf-content h3 {
+          margin-top: 30pt;
+          font-family: 'Playfair Display', serif;
+          font-weight: 700;
+          line-height: 1.3;
+        }
+        .pdf-content blockquote {
+          border-left: 4pt solid #000;
+          padding-left: 15pt;
+          font-style: italic;
+          margin: 20pt 0;
+          color: #333;
+        }
+        .pdf-content pre {
+          background: #f8f8f8;
+          padding: 15pt;
+          font-family: monospace;
+          font-size: 10pt;
+          border: 0.5pt solid #eee;
+          white-space: pre-wrap;
+          word-wrap: break-word;
+        }
+        .pdf-content img {
+          max-width: 100% !important;
+          height: auto !important;
+        }
+        .pdf-footer {
+          margin-top: 60pt; 
+          border-top: 0.5pt solid #eee; 
+          padding-top: 20pt; 
+          text-align: center;
+        }
+      </style>
+      <div class="pdf-container">
+        <div class="pdf-header">
+          <h1 class="pdf-title">${note.title || 'Sem título'}</h1>
+          <div style="display: flex; align-items: center; gap: 10pt;">
+            <span style="font-size: 8pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; background: #000; color: #fff; padding: 3pt 6pt;">MEMÓRIA NEURAL</span>
+            <span style="font-size: 9pt; font-weight: 500; color: #666;">${dateStr}</span>
+          </div>
+        </div>
+        
+        <div class="pdf-content">
+          ${note.content}
+        </div>
+
+        <div class="pdf-footer">
+          <p style="font-size: 7pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.4em; color: #bbb;">Cérebro² Neural Export • Autenticado via Mente+</p>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(element);
+
+    try {
+      const doc = new jsPDF({
+        orientation: 'p',
+        unit: 'pt',
+        format: 'a4'
+      });
+
+      // Usando html2canvas explicitamente para melhor controle antes de passar para o jsPDF
+      const canvas = await html2canvas(element, {
+        scale: 2, // Melhor qualidade
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowWidth: 800
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
+      const pdfWidth = doc.internal.pageSize.getWidth();
+      const pdfHeight = doc.internal.pageSize.getHeight();
+      const imgWidth = pdfWidth - 80; // Margens de 40pt
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      let heightLeft = imgHeight;
+      let position = 40; // Margem superior
+
+      doc.addImage(imgData, 'JPEG', 40, position, imgWidth, imgHeight);
+      heightLeft -= (pdfHeight - 80);
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight + 40;
+        doc.addPage();
+        doc.addImage(imgData, 'JPEG', 40, position, imgWidth, imgHeight);
+        heightLeft -= pdfHeight;
+      }
+
+      doc.save(`${note.title || 'nota'}.pdf`);
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      alert('Erro ao gerar PDF. Tente novamente.');
+    } finally {
+      document.body.removeChild(element);
+    }
   };
+
+
+
 
   const exportAsTXT = (note: Note) => {
     const element = document.createElement("a");
