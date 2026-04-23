@@ -399,20 +399,22 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
       {/* Toolbar Console */}
       <div className="bg-[var(--sidebar-bg)] border-b border-[var(--border)] sticky top-0 z-30 touch-pan-y overflow-hidden">
         <div className="flex flex-nowrap items-center justify-start gap-x-1 p-1.5 overflow-x-auto no-scrollbar scroll-smooth touch-pan-x">
-        <ToolbarGroup label="EDIT">
-          <ToolbarButton
-            onClick={() => editor.chain().focus().undo().run()}
-            title="Desfazer"
-          >
-            <Undo className="w-3.5 h-3.5" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().redo().run()}
-            title="Refazer"
-          >
-            <Redo className="w-3.5 h-3.5" />
-          </ToolbarButton>
-        </ToolbarGroup>
+        <div className={isFocusMode ? "hidden md:flex" : "hidden"}>
+          <ToolbarGroup label="EDIT">
+            <ToolbarButton
+              onClick={() => editor.chain().focus().undo().run()}
+              title="Desfazer"
+            >
+              <Undo className="w-3.5 h-3.5" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().redo().run()}
+              title="Refazer"
+            >
+              <Redo className="w-3.5 h-3.5" />
+            </ToolbarButton>
+          </ToolbarGroup>
+        </div>
 
         <ToolbarGroup label="TEXT">
           <CustomSelect 
@@ -477,7 +479,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
           />
         </ToolbarGroup>
 
-        <div className="hidden md:block">
+        <div className={isFocusMode ? "hidden md:block" : "hidden"}>
           <ToolbarGroup>
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleCode().run()}
@@ -503,7 +505,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
           </ToolbarGroup>
         </div>
 
-        <div className="hidden md:block">
+        <div className={isFocusMode ? "hidden md:block" : "hidden"}>
           <ToolbarGroup label="LAYOUT">
             <CustomSelect 
               label="Alinhamento"
@@ -524,7 +526,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
           </ToolbarGroup>
         </div>
 
-        <div className="hidden md:block">
+        <div className={isFocusMode ? "hidden md:block" : "hidden"}>
           <ToolbarGroup label="TYPO">
             <CustomSelect 
               label="Fonte"
@@ -582,7 +584,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
           </ToolbarGroup>
         </div>
 
-        <div className="hidden md:block">
+        <div className={isFocusMode ? "hidden md:block" : "hidden"}>
           <ToolbarGroup label="COLOR">
             <div className="flex items-center gap-1 px-1 py-0.5">
               <Palette className="w-3 h-3 opacity-30 text-[var(--foreground)]" />
