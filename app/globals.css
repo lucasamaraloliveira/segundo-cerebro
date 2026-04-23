@@ -197,8 +197,8 @@ select option {
 
 .prose p, .prose li, .prose h1, .prose h2, .prose h3, .prose h4 {
   color: var(--foreground) !important;
-  @apply text-base md:text-xl leading-snug md:leading-relaxed opacity-80 dark:opacity-90;
-  margin-bottom: 0.75rem;
+  @apply text-xl md:text-2xl leading-relaxed opacity-80 dark:opacity-90;
+  margin-bottom: 1rem;
 }
 
 @media (min-width: 768px) {

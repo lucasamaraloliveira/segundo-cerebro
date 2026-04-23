@@ -76,7 +76,7 @@ const NoteCard = React.memo(({
     <motion.div
       layout
       onClick={onClick}
-      className={`p-6 border-l-2 transition-all cursor-pointer ${isActive ? 'bg-[var(--muted)] border-[var(--accent)]' : 'border-transparent hover:bg-[var(--muted)]/50'}`}
+      className={`p-6 border transition-all cursor-pointer mb-3 rounded-none ${isActive ? 'bg-[var(--muted)] border-[var(--accent)] shadow-sm' : 'border-[var(--border)] hover:border-[var(--foreground)]/10 hover:bg-[var(--muted)]/50'}`}
     >
       <div className="flex items-start justify-between mb-2">
         <p className="text-[10px] font-bold uppercase tracking-tighter opacity-40 text-[var(--foreground)]">
@@ -84,8 +84,8 @@ const NoteCard = React.memo(({
         </p>
         {note.isBookmarked && <Bookmark className="w-3 h-3 fill-[var(--accent)] text-[var(--accent)] opacity-30" />}
       </div>
-      <h3 className="font-serif text-sm md:text-lg leading-snug mb-1 line-clamp-3 text-[var(--foreground)]">{note.title || 'Sem título'}</h3>
-      <p className="text-[11px] opacity-60 line-clamp-2 leading-tight text-[var(--foreground)]">
+      <h3 className="font-serif font-bold text-base md:text-lg leading-snug mb-1 line-clamp-3 text-[var(--foreground)]">{note.title || 'Sem título'}</h3>
+      <p className="text-[13px] opacity-60 line-clamp-2 leading-tight text-[var(--foreground)]">
         {stripHtml(note.content) || 'Sem conteúdo...'}
       </p>
     </motion.div>
@@ -232,7 +232,7 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
             value={localTitle}
             placeholder="Título da nota"
             onChange={(e) => setLocalTitle(e.target.value)}
-            className="w-full text-2xl md:text-3xl lg:text-4xl xl:text-6xl font-serif tracking-tighter leading-none bg-transparent border-none focus:outline-none mb-6 md:mb-10 placeholder:text-[var(--foreground)]/40 text-[var(--foreground)]"
+            className="w-full text-3xl md:text-3xl lg:text-4xl xl:text-6xl font-serif font-bold tracking-tighter leading-none bg-transparent border-none focus:outline-none mb-6 md:mb-10 placeholder:text-[var(--foreground)]/40 text-[var(--foreground)]"
           />
           <div className="grid grid-cols-2 gap-4 md:gap-8 mb-6 md:mb-10 pb-6 md:pb-8 border-b border-[var(--border)]">
             <div className="space-y-1">
