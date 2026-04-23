@@ -193,8 +193,8 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
           </button>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12 custom-scrollbar">
-        <div className="max-w-5xl mx-auto w-full overflow-x-hidden">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 lg:p-12 custom-scrollbar">
+        <div className="max-w-5xl mx-auto w-full">
           <div className="mb-6 md:mb-10 flex justify-between items-end border-b border-[var(--border)] pb-4 md:pb-6">
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
