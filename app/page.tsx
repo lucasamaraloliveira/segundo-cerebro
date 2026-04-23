@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   collection,
   query,
@@ -48,7 +48,8 @@ import {
   ArrowRight,
   Undo2,
   AlertTriangle,
-  RotateCcw
+  RotateCcw,
+  Mic
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';

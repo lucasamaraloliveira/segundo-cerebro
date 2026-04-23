@@ -15,6 +15,7 @@ import BulletList from '@tiptap/extension-bullet-list';
 import OrderedList from '@tiptap/extension-ordered-list';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Bold, 
   Italic, 
@@ -40,7 +41,8 @@ import {
   AlignCenter,
   AlignRight,
   AlignJustify,
-  ChevronDown
+  ChevronDown,
+  Mic
 } from 'lucide-react';
 
 declare module '@tiptap/core' {
@@ -80,6 +82,14 @@ const FontSize = Extension.create({
       {
         types: ['paragraph', 'heading', 'listItem', 'bulletList', 'orderedList'],
         attributes: {
+          fontSize: {
+            default: null,
+            parseHTML: (element: HTMLElement) => element.style.fontSize,
+            renderHTML: (attributes: Record<string, any>) => {
+              if (!attributes.fontSize) return {}
+              return { style: `font-size: ${attributes.fontSize}` }
+            },
+          },
           fontFamily: {
             default: null,
             parseHTML: (element: HTMLElement) => element.style.fontFamily,
@@ -141,9 +151,9 @@ const ToolbarButton = ({
 );
 
 const ToolbarGroup = ({ children, label }: { children: React.ReactNode, label?: string }) => (
-  <div className="flex flex-col gap-0.5 mx-0.5 flex-shrink-0">
+  <div className="flex flex-col gap-0 flex-shrink-0">
     {label && <span className="hidden md:block text-[6px] font-mono font-bold uppercase tracking-[0.15em] opacity-20 px-0.5">{label}</span>}
-    <div className="flex items-center gap-0.5 bg-[var(--muted)]/10 p-0.5 md:p-1 rounded-none border border-[var(--border)]/5">
+    <div className="flex items-center gap-0.5 bg-[var(--muted)]/5 p-0.5 rounded-none border border-[var(--border)]/5">
       {children}
     </div>
   </div>
@@ -157,9 +167,9 @@ const CustomSelect = ({
   label 
 }: { 
   icon: any, 
-  value: string, 
+  value?: string, 
   onChange: (val: string) => void, 
-  options: { label: string, value: string }[],
+  options: { label: string, value: string, isActive?: boolean }[],
   label: string
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -180,13 +190,13 @@ const CustomSelect = ({
       <button
         ref={buttonRef}
         onClick={toggleDropdown}
-        className="flex items-center gap-1 px-1.5 py-1 rounded-none bg-[var(--muted)]/30 text-[var(--foreground)] border border-[var(--border)]/10 hover:border-[var(--accent)] transition-all min-w-[70px] md:min-w-[85px]"
+        className="flex items-center gap-0.5 px-1 py-1 rounded-none bg-[var(--muted)]/30 text-[var(--foreground)] border border-[var(--border)]/10 hover:border-[var(--accent)] transition-all min-w-[58px] md:min-w-[80px]"
       >
-        <Icon className="w-3 h-3 md:w-3.5 md:h-3.5 opacity-60" />
-        <span className="text-[8px] md:text-[9px] font-bold uppercase tracking-widest truncate max-w-[45px] md:max-w-[60px]">
+        <Icon className="w-2.5 h-2.5 md:w-3 md:h-3 opacity-60" />
+        <span className="text-[7px] md:text-[8px] font-bold uppercase tracking-widest truncate max-w-[35px] md:max-w-[55px]">
           {selectedLabel}
         </span>
-        <ChevronDown className={`w-2.5 h-2.5 ml-auto transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className="w-2 h-2 ml-auto opacity-30" />
       </button>
 
       {isOpen && (
@@ -205,11 +215,15 @@ const CustomSelect = ({
                 key={opt.value}
                 onClick={() => {
                   onChange(opt.value);
-                  setIsOpen(false);
+                  if (!opt.isActive) setIsOpen(false); // Only close if it's not a toggle-style option or we want standard behavior
+                  setIsOpen(false); 
                 }}
-                className={`w-full text-left px-4 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] ${value === opt.value ? 'bg-[var(--muted)] border-l-4 border-[var(--accent)]' : ''}`}
+                className={`w-full text-left px-4 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] ${opt.isActive || value === opt.value ? 'bg-[var(--muted)] border-l-4 border-[var(--accent)]' : ''}`}
               >
-                {opt.label}
+                <div className="flex items-center justify-between">
+                  {opt.label}
+                  {(opt.isActive || value === opt.value) && <div className="w-1 h-1 bg-[var(--accent)] rounded-full" />}
+                </div>
               </button>
             ))}
           </div>
@@ -221,6 +235,9 @@ const CustomSelect = ({
 
 export default function RichTextEditor({ content, onChange, placeholder, isFocusMode = false }: RichTextEditorProps) {
   const [pasteModal, setPasteModal] = useState<{ show: boolean, text: string, html: string } | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [interimText, setInterimText] = useState('');
+  const recognitionRef = useRef<any>(null);
 
   const editor = useEditor({
     extensions: [
@@ -262,7 +279,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-sm md:prose-lg dark:prose-invert max-w-none focus:outline-none min-h-[500px]',
+        class: 'prose prose-sm md:prose-base xl:prose-lg dark:prose-invert max-w-none focus:outline-none min-h-[500px] font-sans',
       },
     },
   });
@@ -273,14 +290,14 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
       editor.setOptions({
         editorProps: {
           attributes: {
-            class: 'prose prose-sm md:prose-base xl:prose-lg dark:prose-invert max-w-none focus:outline-none min-h-[500px]',
-          },
-          handlePaste(view, event) {
-            const text = event.clipboardData?.getData('text/plain') || '';
-            const html = event.clipboardData?.getData('text/html') || '';
-            if (!html || html === text) return false;
-            setPasteModal({ show: true, text, html });
-            return true;
+            class: 'prose prose-sm md:prose-base xl:prose-lg dark:prose-invert max-w-none focus:outline-none min-h-[500px] font-sans',
+            handlePaste(view, event) {
+              const text = event.clipboardData?.getData('text/plain') || '';
+              const html = event.clipboardData?.getData('text/html') || '';
+              if (!html || html === text) return false;
+              setPasteModal({ show: true, text, html });
+              return true;
+            },
           },
         },
       });
@@ -297,6 +314,75 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
     setPasteModal(null);
   };
 
+  const toggleTranscription = () => {
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      setIsRecording(false);
+      setInterimText('');
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Seu navegador não suporta transcrição de áudio.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'pt-BR';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    recognition.onresult = (event: any) => {
+      let finalTranscript = '';
+      let currentInterim = '';
+
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          currentInterim += transcript;
+        }
+      }
+
+      setInterimText(currentInterim);
+
+      if (finalTranscript && editor) {
+        const processed = finalTranscript
+          .replace(/ vírgula/gi, ',')
+          .replace(/ ponto final/gi, '.')
+          .replace(/ ponto/gi, '.')
+          .replace(/ nova linha/gi, '<br>')
+          .replace(/ próximo parágrafo/gi, '<br><br>')
+          .replace(/ parágrafo/gi, '<br><br>')
+          .replace(/ interrogação/gi, '?')
+          .replace(/ exclamação/gi, '!');
+        
+        editor.chain().focus().insertContent(processed + " ").run();
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Erro na transcrição:', event.error);
+      setIsRecording(false);
+      setInterimText('');
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+      setInterimText('');
+    };
+    
+    try {
+      recognition.start();
+      setIsRecording(true);
+      recognitionRef.current = recognition;
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   if (!editor) {
     return null;
   }
@@ -305,7 +391,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
     <div className="flex flex-col w-full">
       {/* Toolbar Console */}
       <div className="bg-[var(--sidebar-bg)] border-b border-[var(--border)] sticky top-0 z-30 touch-pan-y overflow-hidden">
-        <div className="flex flex-nowrap items-center md:items-end gap-x-0.5 md:gap-x-1 p-1 md:p-1.5 overflow-x-auto no-scrollbar scroll-smooth touch-pan-x">
+        <div className="flex flex-nowrap items-center justify-start gap-x-0.5 p-1 scroll-smooth">
         <ToolbarGroup label="EDIT">
           <ToolbarButton
             onClick={() => editor.chain().focus().undo().run()}
@@ -322,248 +408,169 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
         </ToolbarGroup>
 
         <ToolbarGroup label="TEXT">
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            isActive={editor.isActive('bold')}
-            title="Negrito"
-          >
-            <Bold className="w-4 h-4" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-            isActive={editor.isActive('italic')}
-            title="Itálico"
-          >
-            <Italic className="w-4 h-4" />
-          </ToolbarButton>
-          <div className="hidden md:block">
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleUnderline().run()}
-              isActive={editor.isActive('underline')}
-              title="Sublinhado"
-            >
-              <UnderlineIcon className="w-4 h-4" />
-            </ToolbarButton>
-          </div>
+          <CustomSelect 
+            label="Formato"
+            icon={Type}
+            onChange={(val) => {
+              if (val === 'bold') editor.chain().focus().toggleBold().run();
+              if (val === 'italic') editor.chain().focus().toggleItalic().run();
+              if (val === 'underline') editor.chain().focus().toggleUnderline().run();
+            }}
+            options={[
+              { label: 'Negrito', value: 'bold', isActive: editor.isActive('bold') },
+              { label: 'Itálico', value: 'italic', isActive: editor.isActive('italic') },
+              { label: 'Sublinhado', value: 'underline', isActive: editor.isActive('underline') },
+            ]}
+          />
         </ToolbarGroup>
         
         <ToolbarGroup label="STRUCT">
-          {/* Heading Dropdown (Mobile Only) */}
-          <div className="flex md:hidden">
-            <CustomSelect 
-              label="Estilo"
-              icon={Heading1}
-              value={
-                editor.isActive('heading', { level: 1 }) ? 'h1' :
-                editor.isActive('heading', { level: 2 }) ? 'h2' :
-                editor.isActive('heading', { level: 3 }) ? 'h3' :
-                editor.isActive('heading', { level: 4 }) ? 'h4' : 'p'
-              }
-              onChange={(val) => {
-                if (val === 'p') editor.chain().focus().setParagraph().run();
-                else editor.chain().focus().toggleHeading({ level: parseInt(val.replace('h', '')) as any }).run();
-              }}
-              options={[
-                { label: 'Parágrafo', value: 'p' },
-                { label: 'Título 1', value: 'h1' },
-                { label: 'Título 2', value: 'h2' },
-                { label: 'Título 3', value: 'h3' },
-                { label: 'Título 4', value: 'h4' },
-              ]}
-            />
-          </div>
-
-          {/* Heading Individual (Desktop Only) */}
-          <div className="hidden md:flex items-center gap-0.5">
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-              isActive={editor.isActive('heading', { level: 1 })}
-              title="Título Grande"
-            >
-              <Heading1 className="w-4 h-4" />
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-              isActive={editor.isActive('heading', { level: 2 })}
-              title="Título Médio"
-            >
-              <Heading2 className="w-4 h-4" />
-            </ToolbarButton>
-            {isFocusMode && (
-              <ToolbarButton
-                onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-                isActive={editor.isActive('heading', { level: 3 })}
-                title="Título Pequeno"
-              >
-                <Heading3 className="w-4 h-4" />
-              </ToolbarButton>
-            )}
-          </div>
+          <CustomSelect 
+            label="Estilo"
+            icon={Heading1}
+            value={
+              editor.isActive('heading', { level: 1 }) ? 'h1' :
+              editor.isActive('heading', { level: 2 }) ? 'h2' :
+              editor.isActive('heading', { level: 3 }) ? 'h3' :
+              editor.isActive('heading', { level: 4 }) ? 'h4' : 'p'
+            }
+            onChange={(val) => {
+              if (val === 'p') editor.chain().focus().setParagraph().run();
+              else editor.chain().focus().toggleHeading({ level: parseInt(val.replace('h', '')) as any }).run();
+            }}
+            options={[
+              { label: 'Parágrafo', value: 'p' },
+              { label: 'Título 1', value: 'h1' },
+              { label: 'Título 2', value: 'h2' },
+              { label: 'Título 3', value: 'h3' },
+              { label: 'Título 4', value: 'h4' },
+            ]}
+          />
         </ToolbarGroup>
 
         <ToolbarGroup label="LIST">
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleBulletList().run()}
-            isActive={editor.isActive('bulletList')}
-            title="Lista de Marcadores"
-          >
-            <List className="w-4 h-4" />
-          </ToolbarButton>
-          <div className="hidden md:block">
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleOrderedList().run()}
-              isActive={editor.isActive('orderedList')}
-              title="Lista Numerada"
-            >
-              <ListOrdered className="w-4 h-4" />
-            </ToolbarButton>
-          </div>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleTaskList().run()}
-            isActive={editor.isActive('taskList')}
-            title="Lista de Tarefas"
-          >
-            <CheckSquare className="w-4 h-4" />
-          </ToolbarButton>
+          <CustomSelect 
+            label="Lista"
+            icon={List}
+            value={
+              editor.isActive('bulletList') ? 'bullet' :
+              editor.isActive('orderedList') ? 'ordered' :
+              editor.isActive('taskList') ? 'task' : undefined
+            }
+            onChange={(val) => {
+              if (val === 'bullet') editor.chain().focus().toggleBulletList().run();
+              if (val === 'ordered') editor.chain().focus().toggleOrderedList().run();
+              if (val === 'task') editor.chain().focus().toggleTaskList().run();
+            }}
+            options={[
+              { label: 'Marcadores', value: 'bullet', isActive: editor.isActive('bulletList') },
+              { label: 'Numerada', value: 'ordered', isActive: editor.isActive('orderedList') },
+              { label: 'Tarefas', value: 'task', isActive: editor.isActive('taskList') },
+            ]}
+          />
         </ToolbarGroup>
 
         <div className="hidden md:block">
-          {isFocusMode && (
-            <ToolbarGroup>
-              <ToolbarButton
-                onClick={() => editor.chain().focus().toggleCode().run()}
-                isActive={editor.isActive('code')}
-                title="Código Inline"
-              >
-                <Code className="w-4 h-4" />
-              </ToolbarButton>
-              <ToolbarButton
-                onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-                isActive={editor.isActive('codeBlock')}
-                title="Bloco de Código"
-              >
-                <SquareCode className="w-4 h-4" />
-              </ToolbarButton>
-              <ToolbarButton
-                onClick={() => editor.chain().focus().toggleBlockquote().run()}
-                isActive={editor.isActive('blockquote')}
-                title="Citação"
-              >
-                <Quote className="w-4 h-4" />
-              </ToolbarButton>
-            </ToolbarGroup>
-          )}
+          <ToolbarGroup>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleCode().run()}
+              isActive={editor.isActive('code')}
+              title="Código Inline"
+            >
+              <Code className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+              isActive={editor.isActive('codeBlock')}
+              title="Bloco de Código"
+            >
+              <SquareCode className="w-4 h-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleBlockquote().run()}
+              isActive={editor.isActive('blockquote')}
+              title="Citação"
+            >
+              <Quote className="w-4 h-4" />
+            </ToolbarButton>
+          </ToolbarGroup>
         </div>
 
-        <div className="hidden md:block">
-          {isFocusMode && (
-            <ToolbarGroup label="LAYOUT">
-              {/* Alignment Dropdown (Mobile Only) */}
-              <div className="flex md:hidden">
-                <CustomSelect 
-                  label="Alinhamento"
-                  icon={AlignLeft}
-                  value={
-                    editor.isActive({ textAlign: 'center' }) ? 'center' :
-                    editor.isActive({ textAlign: 'right' }) ? 'right' :
-                    editor.isActive({ textAlign: 'justify' }) ? 'justify' : 'left'
-                  }
-                  onChange={(val) => editor.chain().focus().setTextAlign(val).run()}
-                  options={[
-                    { label: 'Esquerda', value: 'left' },
-                    { label: 'Centro', value: 'center' },
-                    { label: 'Direita', value: 'right' },
-                    { label: 'Justificado', value: 'justify' },
-                  ]}
-                />
-              </div>
-
-              {/* Alignment Individual (Desktop Only) */}
-              <div className="hidden md:flex items-center gap-0.5">
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().setTextAlign('left').run()}
-                  isActive={editor.isActive({ textAlign: 'left' })}
-                  title="Alinhar à Esquerda"
-                >
-                  <AlignLeft className="w-4 h-4" />
-                </ToolbarButton>
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().setTextAlign('center').run()}
-                  isActive={editor.isActive({ textAlign: 'center' })}
-                  title="Centralizar"
-                >
-                  <AlignCenter className="w-4 h-4" />
-                </ToolbarButton>
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().setTextAlign('right').run()}
-                  isActive={editor.isActive({ textAlign: 'right' })}
-                  title="Alinhar à Direita"
-                >
-                  <AlignRight className="w-4 h-4" />
-                </ToolbarButton>
-              </div>
-            </ToolbarGroup>
-          )}
-        </div>
+        <ToolbarGroup label="LAYOUT">
+          <CustomSelect 
+            label="Alinhamento"
+            icon={AlignLeft}
+            value={
+              editor.isActive({ textAlign: 'center' }) ? 'center' :
+              editor.isActive({ textAlign: 'right' }) ? 'right' :
+              editor.isActive({ textAlign: 'justify' }) ? 'justify' : 'left'
+            }
+            onChange={(val) => editor.chain().focus().setTextAlign(val).run()}
+            options={[
+              { label: 'Esquerda', value: 'left' },
+              { label: 'Centro', value: 'center' },
+              { label: 'Direita', value: 'right' },
+              { label: 'Justificado', value: 'justify' },
+            ]}
+          />
+        </ToolbarGroup>
 
         <div className="hidden md:block">
-          {isFocusMode && (
-            <ToolbarGroup label="TYPO">
-              <CustomSelect 
-                label="Fonte"
-                icon={Type}
-                value={editor.getAttributes('textStyle').fontFamily || editor.getAttributes('paragraph').fontFamily || 'Inter'}
-                onChange={(val) => {
-                  editor.chain().focus()
-                    .setFontFamily(val)
-                    .command(({ tr, state }) => {
-                      const { from, to } = state.selection;
-                      state.doc.nodesBetween(from, to, (node, pos) => {
-                        if (['paragraph', 'heading', 'listItem', 'bulletList', 'orderedList'].includes(node.type.name)) {
-                          tr.setNodeMarkup(pos, undefined, { ...node.attrs, fontFamily: val });
-                        }
-                      });
-                      return true;
-                    })
-                    .run();
-                }}
-                options={[
-                  { label: 'Sans', value: 'Inter' },
-                  { label: 'Serif', value: 'Georgia' },
-                  { label: 'Mono', value: 'monospace' },
-                ]}
-              />
-              <CustomSelect 
-                label="Tamanho"
-                icon={Type}
-                value={editor.getAttributes('textStyle').fontSize || editor.getAttributes('paragraph').fontSize || '18px'}
-                onChange={(val) => {
-                  editor.chain().focus()
-                    .setFontSize(val)
-                    .command(({ tr, state }) => {
-                      const { from, to } = state.selection;
-                      state.doc.nodesBetween(from, to, (node, pos) => {
-                        if (['paragraph', 'heading', 'listItem', 'bulletList', 'orderedList'].includes(node.type.name)) {
-                          tr.setNodeMarkup(pos, undefined, { ...node.attrs, fontSize: val });
-                        }
-                      });
-                      return true;
-                    })
-                    .run();
-                }}
-                options={[
-                  { label: '12px', value: '12px' },
-                  { label: '14px', value: '14px' },
-                  { label: '16px', value: '16px' },
-                  { label: '18px', value: '18px' },
-                  { label: '20px', value: '20px' },
-                  { label: '24px', value: '24px' },
-                  { label: '32px', value: '32px' },
-                  { label: '48px', value: '48px' },
-                ]}
-              />
-            </ToolbarGroup>
-          )}
+          <ToolbarGroup label="TYPO">
+            <CustomSelect 
+              label="Fonte"
+              icon={Type}
+              value={editor.getAttributes('textStyle').fontFamily || editor.getAttributes('paragraph').fontFamily || 'Inter'}
+              onChange={(val) => {
+                editor.chain().focus()
+                  .setFontFamily(val)
+                  .command(({ tr, state }) => {
+                    const { from, to } = state.selection;
+                    state.doc.nodesBetween(from, to, (node, pos) => {
+                      if (['paragraph', 'heading', 'listItem', 'bulletList', 'orderedList'].includes(node.type.name)) {
+                        tr.setNodeMarkup(pos, undefined, { ...node.attrs, fontFamily: val });
+                      }
+                    });
+                    return true;
+                  })
+                  .run();
+              }}
+              options={[
+                { label: 'Sans', value: 'Inter' },
+                { label: 'Serif', value: 'Georgia' },
+                { label: 'Mono', value: 'monospace' },
+              ]}
+            />
+            <CustomSelect 
+              label="Tamanho"
+              icon={Type}
+              value={editor.getAttributes('textStyle').fontSize || editor.getAttributes('paragraph').fontSize || '18px'}
+              onChange={(val) => {
+                editor.chain().focus()
+                  .setFontSize(val)
+                  .command(({ tr, state }) => {
+                    const { from, to } = state.selection;
+                    state.doc.nodesBetween(from, to, (node, pos) => {
+                      if (['paragraph', 'heading', 'listItem', 'bulletList', 'orderedList'].includes(node.type.name)) {
+                        tr.setNodeMarkup(pos, undefined, { ...node.attrs, fontSize: val });
+                      }
+                    });
+                    return true;
+                  })
+                  .run();
+              }}
+              options={[
+                { label: '12px', value: '12px' },
+                { label: '14px', value: '14px' },
+                { label: '16px', value: '16px' },
+                { label: '18px', value: '18px' },
+                { label: '20px', value: '20px' },
+                { label: '24px', value: '24px' },
+                { label: '32px', value: '32px' },
+                { label: '48px', value: '48px' },
+              ]}
+            />
+          </ToolbarGroup>
         </div>
 
         <div className="hidden md:block">
@@ -588,14 +595,36 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
           </ToolbarGroup>
         </div>
 
+        <ToolbarGroup label="VOICE">
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              toggleTranscription();
+            }}
+            className={`flex items-center justify-center w-7 h-7 md:w-auto md:px-2 md:h-7 transition-all ${isRecording ? 'bg-red-500 text-white' : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60 hover:opacity-100 border border-[var(--border)]/10'}`}
+          >
+            <Mic className={`w-3 h-3 ${isRecording ? 'animate-pulse' : ''}`} />
+            <span className="text-[8px] font-bold uppercase tracking-widest hidden md:block ml-1">
+              {isRecording ? 'Ouvindo' : 'Voz'}
+            </span>
+          </button>
+        </ToolbarGroup>
+
         <ToolbarGroup>
           <ToolbarButton
             onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}
             title="Limpar Formatação"
           >
-            <Eraser className="w-3.5 h-3.5" />
+            <Eraser className="w-3 h-3" />
           </ToolbarButton>
         </ToolbarGroup>
+
+        {/* Interim Text Indicator */}
+        {isRecording && interimText && (
+          <div className="flex items-center px-3 py-1 bg-black/5 dark:bg-white/5 border-l border-[var(--accent)] animate-in slide-in-from-left-2">
+            <span className="text-[10px] italic opacity-40 truncate max-w-[200px]">{interimText}...</span>
+          </div>
+        )}
 
         {/* Scroll Buffer */}
         <div className="w-8 flex-shrink-0 h-1" />
@@ -605,6 +634,39 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
       <div>
         <EditorContent editor={editor} />
       </div>
+
+      {/* Transcription Status Modal */}
+      <AnimatePresence>
+        {isRecording && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-3"
+          >
+            <div className="bg-black/90 dark:bg-white/90 text-white dark:text-black px-6 py-4 rounded-none border border-[var(--accent)] shadow-[20px_20px_0px_rgba(0,0,0,0.2)] flex items-center gap-4 min-w-[300px]">
+              <div className="relative">
+                <div className="w-10 h-10 bg-[var(--accent)] flex items-center justify-center rounded-none animate-pulse">
+                  <Mic className="w-5 h-5 text-white" />
+                </div>
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-ping" />
+              </div>
+              <div className="flex-1">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-50 mb-1">Neural Listening</p>
+                <div className="flex items-baseline gap-1">
+                  <p className="text-sm font-serif italic truncate max-w-[200px]">{interimText || 'Ouvindo seus pensamentos...'}</p>
+                  <span className="flex gap-0.5">
+                    <span className="w-1 h-1 bg-[var(--accent)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1 h-1 bg-[var(--accent)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1 h-1 bg-[var(--accent)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </span>
+                </div>
+              </div>
+            </div>
+            <p className="text-[9px] font-bold uppercase tracking-widest opacity-40 bg-black/5 dark:bg-white/5 px-2 py-1">Diga "ponto final" ou "nova linha" para formatar</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Paste Choice Modal */}
       {pasteModal && (

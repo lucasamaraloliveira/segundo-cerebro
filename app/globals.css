@@ -90,6 +90,7 @@ select option {
 /* Tiptap Editor Styles */
 .tiptap {
   @apply min-h-[500px];
+  font-family: var(--font-sans);
 }
 
 .tiptap:focus {
@@ -198,7 +199,7 @@ select option {
 
 .prose p, .prose li, .prose h1, .prose h2, .prose h3, .prose h4 {
   color: var(--foreground) !important;
-  @apply text-xl md:text-2xl leading-relaxed opacity-80 dark:opacity-90;
+  @apply leading-relaxed opacity-80 dark:opacity-90;
   margin-bottom: 1rem;
 }
 
