@@ -62,194 +62,6 @@ const stripHtml = (html: string) => {
   return doc.textContent || "";
 };
 
-const NoteEditor = React.memo(({ 
-  activeNote, 
-  updateNote, 
-  isFullscreen,
-  isAiLoading,
-  handleAiAction,
-  exportAsPDF,
-  deleteNote,
-  setIsFullscreen,
-  setIsTagModalOpen,
-  setNewTagInput
-}: { 
-  activeNote: Note, 
-  updateNote: (id: string, updates: Partial<Note>) => Promise<void>,
-  isFullscreen: boolean,
-  isAiLoading: boolean,
-  handleAiAction: (note: Note) => Promise<void>,
-  exportAsPDF: (note: Note) => void,
-  deleteNote: (id: string) => Promise<void>,
-  setIsFullscreen: (val: boolean) => void,
-  setIsTagModalOpen: (val: boolean) => void,
-  setNewTagInput: (val: string) => void
-}) => {
-  const [localTitle, setLocalTitle] = useState(activeNote.title);
-  const [localContent, setLocalContent] = useState(activeNote.content);
-
-  // Sync local state when note changes
-  useEffect(() => {
-    setLocalTitle(activeNote.title);
-    setLocalContent(activeNote.content);
-  }, [activeNote.id]);
-
-  // Debounced update for Title
-  useEffect(() => {
-    if (localTitle === activeNote.title) return;
-    const timeout = setTimeout(() => {
-      updateNote(activeNote.id, { title: localTitle });
-    }, 1000);
-    return () => clearTimeout(timeout);
-  }, [localTitle]);
-
-  // Debounced update for Content
-  useEffect(() => {
-    if (localContent === activeNote.content) return;
-    const timeout = setTimeout(() => {
-      updateNote(activeNote.id, { content: localContent });
-    }, 1000);
-    return () => clearTimeout(timeout);
-  }, [localContent]);
-
-  return (
-    <motion.div
-      key={activeNote.id}
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      className="flex-1 flex flex-col h-full overflow-hidden"
-    >
-      {/* Toolbar */}
-      <div className="px-4 md:px-12 py-4 md:py-6 border-b border-[var(--border)] flex items-center justify-between bg-[var(--background)]/80 backdrop-blur-sm sticky top-0 z-20">
-        <div className="flex items-center gap-3 md:gap-6">
-          <button
-            onClick={() => updateNote(activeNote.id, { isBookmarked: !activeNote.isBookmarked })}
-            className={`p-1.5 transition-all ${activeNote.isBookmarked ? 'bg-[var(--accent)] text-[var(--accent-foreground)] rounded-md' : 'text-[var(--foreground)]/40 hover:text-[var(--foreground)]'}`}
-            title="Favoritar"
-          >
-            <Bookmark className={`w-3.5 h-3.5 ${activeNote.isBookmarked ? 'fill-white' : ''}`} />
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 bg-green-500 rounded-none animate-pulse" />
-            <p className="hidden sm:block text-[10px] md:text-[11px] opacity-40 font-bold uppercase tracking-widest text-[var(--foreground)]">Sincronizado</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 md:gap-6 h-8 overflow-x-auto no-scrollbar flex-nowrap pr-4">
-          <button
-            onClick={() => handleAiAction(activeNote)}
-            disabled={isAiLoading}
-            className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter hover:text-[var(--foreground)] transition-all group text-[var(--foreground)]"
-          >
-            <Sparkles className={`w-3.5 h-3.5 ${isAiLoading ? 'animate-pulse text-blue-500' : 'text-blue-400 group-hover:text-blue-600'}`} />
-            <span className="whitespace-nowrap">{isAiLoading ? 'Pensando...' : 'Assistente IA'}</span>
-          </button>
-
-          <div className="flex-shrink-0 w-[1px] h-3 bg-[var(--border)] hidden md:block" />
-
-          <button
-            onClick={() => exportAsPDF(activeNote)}
-            className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter hover:text-[var(--foreground)] transition-all group text-[var(--foreground)]"
-          >
-            <Download className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100" />
-            <span className="whitespace-nowrap">Exportar</span>
-          </button>
-
-          <button
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter hover:text-[var(--foreground)] transition-all group text-[var(--foreground)]"
-          >
-            <Maximize2 className={`w-3.5 h-3.5 ${isFullscreen ? 'text-blue-600' : 'opacity-40 group-hover:opacity-100'}`} />
-            <span className="whitespace-nowrap">{isFullscreen ? 'Sair Foco' : 'Modo Foco'}</span>
-          </button>
-
-          <button
-            onClick={() => deleteNote(activeNote.id)}
-            className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter text-red-400 hover:text-red-600 transition-all group"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span className="whitespace-nowrap">Excluir</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Editor Content */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12 custom-scrollbar">
-        <div className="max-w-5xl mx-auto w-full">
-          <div className="mb-6 md:mb-10 flex justify-between items-end border-b border-[var(--border)] pb-4 md:pb-6">
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                {activeNote.tags?.map(tag => (
-                  <span key={tag} className="px-2 py-1 bg-[var(--muted)] text-[var(--foreground)] text-[10px] font-bold uppercase tracking-widest rounded flex items-center gap-1 group">
-                    #{tag}
-                    <button
-                      onClick={() => updateNote(activeNote.id, { tags: activeNote.tags.filter(t => t !== tag) })}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-                <button
-                  onClick={() => {
-                    setNewTagInput('');
-                    setIsTagModalOpen(true);
-                  }}
-                  className="text-[10px] font-bold uppercase tracking-widest text-[var(--foreground)] opacity-30 hover:opacity-100 transition-colors"
-                >
-                  + Adicionar Tag
-                </button>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Atualizado em</p>
-              <p className="text-sm font-serif italic">
-                {activeNote.updatedAt ? format(activeNote.updatedAt.toDate(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : 'Agora'}
-              </p>
-            </div>
-          </div>
-
-          <input
-            type="text"
-            value={localTitle}
-            placeholder="Título da nota"
-            onChange={(e) => setLocalTitle(e.target.value)}
-            className="w-full text-2xl md:text-3xl lg:text-4xl xl:text-6xl font-serif tracking-tighter leading-none bg-transparent border-none focus:outline-none mb-6 md:mb-10 placeholder:text-[var(--foreground)]/40 text-[var(--foreground)]"
-          />
-
-          <div className="grid grid-cols-2 gap-4 md:gap-8 mb-6 md:mb-10 pb-6 md:pb-8 border-b border-[var(--border)]">
-            <div className="space-y-1">
-              <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Lembrete</p>
-              <input
-                type="datetime-local"
-                className="w-full bg-[var(--muted)] text-[var(--foreground)] px-3 py-2 text-xs font-bold uppercase tracking-wider rounded border-none focus:outline-none"
-                value={activeNote.reminder ? format(activeNote.reminder.toDate(), "yyyy-MM-dd'T'HH:mm") : ''}
-                onChange={(e) => updateNote(activeNote.id, { reminder: e.target.value ? Timestamp.fromDate(new Date(e.target.value)) : null })}
-              />
-            </div>
-            <div className="space-y-1">
-              <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Vencimento</p>
-              <input
-                type="date"
-                className="w-full bg-[var(--muted)] text-[var(--foreground)] px-3 py-2 text-xs font-bold uppercase tracking-wider rounded border-none focus:outline-none"
-                value={activeNote.expiryDate ? format(activeNote.expiryDate.toDate(), 'yyyy-MM-dd') : ''}
-                onChange={(e) => updateNote(activeNote.id, { expiryDate: e.target.value ? Timestamp.fromDate(new Date(e.target.value)) : null })}
-              />
-            </div>
-          </div>
-
-          <RichTextEditor
-            content={localContent}
-            onChange={(html) => setLocalContent(html)}
-            isFocusMode={isFullscreen}
-          />
-        </div>
-      </div>
-    </motion.div>
-  );
-});
-
-NoteEditor.displayName = 'NoteEditor';
 
 const NoteCard = React.memo(({ 
   note, 
@@ -696,7 +508,7 @@ export default function Home() {
   }
 
   return (
-    <div className={`flex h-screen overflow-hidden bg-[var(--background)] ${isFullscreen ? 'p-0' : ''}`}>
+    <div className={`flex h-screen overflow-hidden bg-[var(--background)] ${isFullscreen ? 'p-0' : ''} touch-pan-y md:touch-auto`}>
       {/* SIDEBAR - Hidden on mobile by default, toggled via menu */}
       <AnimatePresence>
         {isSidebarOpen && !isFullscreen && (
@@ -1038,7 +850,7 @@ export default function Home() {
             initial={{ scale: 0, y: 100 }}
             animate={{ scale: 1, y: 0 }}
             onClick={createNewNote}
-            className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-14 h-14 bg-[var(--accent)] text-[var(--accent-foreground)] rounded-none shadow-[4px_4px_0px_#000000] flex items-center justify-center z-50 border-2 border-black group"
+            className="md:hidden fixed bottom-10 left-1/2 -translate-x-1/2 w-14 h-14 bg-[var(--accent)] text-[var(--accent-foreground)] rounded-none shadow-[4px_4px_0px_rgba(0,0,0,0.1)] flex items-center justify-center z-50 border border-black/5 group"
           >
             <Plus className="w-7 h-7 transition-transform group-active:rotate-180" />
           </motion.button>

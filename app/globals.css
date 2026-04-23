@@ -32,6 +32,8 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   transition: none;
+  overflow-x: hidden;
+  touch-action: pan-y;
 }
 
 ::selection {

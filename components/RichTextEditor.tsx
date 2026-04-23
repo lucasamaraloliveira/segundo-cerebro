@@ -304,8 +304,8 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
   return (
     <div className="flex flex-col w-full">
       {/* Toolbar Console */}
-      <div className="bg-[var(--sidebar-bg)] border-b border-[var(--border)] sticky top-0 z-30">
-        <div className="flex flex-nowrap items-center md:items-end gap-x-0.5 md:gap-x-1 p-1 md:p-1.5 overflow-x-auto no-scrollbar scroll-smooth">
+      <div className="bg-[var(--sidebar-bg)] border-b border-[var(--border)] sticky top-0 z-30 touch-action-pan-y overflow-hidden">
+        <div className="flex flex-nowrap items-center md:items-end gap-x-0.5 md:gap-x-1 p-1 md:p-1.5 overflow-x-auto no-scrollbar scroll-smooth touch-pan-x">
         <ToolbarGroup label="EDIT">
           <ToolbarButton
             onClick={() => editor.chain().focus().undo().run()}
@@ -427,8 +427,8 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
           </ToolbarButton>
         </ToolbarGroup>
 
-        {isFocusMode && (
-          <div className="hidden md:block">
+        <div className="hidden md:block">
+          {isFocusMode && (
             <ToolbarGroup>
               <ToolbarButton
                 onClick={() => editor.chain().focus().toggleCode().run()}
@@ -452,135 +452,141 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
                 <Quote className="w-4 h-4" />
               </ToolbarButton>
             </ToolbarGroup>
-          </div>
-        )}
+          )}
+        </div>
 
-        {isFocusMode && (
-          <ToolbarGroup label="LAYOUT">
-            {/* Alignment Dropdown (Mobile Only) */}
-            <div className="flex md:hidden">
+        <div className="hidden md:block">
+          {isFocusMode && (
+            <ToolbarGroup label="LAYOUT">
+              {/* Alignment Dropdown (Mobile Only) */}
+              <div className="flex md:hidden">
+                <CustomSelect 
+                  label="Alinhamento"
+                  icon={AlignLeft}
+                  value={
+                    editor.isActive({ textAlign: 'center' }) ? 'center' :
+                    editor.isActive({ textAlign: 'right' }) ? 'right' :
+                    editor.isActive({ textAlign: 'justify' }) ? 'justify' : 'left'
+                  }
+                  onChange={(val) => editor.chain().focus().setTextAlign(val).run()}
+                  options={[
+                    { label: 'Esquerda', value: 'left' },
+                    { label: 'Centro', value: 'center' },
+                    { label: 'Direita', value: 'right' },
+                    { label: 'Justificado', value: 'justify' },
+                  ]}
+                />
+              </div>
+
+              {/* Alignment Individual (Desktop Only) */}
+              <div className="hidden md:flex items-center gap-0.5">
+                <ToolbarButton
+                  onClick={() => editor.chain().focus().setTextAlign('left').run()}
+                  isActive={editor.isActive({ textAlign: 'left' })}
+                  title="Alinhar à Esquerda"
+                >
+                  <AlignLeft className="w-4 h-4" />
+                </ToolbarButton>
+                <ToolbarButton
+                  onClick={() => editor.chain().focus().setTextAlign('center').run()}
+                  isActive={editor.isActive({ textAlign: 'center' })}
+                  title="Centralizar"
+                >
+                  <AlignCenter className="w-4 h-4" />
+                </ToolbarButton>
+                <ToolbarButton
+                  onClick={() => editor.chain().focus().setTextAlign('right').run()}
+                  isActive={editor.isActive({ textAlign: 'right' })}
+                  title="Alinhar à Direita"
+                >
+                  <AlignRight className="w-4 h-4" />
+                </ToolbarButton>
+              </div>
+            </ToolbarGroup>
+          )}
+        </div>
+
+        <div className="hidden md:block">
+          {isFocusMode && (
+            <ToolbarGroup label="TYPO">
               <CustomSelect 
-                label="Alinhamento"
-                icon={AlignLeft}
-                value={
-                  editor.isActive({ textAlign: 'center' }) ? 'center' :
-                  editor.isActive({ textAlign: 'right' }) ? 'right' :
-                  editor.isActive({ textAlign: 'justify' }) ? 'justify' : 'left'
-                }
-                onChange={(val) => editor.chain().focus().setTextAlign(val).run()}
+                label="Fonte"
+                icon={Type}
+                value={editor.getAttributes('textStyle').fontFamily || editor.getAttributes('paragraph').fontFamily || 'Inter'}
+                onChange={(val) => {
+                  editor.chain().focus()
+                    .setFontFamily(val)
+                    .command(({ tr, state }) => {
+                      const { from, to } = state.selection;
+                      state.doc.nodesBetween(from, to, (node, pos) => {
+                        if (['paragraph', 'heading', 'listItem', 'bulletList', 'orderedList'].includes(node.type.name)) {
+                          tr.setNodeMarkup(pos, undefined, { ...node.attrs, fontFamily: val });
+                        }
+                      });
+                      return true;
+                    })
+                    .run();
+                }}
                 options={[
-                  { label: 'Esquerda', value: 'left' },
-                  { label: 'Centro', value: 'center' },
-                  { label: 'Direita', value: 'right' },
-                  { label: 'Justificado', value: 'justify' },
+                  { label: 'Sans', value: 'Inter' },
+                  { label: 'Serif', value: 'Georgia' },
+                  { label: 'Mono', value: 'monospace' },
                 ]}
               />
-            </div>
+              <CustomSelect 
+                label="Tamanho"
+                icon={Type}
+                value={editor.getAttributes('textStyle').fontSize || editor.getAttributes('paragraph').fontSize || '18px'}
+                onChange={(val) => {
+                  editor.chain().focus()
+                    .setFontSize(val)
+                    .command(({ tr, state }) => {
+                      const { from, to } = state.selection;
+                      state.doc.nodesBetween(from, to, (node, pos) => {
+                        if (['paragraph', 'heading', 'listItem', 'bulletList', 'orderedList'].includes(node.type.name)) {
+                          tr.setNodeMarkup(pos, undefined, { ...node.attrs, fontSize: val });
+                        }
+                      });
+                      return true;
+                    })
+                    .run();
+                }}
+                options={[
+                  { label: '12px', value: '12px' },
+                  { label: '14px', value: '14px' },
+                  { label: '16px', value: '16px' },
+                  { label: '18px', value: '18px' },
+                  { label: '20px', value: '20px' },
+                  { label: '24px', value: '24px' },
+                  { label: '32px', value: '32px' },
+                  { label: '48px', value: '48px' },
+                ]}
+              />
+            </ToolbarGroup>
+          )}
+        </div>
 
-            {/* Alignment Individual (Desktop Only) */}
-            <div className="hidden md:flex items-center gap-0.5">
-              <ToolbarButton
-                onClick={() => editor.chain().focus().setTextAlign('left').run()}
-                isActive={editor.isActive({ textAlign: 'left' })}
-                title="Alinhar à Esquerda"
+        <div className="hidden md:block">
+          <ToolbarGroup label="COLOR">
+            <div className="flex items-center gap-1 px-1 py-0.5">
+              <Palette className="w-3 h-3 opacity-30 text-[var(--foreground)]" />
+              <select 
+                onChange={(e) => {
+                  if (e.target.value === 'auto') editor.chain().focus().unsetColor().run();
+                  else editor.chain().focus().setColor(e.target.value).run();
+                }}
+                className="bg-transparent text-[8px] font-mono font-bold uppercase tracking-wider outline-none cursor-pointer text-[var(--foreground)]"
+                title="Cor"
               >
-                <AlignLeft className="w-4 h-4" />
-              </ToolbarButton>
-              <ToolbarButton
-                onClick={() => editor.chain().focus().setTextAlign('center').run()}
-                isActive={editor.isActive({ textAlign: 'center' })}
-                title="Centralizar"
-              >
-                <AlignCenter className="w-4 h-4" />
-              </ToolbarButton>
-              <ToolbarButton
-                onClick={() => editor.chain().focus().setTextAlign('right').run()}
-                isActive={editor.isActive({ textAlign: 'right' })}
-                title="Alinhar à Direita"
-              >
-                <AlignRight className="w-4 h-4" />
-              </ToolbarButton>
+                <option value="auto">Auto</option>
+                <option value="#ef4444">Red</option>
+                <option value="#3b82f6">Blue</option>
+                <option value="#10b981">Green</option>
+                <option value="#FF4F00">Accent</option>
+              </select>
             </div>
           </ToolbarGroup>
-        )}
-
-        {isFocusMode && (
-          <ToolbarGroup label="TYPO">
-            <CustomSelect 
-              label="Fonte"
-              icon={Type}
-              value={editor.getAttributes('textStyle').fontFamily || editor.getAttributes('paragraph').fontFamily || 'Inter'}
-              onChange={(val) => {
-                editor.chain().focus()
-                  .setFontFamily(val)
-                  .command(({ tr, state }) => {
-                    const { from, to } = state.selection;
-                    state.doc.nodesBetween(from, to, (node, pos) => {
-                      if (['paragraph', 'heading', 'listItem', 'bulletList', 'orderedList'].includes(node.type.name)) {
-                        tr.setNodeMarkup(pos, undefined, { ...node.attrs, fontFamily: val });
-                      }
-                    });
-                    return true;
-                  })
-                  .run();
-              }}
-              options={[
-                { label: 'Sans', value: 'Inter' },
-                { label: 'Serif', value: 'Georgia' },
-                { label: 'Mono', value: 'monospace' },
-              ]}
-            />
-            <CustomSelect 
-              label="Tamanho"
-              icon={Type}
-              value={editor.getAttributes('textStyle').fontSize || editor.getAttributes('paragraph').fontSize || '18px'}
-              onChange={(val) => {
-                editor.chain().focus()
-                  .setFontSize(val)
-                  .command(({ tr, state }) => {
-                    const { from, to } = state.selection;
-                    state.doc.nodesBetween(from, to, (node, pos) => {
-                      if (['paragraph', 'heading', 'listItem', 'bulletList', 'orderedList'].includes(node.type.name)) {
-                        tr.setNodeMarkup(pos, undefined, { ...node.attrs, fontSize: val });
-                      }
-                    });
-                    return true;
-                  })
-                  .run();
-              }}
-              options={[
-                { label: '12px', value: '12px' },
-                { label: '14px', value: '14px' },
-                { label: '16px', value: '16px' },
-                { label: '18px', value: '18px' },
-                { label: '20px', value: '20px' },
-                { label: '24px', value: '24px' },
-                { label: '32px', value: '32px' },
-                { label: '48px', value: '48px' },
-              ]}
-            />
-          </ToolbarGroup>
-        )}
-
-        <ToolbarGroup label="COLOR">
-          <div className="flex items-center gap-1 px-1 py-0.5">
-            <Palette className="w-3 h-3 opacity-30 text-[var(--foreground)]" />
-            <select 
-              onChange={(e) => {
-                if (e.target.value === 'auto') editor.chain().focus().unsetColor().run();
-                else editor.chain().focus().setColor(e.target.value).run();
-              }}
-              className="bg-transparent text-[8px] font-mono font-bold uppercase tracking-wider outline-none cursor-pointer text-[var(--foreground)]"
-              title="Cor"
-            >
-              <option value="auto">Auto</option>
-              <option value="#ef4444">Red</option>
-              <option value="#3b82f6">Blue</option>
-              <option value="#10b981">Green</option>
-              <option value="#FF4F00">Accent</option>
-            </select>
-          </div>
-        </ToolbarGroup>
+        </div>
 
         <ToolbarGroup>
           <ToolbarButton
