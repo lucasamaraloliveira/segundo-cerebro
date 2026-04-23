@@ -281,16 +281,24 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
       attributes: {
         class: 'prose prose-sm md:prose-base xl:prose-lg dark:prose-invert max-w-none focus:outline-none min-h-[500px] font-sans',
       },
+      handlePaste(view, event) {
+        const text = event.clipboardData?.getData('text/plain') || '';
+        const html = event.clipboardData?.getData('text/html') || '';
+        if (!html || html === text) return false;
+        setPasteModal({ show: true, text, html });
+        return true;
+      },
     },
   });
 
   // Update editor attributes when font changes
   useEffect(() => {
     if (editor) {
-      editor.setOptions({
-        editorProps: {
-          attributes: {
-            class: 'prose prose-sm md:prose-base xl:prose-lg dark:prose-invert max-w-none focus:outline-none min-h-[500px] font-sans',
+        editor.setOptions({
+          editorProps: {
+            attributes: {
+              class: 'prose prose-sm md:prose-base xl:prose-lg dark:prose-invert max-w-none focus:outline-none min-h-[500px] font-sans',
+            },
             handlePaste(view, event) {
               const text = event.clipboardData?.getData('text/plain') || '';
               const html = event.clipboardData?.getData('text/html') || '';
@@ -299,8 +307,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
               return true;
             },
           },
-        },
-      });
+        });
     }
   }, [editor]);
 
