@@ -140,7 +140,7 @@ const ToolbarButton = ({
       onClick();
     }}
     title={title}
-    className={`p-1 md:p-1.5 rounded-none transition-all relative shrink-0 ${
+    className={`p-2 md:p-1.5 rounded-none transition-all relative shrink-0 ${
       isActive 
         ? 'bg-[var(--accent)] text-white' 
         : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60 hover:opacity-100'
@@ -153,7 +153,7 @@ const ToolbarButton = ({
 const ToolbarGroup = ({ children, label }: { children: React.ReactNode, label?: string }) => (
   <div className="flex flex-col gap-0 flex-shrink-0">
     {label && <span className="hidden md:block text-[6px] font-mono font-bold uppercase tracking-[0.15em] opacity-20 px-0.5">{label}</span>}
-    <div className="flex items-center gap-0.5 bg-[var(--muted)]/5 p-0.5 rounded-none border border-[var(--border)]/5">
+    <div className="flex items-center gap-1 bg-[var(--muted)]/5 p-1 rounded-none border border-[var(--border)]/5">
       {children}
     </div>
   </div>
@@ -190,13 +190,13 @@ const CustomSelect = ({
       <button
         ref={buttonRef}
         onClick={toggleDropdown}
-        className="flex items-center gap-0.5 px-1 py-1 rounded-none bg-[var(--muted)]/30 text-[var(--foreground)] border border-[var(--border)]/10 hover:border-[var(--accent)] transition-all min-w-[58px] md:min-w-[80px]"
+        className="flex items-center gap-1 px-2 py-1.5 rounded-none bg-[var(--muted)]/30 text-[var(--foreground)] border border-[var(--border)]/10 hover:border-[var(--accent)] transition-all min-w-[75px] md:min-w-[80px]"
       >
-        <Icon className="w-2.5 h-2.5 md:w-3 md:h-3 opacity-60" />
-        <span className="text-[7px] md:text-[8px] font-bold uppercase tracking-widest truncate max-w-[35px] md:max-w-[55px]">
+        <Icon className="w-3.5 h-3.5 md:w-3 md:h-3 opacity-60" />
+        <span className="text-[9px] md:text-[8px] font-bold uppercase tracking-widest truncate max-w-[45px] md:max-w-[55px]">
           {selectedLabel}
         </span>
-        <ChevronDown className="w-2 h-2 ml-auto opacity-30" />
+        <ChevronDown className="w-3 h-3 ml-auto opacity-30" />
       </button>
 
       {isOpen && (
@@ -398,7 +398,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
     <div className="flex flex-col w-full">
       {/* Toolbar Console */}
       <div className="bg-[var(--sidebar-bg)] border-b border-[var(--border)] sticky top-0 z-30 touch-pan-y overflow-hidden">
-        <div className="flex flex-nowrap items-center justify-start gap-x-0.5 p-1 scroll-smooth">
+        <div className="flex flex-nowrap items-center justify-start gap-x-1 p-1.5 overflow-x-auto no-scrollbar scroll-smooth touch-pan-x">
         <ToolbarGroup label="EDIT">
           <ToolbarButton
             onClick={() => editor.chain().focus().undo().run()}
@@ -503,24 +503,26 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
           </ToolbarGroup>
         </div>
 
-        <ToolbarGroup label="LAYOUT">
-          <CustomSelect 
-            label="Alinhamento"
-            icon={AlignLeft}
-            value={
-              editor.isActive({ textAlign: 'center' }) ? 'center' :
-              editor.isActive({ textAlign: 'right' }) ? 'right' :
-              editor.isActive({ textAlign: 'justify' }) ? 'justify' : 'left'
-            }
-            onChange={(val) => editor.chain().focus().setTextAlign(val).run()}
-            options={[
-              { label: 'Esquerda', value: 'left' },
-              { label: 'Centro', value: 'center' },
-              { label: 'Direita', value: 'right' },
-              { label: 'Justificado', value: 'justify' },
-            ]}
-          />
-        </ToolbarGroup>
+        <div className="hidden md:block">
+          <ToolbarGroup label="LAYOUT">
+            <CustomSelect 
+              label="Alinhamento"
+              icon={AlignLeft}
+              value={
+                editor.isActive({ textAlign: 'center' }) ? 'center' :
+                editor.isActive({ textAlign: 'right' }) ? 'right' :
+                editor.isActive({ textAlign: 'justify' }) ? 'justify' : 'left'
+              }
+              onChange={(val) => editor.chain().focus().setTextAlign(val).run()}
+              options={[
+                { label: 'Esquerda', value: 'left' },
+                { label: 'Centro', value: 'center' },
+                { label: 'Direita', value: 'right' },
+                { label: 'Justificado', value: 'justify' },
+              ]}
+            />
+          </ToolbarGroup>
+        </div>
 
         <div className="hidden md:block">
           <ToolbarGroup label="TYPO">
@@ -608,10 +610,10 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
               e.preventDefault();
               toggleTranscription();
             }}
-            className={`flex items-center justify-center w-7 h-7 md:w-auto md:px-2 md:h-7 transition-all ${isRecording ? 'bg-red-500 text-white' : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60 hover:opacity-100 border border-[var(--border)]/10'}`}
+            className={`flex items-center justify-center w-9 h-9 md:w-auto md:px-2 md:h-7 transition-all ${isRecording ? 'bg-red-500 text-white' : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60 hover:opacity-100 border border-[var(--border)]/10'}`}
           >
-            <Mic className={`w-3 h-3 ${isRecording ? 'animate-pulse' : ''}`} />
-            <span className="text-[8px] font-bold uppercase tracking-widest hidden md:block ml-1">
+            <Mic className={`w-4 h-4 md:w-3 md:h-3 ${isRecording ? 'animate-pulse' : ''}`} />
+            <span className="text-[9px] font-bold uppercase tracking-widest hidden md:block ml-1">
               {isRecording ? 'Ouvindo' : 'Voz'}
             </span>
           </button>
@@ -622,7 +624,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
             onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}
             title="Limpar Formatação"
           >
-            <Eraser className="w-3 h-3" />
+            <Eraser className="w-4 h-4 md:w-3 md:h-3" />
           </ToolbarButton>
         </ToolbarGroup>
 
