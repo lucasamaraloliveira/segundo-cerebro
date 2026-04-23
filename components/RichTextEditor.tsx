@@ -304,7 +304,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
   return (
     <div className="flex flex-col w-full">
       {/* Toolbar Console */}
-      <div className="bg-[var(--sidebar-bg)] border-b border-[var(--border)] sticky top-0 z-30 touch-action-pan-y overflow-hidden">
+      <div className="bg-[var(--sidebar-bg)] border-b border-[var(--border)] sticky top-0 z-30 touch-pan-y overflow-hidden">
         <div className="flex flex-nowrap items-center md:items-end gap-x-0.5 md:gap-x-1 p-1 md:p-1.5 overflow-x-auto no-scrollbar scroll-smooth touch-pan-x">
         <ToolbarGroup label="EDIT">
           <ToolbarButton
