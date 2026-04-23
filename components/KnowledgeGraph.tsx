@@ -5,6 +5,8 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 
+import { forceManyBody, forceCollide } from 'd3-force';
+
 // Dynamic import to avoid SSR issues with ForceGraph
 const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { 
   ssr: false,
@@ -53,39 +55,53 @@ export default function KnowledgeGraph({ notes, width, height }: KnowledgeGraphP
     setMounted(true);
   }, []);
 
-  // Configure forces and restore state once the graph engine is ready
+  // Configure forces whenever notes change or graph is ready
   useEffect(() => {
-    if (fgRef.current && mounted && notes.length > 0 && !hasRestored.current) {
-      // Configure forces
+    if (fgRef.current && mounted && notes.length > 0) {
+      // Re-balancing forces for moderate spacing
       fgRef.current.d3Force('link').distance(250);
-      fgRef.current.d3Force('charge').strength(-800);
-      fgRef.current.d3Force('center').strength(0.05);
-
-      // Restore zoom/pan state with a small delay to ensure d3 is stable
-      const savedState = localStorage.getItem('neural-graph-state');
-      if (savedState) {
-        setTimeout(() => {
-          try {
-            const { x, y, k } = JSON.parse(savedState);
-            fgRef.current.zoom(k, 0); 
-            fgRef.current.centerAt(x, y, 0);
-            hasRestored.current = true;
-          } catch (e) {
-            console.error('Failed to restore graph state', e);
+      fgRef.current.d3Force('charge', forceManyBody().strength(-2000));
+      fgRef.current.d3Force('collide', forceCollide(60));
+      fgRef.current.d3Force('center').strength(0.05); 
+      
+      if (!hasRestored.current) {
+        const savedState = localStorage.getItem('neural-graph-state');
+        
+        const reheat = () => {
+          if (fgRef.current) {
+            fgRef.current.d3ReheatSimulation();
           }
-        }, 100);
-      } else {
-        hasRestored.current = true;
+        };
+
+        if (savedState) {
+          setTimeout(() => {
+            try {
+              const { x, y, k } = JSON.parse(savedState);
+              if (fgRef.current) {
+                fgRef.current.zoom(k, 400); 
+                fgRef.current.centerAt(x, y, 400);
+                reheat();
+              }
+              hasRestored.current = true;
+            } catch (e) {
+              reheat();
+              hasRestored.current = true;
+            }
+          }, 500);
+        } else {
+          setTimeout(reheat, 500);
+          hasRestored.current = true;
+        }
       }
     }
-  }, [mounted, notes]);
+  }, [mounted, notes.length]);
 
   const graphData = useMemo(() => {
     const nodes = notes.map(note => ({
       id: note.id,
       name: note.title || 'Sem título',
       content: note.content || '',
-      val: Math.sqrt(note.content?.length || 0) / 5 + 4,
+      val: Math.sqrt(note.content?.length || 0) / 4 + 6,
       tags: note.tags || [],
       relatedNames: [] as string[]
     }));
@@ -152,12 +168,12 @@ export default function KnowledgeGraph({ notes, width, height }: KnowledgeGraphP
 
           // Draw node glow
           try {
-            const gradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, nodeR * 2.5);
-            gradient.addColorStop(0, 'rgba(255, 79, 0, 0.2)');
+            const gradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, nodeR * 4);
+            gradient.addColorStop(0, 'rgba(255, 79, 0, 0.35)');
             gradient.addColorStop(1, 'rgba(255, 79, 0, 0)');
             ctx.fillStyle = gradient;
             ctx.beginPath();
-            ctx.arc(node.x, node.y, nodeR * 2.5, 0, 2 * Math.PI, false);
+            ctx.arc(node.x, node.y, nodeR * 4, 0, 2 * Math.PI, false);
             ctx.fill();
           } catch (e) {
             // Fallback if gradient fails
@@ -181,6 +197,7 @@ export default function KnowledgeGraph({ notes, width, height }: KnowledgeGraphP
         cooldownTicks={100}
         d3AlphaDecay={0.02}
         d3VelocityDecay={0.3}
+        d3AlphaMin={0.001}
       />
       
       <div className="absolute bottom-10 right-10 pointer-events-none text-right hidden md:block">

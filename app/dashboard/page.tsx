@@ -25,7 +25,7 @@ export default function Dashboard() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [dimensions, setDimensions] = useState<{ width: number, height: number } | null>(null);
 
   useEffect(() => {
     const updateDimensions = () => {
@@ -190,12 +190,18 @@ export default function Dashboard() {
                 Aguardando a primeira sinapse... Adicione tags às suas notas para gerar o mapeamento.
               </p>
             </div>
-          ) : (
+          ) : dimensions ? (
             <KnowledgeGraph 
               notes={notes} 
               width={dimensions.width} 
               height={dimensions.height} 
             />
+          ) : (
+            <div className="h-full w-full flex items-center justify-center">
+              <div className="text-[10px] font-bold uppercase tracking-[0.3em] animate-pulse opacity-40">
+                Calculando Dimensões...
+              </div>
+            </div>
           )}
         </div>
       </main>
