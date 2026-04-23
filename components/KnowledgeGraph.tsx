@@ -60,19 +60,31 @@ export default function KnowledgeGraph({ notes, width, height }: KnowledgeGraphP
     if (fgRef.current && mounted && notes.length > 0) {
       // Re-balancing forces for moderate spacing
       fgRef.current.d3Force('link').distance(250);
-      fgRef.current.d3Force('charge', forceManyBody().strength(-2000));
-      fgRef.current.d3Force('collide', forceCollide(60));
-      fgRef.current.d3Force('center').strength(0.05); 
+      fgRef.current.d3Force('charge', forceManyBody().strength(-3000)); // Higher repulsion for first load
+      fgRef.current.d3Force('collide', forceCollide(80));
+      fgRef.current.d3Force('center').strength(0); // Zero centering force initially to allow expansion
+ 
+      const reheat = () => {
+        if (fgRef.current) {
+          fgRef.current.d3ReheatSimulation();
+        }
+      };
+
+      // Multi-stage reheat to ensure it doesn't bunch up
+      setTimeout(reheat, 100);
+      setTimeout(reheat, 500);
+      setTimeout(reheat, 1000);
       
+      // After it has spread, slowly bring back the center force
+      setTimeout(() => {
+        if (fgRef.current) {
+          fgRef.current.d3Force('center').strength(0.05);
+          fgRef.current.d3ReheatSimulation();
+        }
+      }, 2000);
+
       if (!hasRestored.current) {
         const savedState = localStorage.getItem('neural-graph-state');
-        
-        const reheat = () => {
-          if (fgRef.current) {
-            fgRef.current.d3ReheatSimulation();
-          }
-        };
-
         if (savedState) {
           setTimeout(() => {
             try {
@@ -82,14 +94,10 @@ export default function KnowledgeGraph({ notes, width, height }: KnowledgeGraphP
                 fgRef.current.centerAt(x, y, 400);
                 reheat();
               }
-              hasRestored.current = true;
-            } catch (e) {
-              reheat();
-              hasRestored.current = true;
-            }
-          }, 500);
+            } catch (e) {}
+            hasRestored.current = true;
+          }, 800);
         } else {
-          setTimeout(reheat, 500);
           hasRestored.current = true;
         }
       }
@@ -141,6 +149,9 @@ export default function KnowledgeGraph({ notes, width, height }: KnowledgeGraphP
         linkWidth={(link: any) => link.weight * 1.5}
         nodeRelSize={1}
         backgroundColor="transparent"
+        warmupTicks={200}
+        d3AlphaDecay={0.01}
+        d3VelocityDecay={0.1}
         onNodeClick={(node: any) => {
           router.push(`/?note=${node.id}`);
         }}

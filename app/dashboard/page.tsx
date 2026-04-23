@@ -192,6 +192,7 @@ export default function Dashboard() {
             </div>
           ) : dimensions ? (
             <KnowledgeGraph 
+              key={`${dimensions.width}-${dimensions.height}-${notes.length}`}
               notes={notes} 
               width={dimensions.width} 
               height={dimensions.height} 

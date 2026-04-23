@@ -134,8 +134,17 @@ const TEMPLATES = [
 ];
 
 const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isAiLoading, handleAiAction, exportAsPDF, deleteNote, setIsFullscreen, setIsTagModalOpen, setNewTagInput, relatedNotes, setActiveNoteId, setIsTemplateModalOpen }: any) => {
+  const titleRef = useRef<HTMLTextAreaElement>(null);
   const [localTitle, setLocalTitle] = useState(activeNote.title || '');
   const [localContent, setLocalContent] = useState(activeNote.content || '');
+
+  // Auto-resize title textarea
+  React.useLayoutEffect(() => {
+    if (titleRef.current) {
+      titleRef.current.style.height = 'auto';
+      titleRef.current.style.height = `${titleRef.current.scrollHeight}px`;
+    }
+  }, [localTitle]);
 
   useEffect(() => {
     setLocalTitle(activeNote.title || '');
@@ -230,7 +239,7 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-12 lg:p-20 bg-[var(--muted)]/30 custom-scrollbar">
         <div className="max-w-[850px] mx-auto w-full bg-[var(--background)] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] min-h-[1100px] border border-[var(--border)] overflow-visible">
           <div className="px-8 md:px-16 lg:px-24 py-8 md:py-16 lg:py-20">
-          <div className="mb-6 md:mb-10 flex justify-between items-end border-b border-[var(--border)] pb-4 md:pb-6">
+          <div className="mb-4 md:mb-6 flex justify-between items-end border-b border-[var(--border)] pb-4 md:pb-6">
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
                 {activeNote.tags?.map((tag: string) => (
@@ -262,14 +271,15 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
               </p>
             </div>
           </div>
-          <input
-            type="text"
+          <textarea
+            ref={titleRef}
+            rows={1}
             value={localTitle}
             placeholder="Título da nota"
             onChange={(e) => setLocalTitle(e.target.value)}
-            className="w-full text-3xl md:text-3xl lg:text-4xl xl:text-6xl font-serif font-bold tracking-tighter leading-none bg-transparent border-none focus:outline-none mb-6 md:mb-10 placeholder:text-[var(--foreground)]/40 text-[var(--foreground)]"
+            className="w-full text-3xl md:text-3xl lg:text-4xl xl:text-6xl font-serif font-bold tracking-tighter leading-[1.1] bg-transparent border-none focus:outline-none mb-4 md:mb-6 placeholder:text-[var(--foreground)]/40 text-[var(--foreground)] resize-none overflow-hidden"
           />
-          <div className="grid grid-cols-2 gap-4 md:gap-8 mb-6 md:mb-10 pb-6 md:pb-8 border-b border-[var(--border)]">
+          <div className="grid grid-cols-2 gap-4 md:gap-8 mb-4 md:mb-6 pb-4 md:pb-6 border-b border-[var(--border)]">
             <div className="space-y-1">
               <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Lembrete</p>
               <input
@@ -341,6 +351,7 @@ export default function Home() {
   const [semanticKeywords, setSemanticKeywords] = useState<string[]>([]);
   const [isSemanticLoading, setIsSemanticLoading] = useState(false);
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const activeNote = useMemo(() => notes.find(n => n.id === activeNoteId), [notes, activeNoteId]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -356,6 +367,7 @@ export default function Home() {
   const [isTagModalOpen, setIsTagModalOpen] = useState(false);
   const [isMobileTagsModalOpen, setIsMobileTagsModalOpen] = useState(false);
   const [newTagInput, setNewTagInput] = useState('');
+  const [tagsToAssign, setTagsToAssign] = useState<string[]>([]);
 
   // Sidebar responsiveness
   useEffect(() => {
@@ -363,6 +375,13 @@ export default function Home() {
       setIsSidebarOpen(false);
     }
   }, []);
+
+  // Initialize tagsToAssign when modal opens
+  useEffect(() => {
+    if (isTagModalOpen && activeNote) {
+      setTagsToAssign(activeNote.tags || []);
+    }
+  }, [isTagModalOpen, activeNote?.id]);
 
   // Theme Toggle Effect
   useEffect(() => {
@@ -516,7 +535,6 @@ export default function Home() {
     });
   }, [notes, searchQuery, activeTag, view, isSemanticSearch, semanticKeywords]);
 
-  const activeNote = useMemo(() => notes.find(n => n.id === activeNoteId), [notes, activeNoteId]);
 
   const relatedNotes = useMemo(() => {
     if (!activeNote || !activeNote.tags?.length) return [];
@@ -1324,27 +1342,30 @@ export default function Home() {
 
               {/* Suggestions */}
               <div className="mb-8">
-                <p className="text-[9px] text-[var(--foreground)]/40 uppercase font-bold tracking-widest mb-3">Sugeridas ou Existentes</p>
+                <p className="text-[9px] text-[var(--foreground)]/40 uppercase font-bold tracking-widest mb-3">Selecione ou adicione tags</p>
                 <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto custom-scrollbar pr-2">
                   {allTags
-                    .filter(tag => !activeNote?.tags?.includes(tag))
-                    .map(tag => (
-                      <button
-                        key={tag}
-                        onClick={() => {
-                          if (activeNote) {
-                            updateNote(activeNote.id, { tags: [...(activeNote.tags || []), tag] });
-                            setIsTagModalOpen(false);
-                          }
-                        }}
-                        className="px-2 py-1 bg-[var(--muted)] hover:bg-[var(--accent)] hover:text-white text-[10px] font-bold uppercase tracking-widest transition-all border border-transparent hover:border-black/5"
-                      >
-                        #{tag}
-                      </button>
-                    ))
+                    .map(tag => {
+                      const isSelected = tagsToAssign.includes(tag);
+                      return (
+                        <button
+                          key={tag}
+                          onClick={() => {
+                            if (isSelected) {
+                              setTagsToAssign(prev => prev.filter(t => t !== tag));
+                            } else {
+                              setTagsToAssign(prev => [...prev, tag]);
+                            }
+                          }}
+                          className={`px-2 py-1 text-[10px] font-bold uppercase tracking-widest transition-all border ${isSelected ? 'bg-[var(--accent)] text-white border-[var(--accent)]' : 'bg-[var(--muted)] text-[var(--foreground)] border-transparent hover:border-black/5 hover:bg-[var(--muted)]/80'}`}
+                        >
+                          #{tag}
+                        </button>
+                      );
+                    })
                   }
-                  {allTags.filter(tag => !activeNote?.tags?.includes(tag)).length === 0 && (
-                    <p className="text-[9px] opacity-20 italic">Nenhuma tag nova para sugerir</p>
+                  {allTags.length === 0 && (
+                    <p className="text-[9px] opacity-20 italic">Crie sua primeira etiqueta acima</p>
                   )}
                 </div>
               </div>
@@ -1358,17 +1379,22 @@ export default function Home() {
                 </button>
                 <button
                   onClick={() => {
+                    let finalTags = [...tagsToAssign];
                     if (newTagInput.trim()) {
-                      const tag = newTagInput.trim();
-                      if (activeNote && !activeNote.tags?.includes(tag)) {
-                        updateNote(activeNote.id, { tags: [...(activeNote.tags || []), tag] });
+                      const newTag = newTagInput.trim();
+                      if (!finalTags.includes(newTag)) {
+                        finalTags.push(newTag);
                       }
+                    }
+                    
+                    if (activeNote) {
+                      updateNote(activeNote.id, { tags: finalTags });
                     }
                     setIsTagModalOpen(false);
                   }}
                   className="flex-1 py-4 bg-[var(--accent)] text-[var(--accent-foreground)] rounded-none font-bold uppercase text-[10px] tracking-widest hover:opacity-90 transition-all shadow-lg shadow-black/5"
                 >
-                  Adicionar
+                  Salvar
                 </button>
               </div>
             </motion.div>
