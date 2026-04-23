@@ -97,12 +97,22 @@ select option {
   outline: none;
 }
 
-.tiptap p.is-editor-empty:first-child::before {
-  content: attr(data-placeholder);
-  float: left;
-  color: var(--muted-foreground);
-  pointer-events: none;
-  height: 0;
+.tiptap a {
+  @apply text-[var(--accent)] font-medium underline underline-offset-4 decoration-[var(--accent)]/30 hover:decoration-[var(--accent)] transition-all cursor-pointer;
+}
+
+.tiptap a.internal-link {
+  @apply no-underline bg-[var(--accent)]/5 px-1 rounded-sm border-b border-[var(--accent)]/30 font-bold italic;
+}
+
+.tiptap a.internal-link::before {
+  content: '[[ ';
+  @apply opacity-20 font-mono text-[0.8em];
+}
+
+.tiptap a.internal-link::after {
+  content: ' ]]';
+  @apply opacity-20 font-mono text-[0.8em];
 }
 
 .tiptap u {

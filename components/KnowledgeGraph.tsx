@@ -115,16 +115,32 @@ export default function KnowledgeGraph({ notes, width, height, selectedTag }: Kn
       relatedNames: [] as string[]
     }));
 
-    const links: { source: string; target: string; weight: number }[] = [];
-    
+    // Create links based on shared tags OR internal links (Backlinks)
+    const links: any[] = [];
+
     for (let i = 0; i < notes.length; i++) {
       for (let j = i + 1; j < notes.length; j++) {
         const noteA = notes[i];
         const noteB = notes[j];
-        const sharedTags = noteA.tags?.filter(tag => noteB.tags?.includes(tag)) || [];
-        if (sharedTags.length > 0) {
-          links.push({ source: noteA.id, target: noteB.id, weight: sharedTags.length });
-          
+        
+        // 1. Shared tags connection
+        const commonTags = noteA.tags?.filter(tag => noteB.tags?.includes(tag)) || [];
+        
+        // 2. Direct internal links (Bidirectional check)
+        const aLinksToB = noteA.content?.includes(noteB.id);
+        const bLinksToA = noteB.content?.includes(noteA.id);
+
+        if (commonTags.length > 0 || aLinksToB || bLinksToA) {
+          // Weight calculation: Tags give base weight, direct links give massive weight
+          let weight = commonTags.length * 0.5;
+          if (aLinksToB || bLinksToA) weight += 5; // Direct connection is stronger
+
+          links.push({
+            source: noteA.id,
+            target: noteB.id,
+            weight: weight
+          });
+
           // Store relationships for hover info
           nodes[i].relatedNames.push(noteB.title);
           nodes[j].relatedNames.push(noteA.title);

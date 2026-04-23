@@ -133,10 +133,11 @@ const TEMPLATES = [
   { id: 'study', label: 'Estudo', icon: '📖', content: '<h2>📖 Assunto Principal</h2><p></p><hr><h2>💡 Pontos Chave</h2><ul><li></li></ul><hr><h2>❓ Dúvidas / Revisar</h2><p></p>' },
 ];
 
-const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isAiLoading, handleAiAction, exportAsPDF, deleteNote, setIsFullscreen, setIsTagModalOpen, setNewTagInput, relatedNotes, setActiveNoteId, setIsTemplateModalOpen }: any) => {
+const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isAiLoading, handleAiAction, exportAsPDF, deleteNote, setIsFullscreen, setIsTagModalOpen, setNewTagInput, relatedNotes, setActiveNoteId, setIsTemplateModalOpen, backlinks, allNotes }: any) => {
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const [localTitle, setLocalTitle] = useState(activeNote.title || '');
   const [localContent, setLocalContent] = useState(activeNote.content || '');
+  const [showAllTags, setShowAllTags] = useState(false);
 
   // Auto-resize title textarea
   React.useLayoutEffect(() => {
@@ -242,7 +243,7 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
           <div className="mb-4 md:mb-6 flex justify-between items-end border-b border-[var(--border)] pb-4 md:pb-6">
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
-                {activeNote.tags?.map((tag: string) => (
+                {activeNote.tags?.slice(0, showAllTags ? undefined : 5).map((tag: string) => (
                   <span key={tag} className="px-2 py-1 bg-[var(--muted)] text-[var(--foreground)] text-[10px] font-bold uppercase tracking-widest rounded flex items-center gap-1 group">
                     #{tag}
                     <button
@@ -253,6 +254,14 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
                     </button>
                   </span>
                 ))}
+                {activeNote.tags?.length > 5 && (
+                  <button
+                    onClick={() => setShowAllTags(!showAllTags)}
+                    className="text-[9px] font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity px-2 py-1 border border-[var(--border)] rounded"
+                  >
+                    {showAllTags ? 'Ver menos' : `+${activeNote.tags.length - 5} Ver mais`}
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setNewTagInput('');
@@ -304,11 +313,12 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
             content={localContent}
             onChange={(html: string) => setLocalContent(html)}
             isFocusMode={isFullscreen}
+            notes={allNotes}
           />
 
           {/* Related Notes (AI Auto-Linker) */}
           {relatedNotes && relatedNotes.length > 0 && (
-            <div className="mt-20 pt-10 border-t border-[var(--border)] pb-20 px-8 md:px-16 lg:px-24">
+            <div className="mt-20 pt-10 border-t border-[var(--border)] pb-10 px-8 md:px-16 lg:px-24">
               <div className="flex items-center gap-3 mb-8">
                 <Brain className="w-5 h-5 text-[var(--accent)]" />
                 <h3 className="text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--foreground)] opacity-40">Conexões Sugeridas pela IA</h3>
@@ -324,6 +334,36 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
                       <ArrowRight className="w-3 h-3 text-[var(--accent)]" />
                     </div>
                     <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--foreground)] opacity-20 mb-3">Nota Relacionada</p>
+                    <h4 className="text-sm font-serif italic mb-4 leading-snug group-hover:text-[var(--accent)] transition-colors">{note.title || 'Sem título'}</h4>
+                    <div className="flex flex-wrap gap-1.5">
+                      {note.tags?.slice(0, 3).map((tag: string) => (
+                        <span key={tag} className="text-[8px] font-bold uppercase tracking-tighter opacity-30 group-hover:opacity-60">#{tag}</span>
+                      ))}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Backlinks (Neural References) */}
+          {backlinks && backlinks.length > 0 && (
+            <div className="mt-10 pt-10 border-t border-[var(--border)] pb-20 px-8 md:px-16 lg:px-24">
+              <div className="flex items-center gap-3 mb-8">
+                <Undo2 className="w-5 h-5 text-[var(--accent)]" />
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--foreground)] opacity-40">Menções a esta nota (Backlinks)</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {backlinks.map((note: any) => (
+                  <button
+                    key={note.id}
+                    onClick={() => setActiveNoteId(note.id)}
+                    className="group relative p-6 bg-[var(--muted)]/20 border border-[var(--border)] hover:border-[var(--accent)] transition-all text-left"
+                  >
+                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Undo2 className="w-3 h-3 text-[var(--accent)] rotate-180" />
+                    </div>
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--foreground)] opacity-20 mb-3">Referenciada em</p>
                     <h4 className="text-sm font-serif italic mb-4 leading-snug group-hover:text-[var(--accent)] transition-colors">{note.title || 'Sem título'}</h4>
                     <div className="flex flex-wrap gap-1.5">
                       {note.tags?.slice(0, 3).map((tag: string) => (
@@ -358,6 +398,7 @@ export default function Home() {
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState<Note | null>(null);
+  const [showAllSidebarTags, setShowAllSidebarTags] = useState(false);
   const [showUndoToast, setShowUndoToast] = useState(false);
   const [lastDeletedNote, setLastDeletedNote] = useState<Note | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -534,6 +575,14 @@ export default function Home() {
       return matchesSearch && matchesTag && matchesView;
     });
   }, [notes, searchQuery, activeTag, view, isSemanticSearch, semanticKeywords]);
+
+  const backlinks = useMemo(() => {
+    if (!activeNote) return [];
+    return notes.filter(n => 
+      n.id !== activeNote.id && 
+      n.content?.includes(activeNote.id)
+    );
+  }, [activeNote, notes]);
 
 
   const relatedNotes = useMemo(() => {
@@ -957,14 +1006,24 @@ export default function Home() {
                   {allTags.length === 0 ? (
                     <p className="text-xs text-muted-foreground italic">Nenhuma tag ainda</p>
                   ) : (
-                    allTags.map(tag => (
-                      <TagButton
-                        key={tag}
-                        tag={tag}
-                        isActive={activeTag === tag}
-                        onClick={() => setActiveTag(tag === activeTag ? null : tag)}
-                      />
-                    ))
+                    <>
+                      {allTags.slice(0, showAllSidebarTags ? undefined : 5).map(tag => (
+                        <TagButton
+                          key={tag}
+                          tag={tag}
+                          isActive={activeTag === tag}
+                          onClick={() => setActiveTag(tag === activeTag ? null : tag)}
+                        />
+                      ))}
+                      {allTags.length > 5 && (
+                        <button
+                          onClick={() => setShowAllSidebarTags(!showAllSidebarTags)}
+                          className="w-full text-[9px] font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity py-2 border border-[var(--border)] border-dashed hover:border-[var(--accent)]/30 hover:bg-[var(--accent)]/5 mt-2"
+                        >
+                          {showAllSidebarTags ? 'Ver menos' : `+${allTags.length - 5} Ver todas`}
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -1157,6 +1216,8 @@ export default function Home() {
               relatedNotes={relatedNotes}
               setActiveNoteId={setActiveNoteId}
               setIsTemplateModalOpen={setIsTemplateModalOpen}
+              backlinks={backlinks}
+              allNotes={notes}
             />
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8">

@@ -44,7 +44,8 @@ import {
   AlignJustify,
   ChevronDown,
   Mic,
-  Maximize2
+  Maximize2,
+  Layers
 } from 'lucide-react';
 
 declare module '@tiptap/core' {
@@ -121,6 +122,7 @@ interface RichTextEditorProps {
   onChange: (content: string) => void;
   placeholder?: string;
   isFocusMode?: boolean;
+  notes?: any[];
 }
 
 
@@ -236,8 +238,10 @@ const CustomSelect = ({
   );
 };
 
-export default function RichTextEditor({ content, onChange, placeholder, isFocusMode = false }: RichTextEditorProps) {
+export default function RichTextEditor({ content, onChange, placeholder, isFocusMode = false, notes = [] }: RichTextEditorProps) {
   const [pasteModal, setPasteModal] = useState<{ show: boolean, text: string, html: string } | null>(null);
+  const [noteLinkModal, setNoteLinkModal] = useState(false);
+  const [noteSearch, setNoteSearch] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [interimText, setInterimText] = useState('');
   const recognitionRef = useRef<any>(null);
@@ -508,19 +512,28 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
             <CheckSquare className="w-3.5 h-3.5" />
           </ToolbarButton>
           {isFocusMode && (
-            <ToolbarButton 
-              onClick={() => {
-                const url = window.prompt('URL:');
-                if (url) {
-                  if (url === '') editor.chain().focus().unsetLink().run();
-                  else editor.chain().focus().setLink({ href: url }).run();
-                }
-              }} 
-              isActive={editor.isActive('link')} 
-              title="Inserir Link"
-            >
-              <LinkIcon className="w-3.5 h-3.5" />
-            </ToolbarButton>
+            <>
+              <ToolbarButton 
+                onClick={() => {
+                  const url = window.prompt('URL externa:');
+                  if (url) {
+                    if (url === '') editor.chain().focus().unsetLink().run();
+                    else editor.chain().focus().setLink({ href: url }).run();
+                  }
+                }} 
+                isActive={editor.isActive('link')} 
+                title="Link Externo"
+              >
+                <LinkIcon className="w-3.5 h-3.5" />
+              </ToolbarButton>
+              <ToolbarButton 
+                onClick={() => setNoteLinkModal(true)} 
+                isActive={false} 
+                title="Conectar Nota"
+              >
+                <Layers className="w-3.5 h-3.5 text-[var(--accent)]" />
+              </ToolbarButton>
+            </>
           )}
         </div>
 
@@ -641,6 +654,65 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
           </div>
         </div>
       )}
+      {/* Note Link Modal */}
+      <AnimatePresence>
+        {noteLinkModal && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setNoteLinkModal(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative w-full max-w-lg bg-[var(--background)] border border-[var(--border)] p-8 shadow-[30px_30px_0px_rgba(0,0,0,0.1)]"
+            >
+              <h3 className="text-2xl font-serif mb-2 tracking-tight">Conectar Nota Neural</h3>
+              <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-6">Selecione uma nota para criar um backlink</p>
+              
+              <input 
+                autoFocus
+                type="text"
+                placeholder="Buscar nota pelo título..."
+                value={noteSearch}
+                onChange={(e) => setNoteSearch(e.target.value)}
+                className="w-full bg-[var(--muted)] border-none px-4 py-3 text-sm font-serif italic mb-6 focus:ring-1 focus:ring-[var(--accent)] outline-none"
+              />
+
+              <div className="max-h-[300px] overflow-y-auto custom-scrollbar pr-2 space-y-2">
+                {notes
+                  .filter(n => n.title.toLowerCase().includes(noteSearch.toLowerCase()))
+                  .map(n => (
+                    <button
+                      key={n.id}
+                      onClick={() => {
+                        editor.chain().focus().insertContent(`<a href="/?note=${n.id}" class="internal-link" data-internal-note-id="${n.id}">[[${n.title || 'Sem título'}]]</a> `).run();
+                        setNoteLinkModal(false);
+                        setNoteSearch('');
+                      }}
+                      className="w-full p-4 text-left border border-[var(--border)] hover:border-[var(--accent)] hover:bg-[var(--accent)]/5 transition-all group"
+                    >
+                      <p className="text-sm font-serif italic group-hover:text-[var(--accent)]">{n.title || 'Sem título'}</p>
+                      <p className="text-[9px] opacity-30 mt-1 uppercase font-bold">{n.tags?.join(' · ') || 'Sem tags'}</p>
+                    </button>
+                  ))
+                }
+              </div>
+
+              <button
+                onClick={() => setNoteLinkModal(false)}
+                className="mt-6 w-full py-4 text-[10px] font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity"
+              >
+                Cancelar
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
