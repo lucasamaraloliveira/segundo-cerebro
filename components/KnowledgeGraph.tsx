@@ -43,7 +43,7 @@ const stripHtml = (html: string) => {
 
 export default function KnowledgeGraph({ notes, width, height }: KnowledgeGraphProps) {
   const router = useRouter();
-  const fgRef = useRef<any>();
+  const fgRef = useRef<any>(null);
   const hasRestored = useRef(false);
   const [mounted, setMounted] = useState(false);
   const [hoveredNode, setHoveredNode] = useState<any>(null);
