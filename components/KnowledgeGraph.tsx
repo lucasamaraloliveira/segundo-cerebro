@@ -206,8 +206,6 @@ export default function KnowledgeGraph({ notes, width, height }: KnowledgeGraphP
           }
         }}
         cooldownTicks={100}
-        d3AlphaDecay={0.02}
-        d3VelocityDecay={0.3}
         d3AlphaMin={0.001}
       />
       
