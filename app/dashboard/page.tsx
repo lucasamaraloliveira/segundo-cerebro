@@ -18,6 +18,20 @@ export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const updateDimensions = () => {
+      setDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight - (window.innerWidth < 768 ? 80 : 100)
+      });
+    };
+
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
+    return () => window.removeEventListener('resize', updateDimensions);
+  }, []);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark';
@@ -122,21 +136,21 @@ export default function Dashboard() {
   return (
     <div className="h-screen flex flex-col bg-[var(--background)] overflow-hidden text-[var(--foreground)]">
       {/* Header */}
-      <header className="p-6 border-b border-[var(--border)] bg-[var(--background)] flex items-center justify-between z-10">
-        <div className="flex items-center gap-4">
+      <header className="p-4 md:p-6 border-b border-[var(--border)] bg-[var(--background)] flex items-center justify-between z-10">
+        <div className="flex items-center gap-3 md:gap-4">
           <Link href="/" className="p-2 hover:bg-[var(--muted)] rounded-full transition-all">
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
           </Link>
           <div>
-            <h1 className="font-serif italic text-3xl tracking-tight flex items-center gap-2">
-              <Layers className="w-6 h-6" /> Dashboard Neural
+            <h1 className="font-serif italic text-xl md:text-3xl tracking-tight flex items-center gap-2">
+              <Layers className="w-5 h-5 md:w-6 md:h-6" /> Dashboard Neural
             </h1>
-            <p className="text-xs font-bold uppercase tracking-widest opacity-40">Visualização de Vínculos</p>
+            <p className="text-[9px] md:text-xs font-bold uppercase tracking-widest opacity-40">Visualização de Vínculos</p>
           </div>
         </div>
-        <div className="text-right hidden md:block">
-          <p className="text-sm font-medium">{notes.length} Notas Mapeadas</p>
-          <p className="text-xs opacity-40">{graphData.links.length} Conexões por Tags</p>
+        <div className="text-right hidden sm:block">
+          <p className="text-xs md:text-sm font-medium">{notes.length} Notas Mapeadas</p>
+          <p className="text-[10px] md:text-xs opacity-40">{graphData.links.length} Conexões por Tags</p>
         </div>
       </header>
 
@@ -151,6 +165,8 @@ export default function Dashboard() {
         ) : (
           <ForceGraph2D
             ref={fgRef}
+            width={dimensions.width}
+            height={dimensions.height}
             graphData={graphData}
             nodeLabel="name"
             nodeColor={(node: any) => node.color}
@@ -169,9 +185,9 @@ export default function Dashboard() {
       </div>
 
       {/* Instructions */}
-      <div className="absolute bottom-8 left-8 bg-[var(--accent)] text-[var(--accent-foreground)] p-4 rounded-lg shadow-2xl z-20 max-w-xs pointer-events-none">
-        <p className="text-xs font-bold uppercase tracking-wider mb-2 opacity-60">Como ler o mapa:</p>
-        <p className="text-sm">As linhas conectam notas que possuem **Tags em comum**. Notas maiores possuem mais conteúdo escrito.</p>
+      <div className="absolute bottom-4 md:bottom-8 left-4 md:left-8 bg-[var(--accent)] text-[var(--accent-foreground)] p-3 md:p-4 rounded-lg shadow-2xl z-20 max-w-[200px] md:max-w-xs pointer-events-none">
+        <p className="text-[9px] md:text-xs font-bold uppercase tracking-wider mb-1 md:mb-2 opacity-60">Como ler o mapa:</p>
+        <p className="text-xs md:text-sm leading-tight">As linhas conectam notas com **Tags comuns**. Nós maiores têm mais conteúdo.</p>
       </div>
     </div>
   );

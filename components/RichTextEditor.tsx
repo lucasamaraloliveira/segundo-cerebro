@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Extension } from '@tiptap/core';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Underline } from '@tiptap/extension-underline';
@@ -38,17 +39,187 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
-  AlignJustify
+  AlignJustify,
+  ChevronDown
 } from 'lucide-react';
+
+declare module '@tiptap/core' {
+  interface Commands<ReturnType> {
+    fontSize: {
+      setFontSize: (size: string) => ReturnType;
+      unsetFontSize: () => ReturnType;
+    }
+  }
+}
+
+const FontSize = Extension.create({
+  name: 'fontSize',
+  addGlobalAttributes() {
+    return [
+      {
+        types: ['textStyle'],
+        attributes: {
+          fontSize: {
+            default: null,
+            parseHTML: (element: HTMLElement) => element.style.fontSize,
+            renderHTML: (attributes: Record<string, any>) => {
+              if (!attributes.fontSize) return {}
+              return { style: `font-size: ${attributes.fontSize}` }
+            },
+          },
+          fontFamily: {
+            default: null,
+            parseHTML: (element: HTMLElement) => element.style.fontFamily,
+            renderHTML: (attributes: Record<string, any>) => {
+              if (!attributes.fontFamily) return {}
+              return { style: `font-family: ${attributes.fontFamily}` }
+            },
+          },
+        },
+      },
+      {
+        types: ['paragraph', 'heading', 'listItem', 'bulletList', 'orderedList'],
+        attributes: {
+          fontFamily: {
+            default: null,
+            parseHTML: (element: HTMLElement) => element.style.fontFamily,
+            renderHTML: (attributes: Record<string, any>) => {
+              if (!attributes.fontFamily) return {}
+              return { style: `font-family: ${attributes.fontFamily}` }
+            },
+          },
+        },
+      }
+    ]
+  },
+  addCommands() {
+    return {
+      setFontSize: (fontSize: string) => ({ chain }) => {
+        return chain().setMark('textStyle', { fontSize }).run()
+      },
+      unsetFontSize: () => ({ chain }) => {
+        return chain().setMark('textStyle', { fontSize: null }).run()
+      },
+    }
+  },
+})
 
 interface RichTextEditorProps {
   content: string;
   onChange: (content: string) => void;
   placeholder?: string;
+  isFocusMode?: boolean;
 }
 
-export default function RichTextEditor({ content, onChange, placeholder }: RichTextEditorProps) {
-  const [noteFont, setNoteFont] = useState('font-sans');
+
+// Sub-components moved outside to avoid re-definition and state loss on render
+const ToolbarButton = ({ 
+  onClick, 
+  isActive = false, 
+  children, 
+  title 
+}: { 
+  onClick: () => void; 
+  isActive?: boolean; 
+  children: React.ReactNode;
+  title: string;
+}) => (
+  <button
+    onClick={(e) => {
+      e.preventDefault();
+      onClick();
+    }}
+    title={title}
+    className={`p-1 md:p-1.5 rounded-none transition-all relative shrink-0 ${
+      isActive 
+        ? 'bg-[var(--accent)] text-white' 
+        : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60 hover:opacity-100'
+    }`}
+  >
+    {children}
+  </button>
+);
+
+const ToolbarGroup = ({ children, label }: { children: React.ReactNode, label?: string }) => (
+  <div className="flex flex-col gap-0.5 mx-0.5 flex-shrink-0">
+    {label && <span className="hidden md:block text-[6px] font-mono font-bold uppercase tracking-[0.15em] opacity-20 px-0.5">{label}</span>}
+    <div className="flex items-center gap-0.5 bg-[var(--muted)]/10 p-0.5 md:p-1 rounded-none border border-[var(--border)]/5">
+      {children}
+    </div>
+  </div>
+);
+
+const CustomSelect = ({ 
+  icon: Icon, 
+  value, 
+  onChange, 
+  options, 
+  label 
+}: { 
+  icon: any, 
+  value: string, 
+  onChange: (val: string) => void, 
+  options: { label: string, value: string }[],
+  label: string
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const selectedLabel = options.find(opt => opt.value === value)?.label || label;
+
+  const toggleDropdown = () => {
+    if (!isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setCoords({ top: rect.bottom + window.scrollY, left: rect.left + window.scrollX });
+    }
+    setIsOpen(!isOpen);
+  };
+
+  return (
+    <div className="relative">
+      <button
+        ref={buttonRef}
+        onClick={toggleDropdown}
+        className="flex items-center gap-1 px-1.5 py-1 rounded-none bg-[var(--muted)]/30 text-[var(--foreground)] border border-[var(--border)]/10 hover:border-[var(--accent)] transition-all min-w-[70px] md:min-w-[85px]"
+      >
+        <Icon className="w-3 h-3 md:w-3.5 md:h-3.5 opacity-60" />
+        <span className="text-[8px] md:text-[9px] font-bold uppercase tracking-widest truncate max-w-[45px] md:max-w-[60px]">
+          {selectedLabel}
+        </span>
+        <ChevronDown className={`w-2.5 h-2.5 ml-auto transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-[60]" onClick={() => setIsOpen(false)} />
+          <div 
+            style={{ 
+              position: 'fixed',
+              top: `${coords.top - window.scrollY + 4}px`, 
+              left: `${coords.left - window.scrollX}px`,
+            }}
+            className="z-[70] bg-[var(--sidebar-bg)] border border-[var(--border)] shadow-[4px_4px_0px_rgba(0,0,0,0.2)] min-w-[160px] animate-in fade-in zoom-in-95 duration-100"
+          >
+            {options.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+                className={`w-full text-left px-4 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] ${value === opt.value ? 'bg-[var(--muted)] border-l-4 border-[var(--accent)]' : ''}`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+export default function RichTextEditor({ content, onChange, placeholder, isFocusMode = false }: RichTextEditorProps) {
   const [pasteModal, setPasteModal] = useState<{ show: boolean, text: string, html: string } | null>(null);
 
   const editor = useEditor({
@@ -82,6 +253,7 @@ export default function RichTextEditor({ content, onChange, placeholder }: RichT
       TextAlign.configure({
         types: ['heading', 'paragraph'],
       }),
+      FontSize,
     ],
     content: content,
     immediatelyRender: false,
@@ -97,30 +269,26 @@ export default function RichTextEditor({ content, onChange, placeholder }: RichT
 
   // Update editor attributes when font changes
   useEffect(() => {
-    if (editor && noteFont) {
+    if (editor) {
       editor.setOptions({
         editorProps: {
           attributes: {
-            class: `prose prose-sm md:prose-lg dark:prose-invert max-w-none focus:outline-none min-h-[500px] ${noteFont}`,
+            class: 'prose prose-sm md:prose-base xl:prose-lg dark:prose-invert max-w-none focus:outline-none min-h-[500px]',
           },
           handlePaste(view, event) {
             const text = event.clipboardData?.getData('text/plain') || '';
             const html = event.clipboardData?.getData('text/html') || '';
-
-            // If it's only text, no need to ask
             if (!html || html === text) return false;
-
             setPasteModal({ show: true, text, html });
-            return true; // handled by modal
+            return true;
           },
         },
       });
     }
-  }, [noteFont, editor]);
+  }, [editor]);
 
   const handlePasteChoice = (keep: boolean) => {
     if (!editor || !pasteModal) return;
-
     if (keep) {
       editor.chain().focus().insertContent(pasteModal.html).run();
     } else {
@@ -133,80 +301,12 @@ export default function RichTextEditor({ content, onChange, placeholder }: RichT
     return null;
   }
 
-  const ToolbarButton = ({ 
-    onClick, 
-    isActive = false, 
-    children, 
-    title 
-  }: { 
-    onClick: () => void; 
-    isActive?: boolean; 
-    children: React.ReactNode;
-    title: string;
-  }) => (
-    <button
-      onClick={(e) => {
-        e.preventDefault();
-        onClick();
-      }}
-      title={title}
-      className={`p-1.5 md:p-2 rounded-md transition-all ${
-        isActive 
-          ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' 
-          : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60 hover:opacity-100'
-      }`}
-    >
-      {children}
-    </button>
-  );
-
-  const ToolbarGroup = ({ children }: { children: React.ReactNode }) => (
-    <div className="flex items-center gap-0.5 bg-[var(--muted)]/30 p-0.5 rounded-md border border-[var(--border)]/20 mx-0.5">
-      {children}
-    </div>
-  );
-
-  const StyledSelect = ({ 
-    options, 
-    value, 
-    onChange, 
-    icon: Icon,
-    label 
-  }: { 
-    options: { label: string, value: string }[], 
-    value: string, 
-    onChange: (value: string) => void,
-    icon: any,
-    label: string
-  }) => (
-    <div className="relative flex items-center">
-      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[var(--muted)]/50 text-[var(--foreground)] border border-[var(--border)] transition-all min-w-[80px]">
-        <Icon className="w-3.5 h-3.5 opacity-60" />
-        <span className="text-[9px] font-bold uppercase tracking-widest whitespace-nowrap overflow-hidden text-ellipsis max-w-[50px]">
-          {options.find(opt => opt.value === value)?.label || label}
-        </span>
-      </div>
-      <select 
-        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-        value={value}
-        onChange={(e) => {
-          onChange(e.target.value);
-          // Reset value to avoid sticking if needed, but for headings it's fine
-        }}
-      >
-        <option value="" disabled>{label}</option>
-        {options.map(opt => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
-    </div>
-  );
-
   return (
     <div className="flex flex-col w-full">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-y-2 gap-x-1 p-2 bg-[var(--background)] border-b border-[var(--border)] sticky top-0 z-10">
-        <ToolbarGroup>
+      {/* Toolbar Console */}
+      <div className="bg-[var(--sidebar-bg)] border-b border-[var(--border)] sticky top-0 z-30">
+        <div className="flex flex-nowrap items-center md:items-end gap-x-0.5 md:gap-x-1 p-1 md:p-1.5 overflow-x-auto no-scrollbar scroll-smooth">
+        <ToolbarGroup label="EDIT">
           <ToolbarButton
             onClick={() => editor.chain().focus().undo().run()}
             title="Desfazer"
@@ -221,7 +321,7 @@ export default function RichTextEditor({ content, onChange, placeholder }: RichT
           </ToolbarButton>
         </ToolbarGroup>
 
-        <ToolbarGroup>
+        <ToolbarGroup label="TEXT">
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBold().run()}
             isActive={editor.isActive('bold')}
@@ -236,19 +336,21 @@ export default function RichTextEditor({ content, onChange, placeholder }: RichT
           >
             <Italic className="w-4 h-4" />
           </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleUnderline().run()}
-            isActive={editor.isActive('underline')}
-            title="Sublinhado"
-          >
-            <UnderlineIcon className="w-4 h-4" />
-          </ToolbarButton>
+          <div className="hidden md:block">
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleUnderline().run()}
+              isActive={editor.isActive('underline')}
+              title="Sublinhado"
+            >
+              <UnderlineIcon className="w-4 h-4" />
+            </ToolbarButton>
+          </div>
         </ToolbarGroup>
         
-        <ToolbarGroup>
+        <ToolbarGroup label="STRUCT">
           {/* Heading Dropdown (Mobile Only) */}
           <div className="flex md:hidden">
-            <StyledSelect 
+            <CustomSelect 
               label="Estilo"
               icon={Heading1}
               value={
@@ -287,17 +389,19 @@ export default function RichTextEditor({ content, onChange, placeholder }: RichT
             >
               <Heading2 className="w-4 h-4" />
             </ToolbarButton>
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-              isActive={editor.isActive('heading', { level: 3 })}
-              title="Título Pequeno"
-            >
-              <Heading3 className="w-4 h-4" />
-            </ToolbarButton>
+            {isFocusMode && (
+              <ToolbarButton
+                onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+                isActive={editor.isActive('heading', { level: 3 })}
+                title="Título Pequeno"
+              >
+                <Heading3 className="w-4 h-4" />
+              </ToolbarButton>
+            )}
           </div>
         </ToolbarGroup>
 
-        <ToolbarGroup>
+        <ToolbarGroup label="LIST">
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBulletList().run()}
             isActive={editor.isActive('bulletList')}
@@ -305,13 +409,15 @@ export default function RichTextEditor({ content, onChange, placeholder }: RichT
           >
             <List className="w-4 h-4" />
           </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleOrderedList().run()}
-            isActive={editor.isActive('orderedList')}
-            title="Lista Numerada"
-          >
-            <ListOrdered className="w-4 h-4" />
-          </ToolbarButton>
+          <div className="hidden md:block">
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleOrderedList().run()}
+              isActive={editor.isActive('orderedList')}
+              title="Lista Numerada"
+            >
+              <ListOrdered className="w-4 h-4" />
+            </ToolbarButton>
+          </div>
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleTaskList().run()}
             isActive={editor.isActive('taskList')}
@@ -321,111 +427,160 @@ export default function RichTextEditor({ content, onChange, placeholder }: RichT
           </ToolbarButton>
         </ToolbarGroup>
 
-        <ToolbarGroup>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleCode().run()}
-            isActive={editor.isActive('code')}
-            title="Código Inline"
-          >
-            <Code className="w-4 h-4" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-            isActive={editor.isActive('codeBlock')}
-            title="Bloco de Código"
-          >
-            <SquareCode className="w-4 h-4" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleBlockquote().run()}
-            isActive={editor.isActive('blockquote')}
-            title="Citação"
-          >
-            <Quote className="w-4 h-4" />
-          </ToolbarButton>
-        </ToolbarGroup>
+        {isFocusMode && (
+          <div className="hidden md:block">
+            <ToolbarGroup>
+              <ToolbarButton
+                onClick={() => editor.chain().focus().toggleCode().run()}
+                isActive={editor.isActive('code')}
+                title="Código Inline"
+              >
+                <Code className="w-4 h-4" />
+              </ToolbarButton>
+              <ToolbarButton
+                onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+                isActive={editor.isActive('codeBlock')}
+                title="Bloco de Código"
+              >
+                <SquareCode className="w-4 h-4" />
+              </ToolbarButton>
+              <ToolbarButton
+                onClick={() => editor.chain().focus().toggleBlockquote().run()}
+                isActive={editor.isActive('blockquote')}
+                title="Citação"
+              >
+                <Quote className="w-4 h-4" />
+              </ToolbarButton>
+            </ToolbarGroup>
+          </div>
+        )}
 
-        <ToolbarGroup>
-          {/* Alignment Dropdown (Mobile Only) */}
-          <div className="flex md:hidden">
-            <StyledSelect 
-              label="Alinhamento"
-              icon={AlignLeft}
-              value={
-                editor.isActive({ textAlign: 'center' }) ? 'center' :
-                editor.isActive({ textAlign: 'right' }) ? 'right' :
-                editor.isActive({ textAlign: 'justify' }) ? 'justify' : 'left'
-              }
-              onChange={(val) => editor.chain().focus().setTextAlign(val).run()}
+        {isFocusMode && (
+          <ToolbarGroup label="LAYOUT">
+            {/* Alignment Dropdown (Mobile Only) */}
+            <div className="flex md:hidden">
+              <CustomSelect 
+                label="Alinhamento"
+                icon={AlignLeft}
+                value={
+                  editor.isActive({ textAlign: 'center' }) ? 'center' :
+                  editor.isActive({ textAlign: 'right' }) ? 'right' :
+                  editor.isActive({ textAlign: 'justify' }) ? 'justify' : 'left'
+                }
+                onChange={(val) => editor.chain().focus().setTextAlign(val).run()}
+                options={[
+                  { label: 'Esquerda', value: 'left' },
+                  { label: 'Centro', value: 'center' },
+                  { label: 'Direita', value: 'right' },
+                  { label: 'Justificado', value: 'justify' },
+                ]}
+              />
+            </div>
+
+            {/* Alignment Individual (Desktop Only) */}
+            <div className="hidden md:flex items-center gap-0.5">
+              <ToolbarButton
+                onClick={() => editor.chain().focus().setTextAlign('left').run()}
+                isActive={editor.isActive({ textAlign: 'left' })}
+                title="Alinhar à Esquerda"
+              >
+                <AlignLeft className="w-4 h-4" />
+              </ToolbarButton>
+              <ToolbarButton
+                onClick={() => editor.chain().focus().setTextAlign('center').run()}
+                isActive={editor.isActive({ textAlign: 'center' })}
+                title="Centralizar"
+              >
+                <AlignCenter className="w-4 h-4" />
+              </ToolbarButton>
+              <ToolbarButton
+                onClick={() => editor.chain().focus().setTextAlign('right').run()}
+                isActive={editor.isActive({ textAlign: 'right' })}
+                title="Alinhar à Direita"
+              >
+                <AlignRight className="w-4 h-4" />
+              </ToolbarButton>
+            </div>
+          </ToolbarGroup>
+        )}
+
+        {isFocusMode && (
+          <ToolbarGroup label="TYPO">
+            <CustomSelect 
+              label="Fonte"
+              icon={Type}
+              value={editor.getAttributes('textStyle').fontFamily || editor.getAttributes('paragraph').fontFamily || 'Inter'}
+              onChange={(val) => {
+                editor.chain().focus()
+                  .setFontFamily(val)
+                  .command(({ tr, state }) => {
+                    const { from, to } = state.selection;
+                    state.doc.nodesBetween(from, to, (node, pos) => {
+                      if (['paragraph', 'heading', 'listItem', 'bulletList', 'orderedList'].includes(node.type.name)) {
+                        tr.setNodeMarkup(pos, undefined, { ...node.attrs, fontFamily: val });
+                      }
+                    });
+                    return true;
+                  })
+                  .run();
+              }}
               options={[
-                { label: 'Esquerda', value: 'left' },
-                { label: 'Centro', value: 'center' },
-                { label: 'Direita', value: 'right' },
-                { label: 'Justificado', value: 'justify' },
+                { label: 'Sans', value: 'Inter' },
+                { label: 'Serif', value: 'Georgia' },
+                { label: 'Mono', value: 'monospace' },
               ]}
             />
-          </div>
+            <CustomSelect 
+              label="Tamanho"
+              icon={Type}
+              value={editor.getAttributes('textStyle').fontSize || editor.getAttributes('paragraph').fontSize || '18px'}
+              onChange={(val) => {
+                editor.chain().focus()
+                  .setFontSize(val)
+                  .command(({ tr, state }) => {
+                    const { from, to } = state.selection;
+                    state.doc.nodesBetween(from, to, (node, pos) => {
+                      if (['paragraph', 'heading', 'listItem', 'bulletList', 'orderedList'].includes(node.type.name)) {
+                        tr.setNodeMarkup(pos, undefined, { ...node.attrs, fontSize: val });
+                      }
+                    });
+                    return true;
+                  })
+                  .run();
+              }}
+              options={[
+                { label: '12px', value: '12px' },
+                { label: '14px', value: '14px' },
+                { label: '16px', value: '16px' },
+                { label: '18px', value: '18px' },
+                { label: '20px', value: '20px' },
+                { label: '24px', value: '24px' },
+                { label: '32px', value: '32px' },
+                { label: '48px', value: '48px' },
+              ]}
+            />
+          </ToolbarGroup>
+        )}
 
-          {/* Alignment Individual (Desktop Only) */}
-          <div className="hidden md:flex items-center gap-0.5">
-            <ToolbarButton
-              onClick={() => editor.chain().focus().setTextAlign('left').run()}
-              isActive={editor.isActive({ textAlign: 'left' })}
-              title="Alinhar à Esquerda"
-            >
-              <AlignLeft className="w-4 h-4" />
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => editor.chain().focus().setTextAlign('center').run()}
-              isActive={editor.isActive({ textAlign: 'center' })}
-              title="Centralizar"
-            >
-              <AlignCenter className="w-4 h-4" />
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => editor.chain().focus().setTextAlign('right').run()}
-              isActive={editor.isActive({ textAlign: 'right' })}
-              title="Alinhar à Direita"
-            >
-              <AlignRight className="w-4 h-4" />
-            </ToolbarButton>
-          </div>
-        </ToolbarGroup>
-
-        <ToolbarGroup>
-          <div className="flex items-center gap-1 px-1">
-            <Type className="w-3 h-3 opacity-30 text-[var(--foreground)]" />
-            <select 
-              onChange={(e) => setNoteFont(e.target.value)}
-              className="bg-transparent text-[9px] font-bold uppercase tracking-wider outline-none cursor-pointer max-w-[70px] text-[var(--foreground)]"
-              value={noteFont}
-              title="Fonte"
-            >
-              <option value="font-sans">Sans</option>
-              <option value="font-serif">Serif</option>
-              <option value="font-mono">Mono</option>
-            </select>
-          </div>
-          <div className="w-[1px] h-3 bg-[var(--border)] mx-1" />
-          <div className="flex items-center gap-1 px-1">
+        <ToolbarGroup label="COLOR">
+          <div className="flex items-center gap-1 px-1 py-0.5">
             <Palette className="w-3 h-3 opacity-30 text-[var(--foreground)]" />
             <select 
               onChange={(e) => {
                 if (e.target.value === 'auto') editor.chain().focus().unsetColor().run();
                 else editor.chain().focus().setColor(e.target.value).run();
               }}
-              className="bg-transparent text-[9px] font-bold uppercase tracking-wider outline-none cursor-pointer text-[var(--foreground)]"
+              className="bg-transparent text-[8px] font-mono font-bold uppercase tracking-wider outline-none cursor-pointer text-[var(--foreground)]"
               title="Cor"
             >
               <option value="auto">Auto</option>
               <option value="#ef4444">Red</option>
               <option value="#3b82f6">Blue</option>
               <option value="#10b981">Green</option>
+              <option value="#FF4F00">Accent</option>
             </select>
           </div>
         </ToolbarGroup>
-
-        <div className="flex-1" />
 
         <ToolbarGroup>
           <ToolbarButton
@@ -435,16 +590,20 @@ export default function RichTextEditor({ content, onChange, placeholder }: RichT
             <Eraser className="w-3.5 h-3.5" />
           </ToolbarButton>
         </ToolbarGroup>
-      </div>
 
-      <div className={noteFont}>
+        {/* Scroll Buffer */}
+        <div className="w-8 flex-shrink-0 h-1" />
+      </div>
+    </div>
+
+      <div>
         <EditorContent editor={editor} />
       </div>
 
       {/* Paste Choice Modal */}
       {pasteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-[var(--background)] rounded-2xl shadow-2xl p-8 max-w-md w-full border border-[var(--border)] animate-in zoom-in-95 duration-200">
+          <div className="bg-[var(--background)] rounded-none shadow-2xl p-8 max-w-md w-full border border-[var(--border)] animate-in zoom-in-95 duration-200">
             <h3 className="text-2xl font-serif mb-4 tracking-tight text-[var(--foreground)]">Como deseja colar?</h3>
             <p className="text-sm text-[var(--foreground)]/60 mb-8 leading-relaxed">
               O conteúdo copiado possui formatação original. Escolha como deseja integrá-lo à sua nota.
@@ -452,14 +611,14 @@ export default function RichTextEditor({ content, onChange, placeholder }: RichT
             <div className="grid gap-3">
               <button 
                 onClick={() => handlePasteChoice(false)}
-                className="w-full py-4 px-6 bg-[var(--accent)] text-[var(--accent-foreground)] rounded-xl font-bold uppercase text-[11px] tracking-widest hover:opacity-90 transition-all flex items-center justify-between group"
+                className="w-full py-4 px-6 bg-[var(--accent)] text-[var(--accent-foreground)] rounded-none font-bold uppercase text-[11px] tracking-widest hover:opacity-90 transition-all flex items-center justify-between group"
               >
                 Limpar Formatação
                 <span className="opacity-40 group-hover:opacity-100 transition-opacity text-[var(--accent-foreground)]">Ajustar ao estilo atual</span>
               </button>
               <button 
                 onClick={() => handlePasteChoice(true)}
-                className="w-full py-4 px-6 bg-transparent text-[var(--foreground)] border border-[var(--border)] rounded-xl font-bold uppercase text-[11px] tracking-widest hover:bg-[var(--muted)] transition-all flex items-center justify-between group"
+                className="w-full py-4 px-6 bg-transparent text-[var(--foreground)] border border-[var(--border)] rounded-none font-bold uppercase text-[11px] tracking-widest hover:bg-[var(--muted)] transition-all flex items-center justify-between group"
               >
                 Manter Original
                 <span className="opacity-40 group-hover:opacity-100 transition-opacity">Preservar estilo externo</span>
