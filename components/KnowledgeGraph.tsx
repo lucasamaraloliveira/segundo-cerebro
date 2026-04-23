@@ -30,6 +30,7 @@ interface KnowledgeGraphProps {
   notes: Note[];
   width?: number;
   height?: number;
+  selectedTag?: string | null;
 }
 
 // Helper to strip HTML for previews
@@ -43,7 +44,7 @@ const stripHtml = (html: string) => {
   }
 };
 
-export default function KnowledgeGraph({ notes, width, height }: KnowledgeGraphProps) {
+export default function KnowledgeGraph({ notes, width, height, selectedTag }: KnowledgeGraphProps) {
   const router = useRouter();
   const fgRef = useRef<any>(null);
   const hasRestored = useRef(false);
@@ -144,8 +145,16 @@ export default function KnowledgeGraph({ notes, width, height }: KnowledgeGraphP
         height={height}
         graphData={graphData}
         nodeLabel="name"
-        nodeColor={(node: any) => '#FF4F00'}
-        linkColor={() => 'rgba(128, 128, 128, 0.15)'}
+        nodeColor={(node: any) => {
+          if (!selectedTag) return '#FF4F00';
+          return node.tags?.includes(selectedTag) ? '#FF4F00' : 'rgba(128, 128, 128, 0.1)';
+        }}
+        linkColor={(link: any) => {
+          if (!selectedTag) return 'rgba(128, 128, 128, 0.15)';
+          const sourceMatch = link.source.tags?.includes(selectedTag);
+          const targetMatch = link.target.tags?.includes(selectedTag);
+          return (sourceMatch && targetMatch) ? 'rgba(255, 79, 0, 0.3)' : 'rgba(128, 128, 128, 0.03)';
+        }}
         linkWidth={(link: any) => link.weight * 1.5}
         nodeRelSize={1}
         backgroundColor="transparent"
@@ -179,8 +188,10 @@ export default function KnowledgeGraph({ notes, width, height }: KnowledgeGraphP
 
           // Draw node glow
           try {
+            const isHighlighted = !selectedTag || node.tags?.includes(selectedTag);
+            const glowOpacity = isHighlighted ? 0.35 : 0.05;
             const gradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, nodeR * 4);
-            gradient.addColorStop(0, 'rgba(255, 79, 0, 0.35)');
+            gradient.addColorStop(0, `rgba(255, 79, 0, ${glowOpacity})`);
             gradient.addColorStop(1, 'rgba(255, 79, 0, 0)');
             ctx.fillStyle = gradient;
             ctx.beginPath();
@@ -191,9 +202,10 @@ export default function KnowledgeGraph({ notes, width, height }: KnowledgeGraphP
           }
 
           // Draw node
+          const isNodeHighlighted = !selectedTag || node.tags?.includes(selectedTag);
           ctx.beginPath();
           ctx.arc(node.x, node.y, nodeR, 0, 2 * Math.PI, false);
-          ctx.fillStyle = '#FF4F00';
+          ctx.fillStyle = isNodeHighlighted ? '#FF4F00' : 'rgba(128, 128, 128, 0.2)';
           ctx.fill();
           
           // Labels (only when zoomed in)

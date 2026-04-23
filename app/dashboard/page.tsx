@@ -26,6 +26,7 @@ export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [dimensions, setDimensions] = useState<{ width: number, height: number } | null>(null);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
   useEffect(() => {
     const updateDimensions = () => {
@@ -150,23 +151,35 @@ export default function Dashboard() {
         </div>
         
         {/* Left Stats Sidebar (HUD Style) */}
-        <div className="absolute top-10 left-10 z-20 hidden lg:block pointer-events-none">
+        <div className="absolute top-10 left-10 z-20 hidden lg:block">
           <div className="space-y-10">
             <div className="space-y-4">
               <div className="flex items-center gap-2 opacity-40">
                 <BarChart3 className="w-4 h-4" />
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Principais Tópicos</p>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-3 pointer-events-auto">
                 {stats.topTags.map(([tag, count]: any) => (
-                  <div key={tag} className="flex items-center gap-4">
-                    <div className="w-2 h-2 bg-[var(--accent)]" />
+                  <button 
+                    key={tag} 
+                    onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                    className={`flex items-center gap-4 w-full text-left transition-all group ${selectedTag && selectedTag !== tag ? 'opacity-30' : 'opacity-100'}`}
+                  >
+                    <div className={`w-2 h-2 transition-all ${selectedTag === tag ? 'bg-[var(--accent)] scale-150 rotate-45 shadow-[0_0_10px_var(--accent)]' : 'bg-[var(--accent)]/40 group-hover:bg-[var(--accent)]'}`} />
                     <div>
-                      <p className="text-sm font-serif italic leading-none">{tag}</p>
+                      <p className={`text-sm font-serif italic leading-none transition-colors ${selectedTag === tag ? 'text-[var(--accent)]' : 'text-[var(--foreground)]'}`}>{tag}</p>
                       <p className="text-[9px] font-bold uppercase tracking-tighter opacity-30">{count} conexões</p>
                     </div>
-                  </div>
+                  </button>
                 ))}
+                {selectedTag && (
+                  <button 
+                    onClick={() => setSelectedTag(null)}
+                    className="mt-4 text-[8px] font-bold uppercase tracking-widest text-[var(--accent)] hover:underline"
+                  >
+                    × Limpar Filtro
+                  </button>
+                )}
               </div>
             </div>
 
@@ -196,6 +209,7 @@ export default function Dashboard() {
               notes={notes} 
               width={dimensions.width} 
               height={dimensions.height} 
+              selectedTag={selectedTag}
             />
           ) : (
             <div className="h-full w-full flex items-center justify-center">
