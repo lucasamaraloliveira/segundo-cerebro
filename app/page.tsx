@@ -637,6 +637,20 @@ export default function Home() {
     });
   }, [notes, searchQuery, activeTag, view, isSemanticSearch, semanticKeywords]);
 
+  const storageUsage = useMemo(() => {
+    const totalBytes = notes.reduce((acc, note) => {
+      return acc + (JSON.stringify(note).length * 2); // 2 bytes per char for UTF-16
+    }, 0);
+    const limitBytes = 1024 * 1024 * 1024; // 1GB (Firestore Spark Limit)
+    return {
+      bytes: totalBytes,
+      percentage: Math.max(0.1, (totalBytes / limitBytes) * 100),
+      formatted: totalBytes < 1024 * 1024 
+        ? (totalBytes / 1024).toFixed(1) + ' KB' 
+        : (totalBytes / (1024 * 1024)).toFixed(1) + ' MB'
+    };
+  }, [notes]);
+
   const backlinks = useMemo(() => {
     if (!activeNote) return [];
     return notes.filter(n => 
@@ -1030,7 +1044,7 @@ export default function Home() {
                       <FileText className={`w-4 h-4 ${view === 'all' && !activeTag ? 'opacity-100' : 'opacity-40'}`} />
                       Todas as Notas
                     </div>
-                    <span className="text-[10px] opacity-40 font-mono">{notes.length}</span>
+                    <span className="text-[10px] opacity-60 font-mono">{notes.length}</span>
                   </button>
                   <button
                     onClick={() => {
@@ -1043,25 +1057,25 @@ export default function Home() {
                       <Star className={`w-4 h-4 ${view === 'favorites' ? 'text-yellow-500 fill-yellow-500' : 'opacity-40'}`} />
                       Favoritos
                     </div>
-                    <span className="text-[10px] opacity-40 font-mono">{notes.filter(n => n.isBookmarked).length}</span>
+                    <span className="text-[10px] opacity-60 font-mono">{notes.filter(n => n.isBookmarked).length}</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setView('reminders');
+                      setActiveTag(null);
+                    }}
+                    className={`w-full flex items-center justify-between px-2 py-2 rounded-none transition-all text-sm font-medium ${view === 'reminders' ? 'bg-[var(--muted)] text-[var(--foreground)]' : 'text-[var(--foreground)] opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Bell className={`w-4 h-4 ${view === 'reminders' ? 'text-[var(--accent)]' : 'opacity-40'}`} />
+                      Lembretes
+                    </div>
+                    <span className="text-[10px] opacity-60 font-mono">{notes.filter(n => n.reminder).length}</span>
                   </button>
                 </div>
-                <button
-                  onClick={() => {
-                    setView('reminders');
-                    setActiveTag(null);
-                  }}
-                  className={`w-full flex items-center justify-between px-2 py-2 rounded-none transition-all text-sm font-medium ${view === 'reminders' ? 'bg-[var(--muted)] text-[var(--foreground)]' : 'text-[var(--foreground)] opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Bell className={`w-4 h-4 ${view === 'reminders' ? 'text-[var(--accent)]' : 'opacity-40'}`} />
-                    Lembretes
-                  </div>
-                  <span className="text-[10px] opacity-40 font-mono">{notes.filter(n => n.reminder).length}</span>
-                </button>
                 <Link
                   href="/dashboard"
-                  className="block w-full text-left text-sm font-medium transition-all hover:italic hover:pl-2 text-accent flex items-center gap-2"
+                  className="block w-full text-left text-sm font-medium transition-all hover:italic hover:pl-2 text-accent flex items-center gap-2 pt-2"
                 >
                   <Brain className="w-4 h-4 opacity-40" />
                   Dashboard Neural
@@ -1098,6 +1112,26 @@ export default function Home() {
             </nav>
 
             <div className="pt-8 border-t border-[var(--border)]">
+              {/* Firebase Usage Monitor */}
+              <div className="mb-6 space-y-2">
+                <div className="flex items-center justify-between gap-2 flex-nowrap">
+                  <span className="text-[9px] font-bold uppercase tracking-widest opacity-40 whitespace-nowrap">Capacidade Neural</span>
+                  <span className="text-[9px] font-mono opacity-40 whitespace-nowrap">{storageUsage.formatted} / 1GB</span>
+                </div>
+                <div className="h-1 w-full bg-[var(--muted)] rounded-none overflow-hidden border border-black/5">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${storageUsage.percentage}%` }}
+                    className={`h-full transition-colors ${
+                      storageUsage.percentage > 90 ? 'bg-red-500' : 
+                      storageUsage.percentage > 70 ? 'bg-orange-500' : 
+                      'bg-[var(--accent)]'
+                    }`}
+                  />
+                </div>
+                <p className="text-[8px] italic opacity-30 leading-tight">Limite do Plano Gratuito (Firestore)</p>
+              </div>
+
               <div className="flex items-center gap-2 text-green-600 mb-6">
                 <div className="w-2 h-2 rounded-none bg-current animate-pulse"></div>
                 <span className="text-[11px] font-bold uppercase tracking-wider">Sincronizado</span>
