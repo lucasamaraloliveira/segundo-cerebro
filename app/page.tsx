@@ -49,7 +49,8 @@ import {
   Undo2,
   AlertTriangle,
   RotateCcw,
-  Mic
+  Mic,
+  X
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -432,6 +433,65 @@ export default function Home() {
   const [newTagInput, setNewTagInput] = useState('');
   const [tagsToAssign, setTagsToAssign] = useState<string[]>([]);
   const [notifiedReminders, setNotifiedReminders] = useState<Set<string>>(new Set());
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isReminderAlertOpen, setIsReminderAlertOpen] = useState(false);
+  const [currentReminderNote, setCurrentReminderNote] = useState<Note | null>(null);
+  const [alarmType, setAlarmType] = useState<'neural' | 'crystal' | 'pulsar' | 'zen'>('neural');
+
+  // Persistência do tipo de alarme
+  useEffect(() => {
+    const savedAlarm = localStorage.getItem('alarmType') as any;
+    if (savedAlarm) setAlarmType(savedAlarm);
+  }, []);
+
+  const playNeuralSound = (typeOverride?: string) => {
+    if (typeof window === "undefined") return;
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const type = typeOverride || alarmType;
+    
+    const osc = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    
+    osc.connect(gain);
+    gain.connect(audioContext.destination);
+
+    switch(type) {
+      case 'crystal':
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(1760, audioContext.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, audioContext.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.05, audioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.2);
+        osc.start();
+        osc.stop(audioContext.currentTime + 0.2);
+        break;
+      case 'pulsar':
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(440, audioContext.currentTime);
+        osc.frequency.setValueAtTime(880, audioContext.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.02, audioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.3);
+        osc.start();
+        osc.stop(audioContext.currentTime + 0.3);
+        break;
+      case 'zen':
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523.25, audioContext.currentTime); // C5
+        gain.gain.setValueAtTime(0.08, audioContext.currentTime);
+        gain.gain.linearRampToValueAtTime(0, audioContext.currentTime + 1);
+        osc.start();
+        osc.stop(audioContext.currentTime + 1);
+        break;
+      default: // neural
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, audioContext.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(440, audioContext.currentTime + 0.5);
+        gain.gain.setValueAtTime(0.1, audioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+        osc.start();
+        osc.stop(audioContext.currentTime + 0.5);
+    }
+  };
 
   // Notification Permission
   useEffect(() => {
@@ -456,8 +516,10 @@ export default function Home() {
               });
             }
             
-            // Visual feedback (Alert as fallback/supplement)
-            alert(`🧠 LEMBRETE NEURAL\n\nNota: ${note.title || 'Sem título'}\n\nEstá na hora de revisar este pensamento.`);
+            // Visual feedback (Styled Modal)
+            setCurrentReminderNote(note);
+            setIsReminderAlertOpen(true);
+            playNeuralSound();
             
             setNotifiedReminders(prev => new Set(prev).add(note.id));
           }
@@ -1149,8 +1211,16 @@ export default function Home() {
                   <p className="text-[11px] font-bold truncate uppercase tracking-widest">{user.displayName || 'Usuário'}</p>
                 </div>
                 <button
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)] rounded-none transition-colors"
+                  title="Configurações"
+                >
+                  <Settings className="w-3 h-3" />
+                </button>
+                <button
                   onClick={logOut}
                   className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)] rounded-none transition-colors"
+                  title="Sair"
                 >
                   <LogOut className="w-3 h-3" />
                 </button>
@@ -1676,6 +1746,141 @@ export default function Home() {
               <RotateCcw className="w-3 h-3" /> Desfazer
             </button>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* NEURAL REMINDER ALERT MODAL */}
+      <AnimatePresence>
+        {isReminderAlertOpen && currentReminderNote && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.8, opacity: 0, y: 20 }}
+              className="relative w-full max-w-md bg-[var(--background)] border-2 border-[var(--accent)] p-8 shadow-[20px_20px_0px_rgba(0,0,0,0.1)]"
+            >
+              <div className="flex flex-col items-center text-center space-y-6">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-[var(--accent)] rounded-full animate-ping opacity-20" />
+                  <div className="relative w-16 h-16 bg-[var(--accent)] flex items-center justify-center shadow-lg">
+                    <Bell className="w-8 h-8 text-white animate-bounce" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-[10px] uppercase tracking-[0.3em] font-bold text-[var(--accent)]">Alerta Neural</h3>
+                  <h2 className="text-2xl font-serif italic">{currentReminderNote.title || 'Pensamento Sem Título'}</h2>
+                  <p className="text-xs opacity-60 line-clamp-2 max-w-[280px] mx-auto">
+                    {((currentReminderNote.content || '').replace(/<[^>]*>/g, '') || 'Este pensamento requer sua atenção agora.').substring(0, 120)}...
+                  </p>
+                </div>
+
+                <div className="w-full pt-4 flex flex-col gap-3">
+                  <button 
+                    onClick={() => {
+                      if (currentReminderNote) {
+                        setActiveNoteId(currentReminderNote.id);
+                        setIsReminderAlertOpen(false);
+                        if (window.innerWidth < 768) setMobileView('editor');
+                      }
+                    }}
+                    className="w-full py-4 bg-[var(--accent)] text-white text-[10px] font-bold uppercase tracking-[0.2em] shadow-[4px_4px_0px_rgba(0,0,0,0.2)] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none transition-all flex items-center justify-center gap-2"
+                  >
+                    <ArrowRight className="w-4 h-4" /> Expandir Pensamento
+                  </button>
+                  <button 
+                    onClick={() => setIsReminderAlertOpen(false)}
+                    className="w-full py-3 text-[10px] font-bold uppercase tracking-[0.2em] opacity-40 hover:opacity-100 transition-all"
+                  >
+                    Ignorar por enquanto
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* SETTINGS MODAL */}
+      <AnimatePresence>
+        {isSettingsOpen && (
+          <div className="fixed inset-0 z-[250] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setIsSettingsOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative w-full max-w-lg bg-[var(--background)] border border-[var(--border)] p-10 shadow-[40px_40px_0px_rgba(0,0,0,0.1)]"
+            >
+              <div className="flex items-center justify-between mb-10">
+                <div>
+                  <h2 className="text-3xl font-serif italic mb-2 tracking-tight">Configurações</h2>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] opacity-40">Personalize sua interface neural</p>
+                </div>
+                <button onClick={() => setIsSettingsOpen(false)} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 transition-all">
+                  <X className="w-5 h-5 opacity-40" />
+                </button>
+              </div>
+
+              <div className="space-y-10">
+                <section className="space-y-6">
+                  <div className="flex items-center gap-3 border-l-4 border-[var(--accent)] pl-4">
+                    <Bell className="w-5 h-5 text-[var(--accent)]" />
+                    <h3 className="text-sm font-bold uppercase tracking-widest">Alarme Neural</h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    {[
+                      { id: 'neural', name: 'Neural', desc: 'Sutil e decrescente' },
+                      { id: 'crystal', name: 'Crystal', desc: 'Agudo e direto' },
+                      { id: 'pulsar', name: 'Pulsar', desc: 'Alerta duplo' },
+                      { id: 'zen', name: 'Zen', desc: 'Harmônico longo' }
+                    ].map(type => (
+                      <button
+                        key={type.id}
+                        onClick={() => {
+                          setAlarmType(type.id as any);
+                          localStorage.setItem('alarmType', type.id);
+                          playNeuralSound(type.id);
+                        }}
+                        className={`text-left p-4 border-2 transition-all group ${
+                          alarmType === type.id 
+                            ? 'border-[var(--accent)] bg-[var(--accent)]/5' 
+                            : 'border-[var(--border)] hover:border-[var(--accent)]/30'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className={`text-[10px] font-bold uppercase tracking-widest ${alarmType === type.id ? 'text-[var(--accent)]' : 'opacity-40'}`}>
+                            {type.name}
+                          </span>
+                          {alarmType === type.id && <div className="w-2 h-2 bg-[var(--accent)]" />}
+                        </div>
+                        <p className="text-[10px] opacity-60 leading-relaxed">{type.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+              </div>
+
+              <div className="mt-12 pt-8 border-t border-[var(--border)]">
+                <button
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="w-full py-4 bg-[var(--foreground)] text-[var(--background)] text-[10px] font-bold uppercase tracking-[0.2em] shadow-[8px_8px_0px_rgba(0,0,0,0.1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
+                >
+                  Salvar e Fechar
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

@@ -19,11 +19,14 @@ const cormorant = Cormorant_Garamond({
   style: ['normal', 'italic'],
 });
 
+export const viewport = {
+  themeColor: '#fcfcf9',
+};
+
 export const metadata: Metadata = {
   title: 'Mente+ Segundo Cérebro',
   description: 'Seu segundo cérebro digital inteligente.',
   manifest: '/manifest.json',
-  themeColor: '#fcfcf9',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',

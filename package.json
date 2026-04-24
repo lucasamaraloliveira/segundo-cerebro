@@ -10,7 +10,7 @@
     "clean": "next clean"
   },
   "dependencies": {
-    "@google/genai": "^1.17.0",
+    "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^5.2.1",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
