@@ -300,6 +300,13 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
       },
     },
   });
+  
+  // Sync external content changes (e.g. from AI Assistant)
+  useEffect(() => {
+    if (editor && content !== editor.getHTML()) {
+      editor.commands.setContent(content);
+    }
+  }, [content, editor]);
 
   // Update editor attributes when font changes
   useEffect(() => {

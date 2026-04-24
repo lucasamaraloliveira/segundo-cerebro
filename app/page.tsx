@@ -68,6 +68,7 @@ const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), {
 });
 
 const CommandPalette = dynamic(() => import('@/components/CommandPalette'), { ssr: false });
+const AIAssistantModal = dynamic(() => import('@/components/AIAssistantModal'), { ssr: false });
 
 // Helper to strip HTML for previews
 const stripHtml = (html: string) => {
@@ -127,14 +128,8 @@ const TagButton = React.memo(({
 
 TagButton.displayName = 'TagButton';
 
-const TEMPLATES = [
-  { id: 'meeting', label: 'Ata de Reunião', icon: '📅', content: '<h2>📅 Detalhes</h2><p><b>Data:</b> ' + new Date().toLocaleDateString('pt-BR') + '</p><p><b>Participantes:</b> </p><hr><h2>📝 Pauta</h2><ul><li></li></ul><hr><h2>✅ Decisões</h2><ul><li></li></ul><hr><h2>🚀 Próximos Passos</h2><ul><li></li></ul>' },
-  { id: 'project', label: 'Plano de Projeto', icon: '🎯', content: '<h2>🎯 Objetivos</h2><p></p><hr><h2>📦 Entregáveis</h2><ul><li></li></ul><hr><h2>⏳ Cronograma</h2><ul><li>Fase 1: </li></ul>' },
-  { id: 'diary', label: 'Diário', icon: '🧠', content: '<h2>🧠 Reflexões do Dia</h2><p></p><hr><h2>🙏 Gratidão</h2><ul><li></li></ul><hr><h2>📅 Para Amanhã</h2><ul><li></li></ul>' },
-  { id: 'study', label: 'Estudo', icon: '📖', content: '<h2>📖 Assunto Principal</h2><p></p><hr><h2>💡 Pontos Chave</h2><ul><li></li></ul><hr><h2>❓ Dúvidas / Revisar</h2><p></p>' },
-];
 
-const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isAiLoading, handleAiAction, exportAsPDF, deleteNote, setIsFullscreen, setIsTagModalOpen, setNewTagInput, relatedNotes, setActiveNoteId, setIsTemplateModalOpen, backlinks, allNotes }: any) => {
+const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isAiLoading, handleAiAction, exportAsPDF, deleteNote, setIsFullscreen, setIsTagModalOpen, setNewTagInput, relatedNotes, setActiveNoteId, setIsAIAssistantOpen, backlinks, allNotes, refreshKey }: any) => {
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const [localTitle, setLocalTitle] = useState(activeNote.title || '');
   const [localContent, setLocalContent] = useState(activeNote.content || '');
@@ -151,7 +146,7 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
   useEffect(() => {
     setLocalTitle(activeNote.title || '');
     setLocalContent(activeNote.content || '');
-  }, [activeNote.id]);
+  }, [activeNote.id, refreshKey]);
 
   useEffect(() => {
     if (localTitle === activeNote.title) return;
@@ -194,11 +189,11 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
         </div>
         <div className="flex items-center gap-3 md:gap-6 h-8 overflow-x-auto no-scrollbar flex-nowrap pr-4">
           <button
-            onClick={() => setIsTemplateModalOpen(true)}
-            className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter hover:text-[var(--foreground)] transition-all group text-[var(--foreground)]"
+            onClick={() => setIsAIAssistantOpen(true)}
+            className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter hover:text-[#FF4F00] transition-all group text-[var(--foreground)]"
           >
-            <Layout className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100" />
-            <span className="whitespace-nowrap">Modelos</span>
+            <Sparkles className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100 group-hover:text-[#FF4F00]" />
+            <span className="whitespace-nowrap">Assistente IA</span>
           </button>
           <div className="flex-shrink-0 w-[1px] h-3 bg-[var(--border)] hidden md:block" />
           <button
@@ -418,7 +413,8 @@ export default function Home() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
+  const [editorRefreshKey, setEditorRefreshKey] = useState(0);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState<Note | null>(null);
   const [showAllSidebarTags, setShowAllSidebarTags] = useState(false);
@@ -795,12 +791,48 @@ export default function Home() {
     setActiveNoteId(docRef.id);
   };
 
-  const updateNote = async (id: string, updates: Partial<Note>) => {
-    const noteRef = doc(db, 'notes', id);
-    await updateDoc(noteRef, {
-      ...updates,
-      updatedAt: serverTimestamp()
+  const updateNote = async (id: string, data: Partial<Note>) => {
+    try {
+      const noteRef = doc(db, 'notes', id);
+      await updateDoc(noteRef, {
+        ...data,
+        updatedAt: serverTimestamp()
+      });
+    } catch (error) {
+      console.error("Error updating note:", error);
+    }
+  };
+
+  // AI Assistant Handlers
+  const handleAIAssistantApply = async (newContent: string) => {
+    if (!activeNote) return;
+    await updateNote(activeNote.id, { content: newContent });
+    setEditorRefreshKey(prev => prev + 1);
+  };
+
+  const allExistingTags = useMemo(() => {
+    const set = new Set<string>();
+    notes.forEach(n => n.tags?.forEach(t => set.add(t)));
+    return Array.from(set);
+  }, [notes]);
+
+  const handleAIAssistantTags = async (suggestedTags: string[]) => {
+    if (!activeNote) return;
+    const currentTags = activeNote.tags || [];
+    const finalTags = [...currentTags];
+    
+    suggestedTags.forEach(suggested => {
+      // Look for match in existing system tags (case insensitive)
+      const existing = allExistingTags.find(t => t.toLowerCase() === suggested.toLowerCase());
+      const tagToAdd = existing || suggested;
+      
+      // Check if this tag is already in this note's tag list
+      if (!finalTags.some(t => t.toLowerCase() === tagToAdd.toLowerCase())) {
+        finalTags.push(tagToAdd);
+      }
     });
+    
+    await updateNote(activeNote.id, { tags: finalTags });
   };
 
   const deleteNote = (id: string) => {
@@ -1387,9 +1419,10 @@ export default function Home() {
               setNewTagInput={setNewTagInput}
               relatedNotes={relatedNotes}
               setActiveNoteId={setActiveNoteId}
-              setIsTemplateModalOpen={setIsTemplateModalOpen}
+              setIsAIAssistantOpen={setIsAIAssistantOpen}
               backlinks={backlinks}
               allNotes={notes}
+              refreshKey={editorRefreshKey}
             />
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
@@ -1641,6 +1674,15 @@ export default function Home() {
         onAction={handleCommandAction}
       />
 
+      <AIAssistantModal 
+        isOpen={isAIAssistantOpen}
+        onClose={() => setIsAIAssistantOpen(false)}
+        content={activeNote?.content || ""}
+        onApply={handleAIAssistantApply}
+        onAddTags={handleAIAssistantTags}
+        existingTags={allExistingTags}
+      />
+
       {/* CUSTOM DELETE MODAL */}
       <AnimatePresence>
         {isDeleteModalOpen && (
@@ -1680,51 +1722,6 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      {/* TEMPLATE SELECTOR MODAL */}
-      <AnimatePresence>
-        {isTemplateModalOpen && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setIsTemplateModalOpen(false)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            />
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-              className="relative w-full max-w-2xl bg-[var(--background)] border border-[var(--border)] p-10 shadow-[30px_30px_0px_rgba(0,0,0,0.1)]"
-            >
-              <div className="flex items-center justify-between mb-10">
-                <div>
-                  <h2 className="text-2xl font-serif italic mb-1">Escolher Modelo</h2>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40">Estruture seu pensamento</p>
-                </div>
-                <button onClick={() => setIsTemplateModalOpen(false)} className="opacity-40 hover:opacity-100 transition-opacity text-2xl">×</button>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {TEMPLATES.map(t => (
-                  <button
-                    key={t.id}
-                    onClick={() => {
-                      if (activeNote) {
-                        const newContent = t.content + (activeNote.content ? '<hr>' + activeNote.content : '');
-                        const newTitle = t.label + ': ' + (activeNote.title === 'Nova Nota' ? '' : activeNote.title);
-                        updateNote(activeNote.id, { content: newContent, title: newTitle });
-                        setIsTemplateModalOpen(false);
-                      }
-                    }}
-                    className="p-6 border border-[var(--border)] bg-[var(--muted)]/20 hover:bg-[var(--accent)]/5 hover:border-[var(--accent)] transition-all text-left group"
-                  >
-                    <div className="text-3xl mb-4 group-hover:scale-110 transition-transform origin-left">{t.icon}</div>
-                    <h4 className="text-sm font-bold uppercase tracking-widest mb-2 group-hover:text-[var(--accent)] transition-colors">{t.label}</h4>
-                    <p className="text-[10px] opacity-40 leading-relaxed">Clique para aplicar este formato à sua nota atual.</p>
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* UNDO TOAST */}
       <AnimatePresence>
