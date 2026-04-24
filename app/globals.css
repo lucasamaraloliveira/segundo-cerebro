@@ -97,6 +97,14 @@ select option {
   outline: none;
 }
 
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--muted-foreground);
+  pointer-events: none;
+  height: 0;
+}
+
 .tiptap a {
   @apply text-[var(--accent)] font-medium underline underline-offset-4 decoration-[var(--accent)]/30 hover:decoration-[var(--accent)] transition-all cursor-pointer;
 }

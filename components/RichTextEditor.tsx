@@ -584,7 +584,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
       </div>
     </div>
 
-    <div className="flex-1 px-8 md:px-16 lg:px-24 py-12 md:py-20">
+    <div className="flex-1 px-8 md:px-16 lg:px-24 py-8">
       <EditorContent editor={editor} />
     </div>
 
