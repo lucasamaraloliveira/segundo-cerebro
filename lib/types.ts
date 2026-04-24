@@ -11,6 +11,7 @@ export interface Note {
   userId: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  embedding?: number[];
 }
 
 export type NoteInput = Omit<Note, 'id' | 'createdAt' | 'updatedAt'>;

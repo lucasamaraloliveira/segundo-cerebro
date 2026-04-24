@@ -37,11 +37,14 @@ export const metadata: Metadata = {
   },
 };
 
+import SpecialistChat from '@/components/SpecialistChat';
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning className={`${inter.variable} ${jetbrainsMono.variable} ${cormorant.variable}`}>
       <body suppressHydrationWarning className="bg-[#fcfcf9] text-[#1a1a1a] font-sans antialiased">
         {children}
+        <SpecialistChat />
         <script
           dangerouslySetInnerHTML={{
             __html: `

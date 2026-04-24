@@ -1262,11 +1262,11 @@ export default function Home() {
           <h2 className="font-serif italic text-2xl tracking-tight text-[var(--foreground)]">Cérebro²</h2>
           <div className="flex items-center gap-1">
             <button 
-              onClick={() => setIsCommandPaletteOpen(true)}
-              className="p-2 bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 shadow-[2px_2px_0px_rgba(0,0,0,0.05)] transition-all active:scale-95"
-              title="Terminal Neural"
+              onClick={() => window.dispatchEvent(new CustomEvent('open-specialist-chat'))}
+              className="p-2 bg-[#FF4F00]/10 text-[#FF4F00] border border-[#FF4F00]/20 shadow-[2px_2px_0px_rgba(0,0,0,0.05)] transition-all active:scale-95"
+              title="Especialista Neural"
             >
-              <Command className="w-4 h-4" />
+              <Brain className="w-4 h-4" />
             </button>
             <button 
               onClick={toggleTheme}
@@ -1351,11 +1351,11 @@ export default function Home() {
             </button>
             <div className="flex items-center gap-1">
               <button 
-                onClick={() => setIsCommandPaletteOpen(true)}
-                className="p-2 bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 active:scale-95 transition-all"
-                title="Terminal Neural"
+                onClick={() => window.dispatchEvent(new CustomEvent('open-specialist-chat'))}
+                className="p-2 bg-[#FF4F00]/10 text-[#FF4F00] border border-[#FF4F00]/20 active:scale-95 transition-all"
+                title="Especialista Neural"
               >
-                <Command className="w-4 h-4" />
+                <Brain className="w-4 h-4" />
               </button>
               <button 
                 onClick={toggleTheme}

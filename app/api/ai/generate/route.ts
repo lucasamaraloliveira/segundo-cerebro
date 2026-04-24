@@ -29,7 +29,7 @@ export async function POST(req: Request) {
 
     // Inicializa o SDK oficial da Google
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite-preview' });
 
     try {
       const result = await model.generateContent(prompt);
