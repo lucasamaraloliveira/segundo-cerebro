@@ -38,12 +38,18 @@ const NEURAL_COLORS = [
 const getTagColor = (tags: string[] = []) => {
   if (tags.length === 0) return '#FF4F00';
   const tag = tags[0];
-  // Simple hash for consistent color
   let hash = 0;
   for (let i = 0; i < tag.length; i++) {
     hash = tag.charCodeAt(i) + ((hash << 5) - hash);
   }
   return NEURAL_COLORS[Math.abs(hash) % NEURAL_COLORS.length];
+};
+
+const hexToRgba = (hex: string, alpha: number) => {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
 export default function KnowledgeGraph({ notes, width, height, selectedTag }: KnowledgeGraphProps) {
@@ -188,15 +194,16 @@ export default function KnowledgeGraph({ notes, width, height, selectedTag }: Kn
           return (!selectedTag || isNodeHighlighted) ? (node.color || '#FF4F00') : 'rgba(128, 128, 128, 0.1)';
         }}
         linkColor={(link: any) => {
+          const sourceColor = typeof link.source === 'object' ? link.source.color : '#FF4F00';
           if (hoveredNode) {
             const isConnected = (typeof link.source === 'object' ? link.source.id === hoveredNode.id : link.source === hoveredNode.id) || 
                                 (typeof link.target === 'object' ? link.target.id === hoveredNode.id : link.target === hoveredNode.id);
-            return isConnected ? 'rgba(255, 79, 0, 0.4)' : 'rgba(128, 128, 128, 0.02)';
+            return isConnected ? hexToRgba(sourceColor, 0.4) : 'rgba(128, 128, 128, 0.02)';
           }
-          if (!selectedTag) return 'rgba(128, 128, 128, 0.15)';
+          if (!selectedTag) return hexToRgba(sourceColor, 0.15);
           const sourceMatch = (typeof link.source === 'object' ? link.source.tags : []).includes(selectedTag);
           const targetMatch = (typeof link.target === 'object' ? link.target.tags : []).includes(selectedTag);
-          return (sourceMatch && targetMatch) ? 'rgba(255, 79, 0, 0.3)' : 'rgba(128, 128, 128, 0.03)';
+          return (sourceMatch && targetMatch) ? hexToRgba(sourceColor, 0.3) : 'rgba(128, 128, 128, 0.03)';
         }}
         linkWidth={(link: any) => {
           if (hoveredNode) {
