@@ -338,17 +338,15 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
             <div className="space-y-1">
               <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Vencimento</p>
               <input
-                type="date"
+                type="datetime-local"
                 className="w-full bg-[var(--muted)] text-[var(--foreground)] px-3 py-2 text-xs font-bold uppercase tracking-wider rounded border-none focus:outline-none"
-                value={activeNote.expiryDate ? format(activeNote.expiryDate.toDate(), 'yyyy-MM-dd') : ''}
+                value={activeNote.expiryDate ? format(activeNote.expiryDate.toDate(), "yyyy-MM-dd'T'HH:mm") : ''}
                 onChange={(e) => {
                   const val = e.target.value;
                   if (!val) {
                     updateNote(activeNote.id, { expiryDate: null });
                   } else {
-                    // Force parsing as local date to avoid timezone shifts
-                    const [year, month, day] = val.split('-').map(Number);
-                    const d = new Date(year, month - 1, day);
+                    const d = new Date(val);
                     if (!isNaN(d.getTime())) {
                       updateNote(activeNote.id, { expiryDate: Timestamp.fromDate(d) });
                     }
@@ -442,7 +440,6 @@ export default function Home() {
   const [isSemanticLoading, setIsSemanticLoading] = useState(false);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const activeNote = useMemo(() => notes.find(n => n.id === activeNoteId), [notes, activeNoteId]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
@@ -534,6 +531,7 @@ export default function Home() {
     const checkReminders = () => {
       const now = new Date();
       notes.forEach(note => {
+        // 1. Handle regular reminders
         if (note.reminder && !notifiedReminders.has(note.id)) {
           const reminderTime = note.reminder.toDate();
           // Trigger if within the current minute
@@ -551,6 +549,17 @@ export default function Home() {
             playNeuralSound();
             
             setNotifiedReminders(prev => new Set(prev).add(note.id));
+            
+            // AUTOMATICALLY REMOVE REMOVED (As requested)
+            updateNote(note.id, { reminder: null });
+          }
+        }
+
+        // 2. Handle expiryDate - if note is expired, clear reminder to avoid zombie alerts
+        if (note.expiryDate && note.reminder) {
+          const expiryTime = note.expiryDate.toDate();
+          if (expiryTime < now) {
+            updateNote(note.id, { reminder: null });
           }
         }
       });
@@ -560,12 +569,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [notes, notifiedReminders]);
 
-  // Sidebar responsiveness
-  useEffect(() => {
-    if (window.innerWidth < 768) {
-      setIsSidebarOpen(false);
-    }
-  }, []);
+
 
   // Initialize tagsToAssign when modal opens
   useEffect(() => {
@@ -1187,17 +1191,17 @@ export default function Home() {
 
   return (
     <div className={`flex h-screen overflow-hidden bg-[var(--background)] ${isFullscreen ? 'p-0' : ''} touch-pan-y md:touch-auto`}>
-      {/* SIDEBAR - Hidden on mobile by default, toggled via menu */}
-      <AnimatePresence>
-        {isSidebarOpen && !isFullscreen && (
-          <motion.aside
-            initial={{ x: -300 }}
-            animate={{ x: 0 }}
-            exit={{ x: -300 }}
-            className={`w-64 border-r border-[var(--border)] bg-[var(--sidebar-bg)] hidden md:flex flex-col z-30 p-8 
-              ${isFullscreen ? 'hidden' : ''} 
-              relative h-full`}
+      {/* SIDEBAR - Permanente, oculta apenas no Modo Foco */}
+      <motion.aside
+            initial={false}
+            animate={{ 
+              width: isFullscreen ? 0 : 320,
+              opacity: isFullscreen ? 0 : 1,
+              x: isFullscreen ? -320 : 0
+            }}
+            className="hidden lg:flex flex-col bg-[var(--sidebar-bg)] border-r border-[var(--border)] relative z-30 overflow-hidden"
           >
+            <div className="p-10 flex-1 flex flex-col h-full">
             <div className="mb-10 flex items-center justify-between">
               <h2 className="font-serif italic text-3xl tracking-tight flex items-center gap-2">
                 Cérebro²
@@ -1208,12 +1212,6 @@ export default function Home() {
                 title="Trocar Tema"
               >
                 {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-              </button>
-              <button
-                onClick={() => setIsSidebarOpen(false)}
-                className="lg:hidden p-2 hover:bg-muted rounded-none"
-              >
-                <ArrowLeft className="w-4 h-4" />
               </button>
             </div>
 
@@ -1374,36 +1372,17 @@ export default function Home() {
                 </button>
               </div>
             </div>
-          </motion.aside>
-        )}
-      </AnimatePresence>
+          </div>
+        </motion.aside>
 
-      {/* Mobile Overlay for Sidebar */}
-      <AnimatePresence>
-        {isSidebarOpen && !isFullscreen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setIsSidebarOpen(false)}
-            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-20 md:hidden"
-          />
-        )}
-      </AnimatePresence>
+
 
       {/* NOTE LIST - Hidden on mobile if editor is open */}
       <section className={`w-full md:w-80 border-r border-[var(--border)] bg-[var(--background)] flex flex-col relative z-10 
         ${isFullscreen ? 'hidden' : ''} 
         ${mobileView === 'editor' ? 'hidden md:flex' : 'flex'}`}
       >
-        {!isSidebarOpen && (
-          <button 
-            onClick={() => setIsSidebarOpen(true)}
-            className="hidden md:block absolute -left-3 top-6 bg-[var(--background)] border border-[var(--border)] rounded-none p-1.5 shadow-sm hover:scale-110 transition-all text-[var(--foreground)]"
-          >
-            <Plus className="w-3 h-3 rotate-45" />
-          </button>
-        )}
+
 
         {/* Mobile Header for List View */}
         <div className="md:hidden flex items-center justify-between p-5 pb-0 bg-[var(--background)]">
