@@ -147,7 +147,7 @@ const TagButton = React.memo(({
 TagButton.displayName = 'TagButton';
 
 
-const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isAiLoading, handleAiAction, exportAsPDF, deleteNote, setIsFullscreen, setIsTagModalOpen, setNewTagInput, relatedNotes, setActiveNoteId, setIsAIAssistantOpen, backlinks, allNotes, refreshKey }: any) => {
+const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isAiLoading, handleAiAction, exportAsPDF, deleteNote, setIsFullscreen, setIsTagModalOpen, setIsPushModalOpen, setNewTagInput, relatedNotes, setActiveNoteId, setIsAIAssistantOpen, backlinks, allNotes, refreshKey }: any) => {
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const [localTitle, setLocalTitle] = useState(activeNote.title || '');
   const [localContent, setLocalContent] = useState(activeNote.content || '');
@@ -526,12 +526,7 @@ export default function Home() {
     }
   };
 
-  // Notification Permission
-  useEffect(() => {
-    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
-  }, []);
+
 
   // Reminder Engine
   useEffect(() => {
@@ -604,9 +599,6 @@ export default function Home() {
       setLoading(false);
       if (!u) setNotes([]);
 
-      if (u && "Notification" in window) {
-        Notification.requestPermission();
-      }
     });
     return () => unsubscribe();
   }, []);
@@ -1478,6 +1470,7 @@ export default function Home() {
               deleteNote={deleteNote}
               setIsFullscreen={setIsFullscreen}
               setIsTagModalOpen={setIsTagModalOpen}
+              setIsPushModalOpen={setIsPushModalOpen}
               setNewTagInput={setNewTagInput}
               relatedNotes={relatedNotes}
               setActiveNoteId={setActiveNoteId}
