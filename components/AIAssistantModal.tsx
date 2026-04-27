@@ -140,7 +140,7 @@ export default function AIAssistantModal({ isOpen, onClose, content, onApply, on
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-2xl bg-[var(--background)] border-2 border-black shadow-[16px_16px_0px_0px_rgba(0,0,0,1)] flex flex-col max-h-[90vh] overflow-hidden"
+            className="relative w-full max-w-2xl bg-[var(--background)] border border-black/10 shadow-[8px_8px_0px_rgba(0,0,0,0.1)] flex flex-col max-h-[90vh] overflow-hidden"
           >
             {/* Header */}
             <div className="p-4 bg-[#FF4F00] text-white border-b-2 border-black flex items-center justify-between">
@@ -162,9 +162,9 @@ export default function AIAssistantModal({ isOpen, onClose, content, onApply, on
                       <button
                         key={opt.id}
                         onClick={() => handleAction(opt.id)}
-                        className="group flex flex-col text-left p-4 border-2 border-black bg-[var(--muted)] hover:bg-[#FF4F00]/5 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] active:shadow-none active:translate-x-[4px] active:translate-y-[4px]"
+                        className="group flex flex-col text-left p-4 border border-black/5 bg-[var(--muted)] hover:bg-[#FF4F00]/5 transition-all shadow-[4px_4px_0px_rgba(0,0,0,0.1)] hover:translate-y-[-2px] hover:shadow-[4px_6px_0px_rgba(0,0,0,0.15)] active:translate-y-[0px] active:shadow-none"
                       >
-                        <div className={`w-10 h-10 ${opt.color} text-white flex items-center justify-center border-2 border-black mb-3 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]`}>
+                        <div className={`w-10 h-10 ${opt.color} text-white flex items-center justify-center border border-black/10 mb-3 shadow-[2px_2px_0px_rgba(0,0,0,0.1)]`}>
                           <opt.icon size={20} />
                         </div>
                         <h3 className="font-bold text-sm uppercase mb-1">{opt.title}</h3>
@@ -202,7 +202,7 @@ export default function AIAssistantModal({ isOpen, onClose, content, onApply, on
                       {error}
                     </div>
                   ) : (
-                    <div className="p-6 border-2 border-black bg-[var(--muted)] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] max-h-[400px] overflow-y-auto custom-scrollbar">
+                    <div className="p-6 border border-black/5 bg-[var(--muted)] shadow-[4px_4px_0px_rgba(0,0,0,0.1)] max-h-[400px] overflow-y-auto custom-scrollbar">
                       <div className="prose prose-sm dark:prose-invert max-w-none">
                         {selectedOption === 'tags' ? (
                           <div className="flex flex-wrap gap-2">
@@ -239,14 +239,14 @@ export default function AIAssistantModal({ isOpen, onClose, content, onApply, on
                           if (selectedOption === 'tags') handleApply('tags');
                           else setShowApplyOptions(true);
                         }}
-                        className="flex-1 bg-black text-white py-3 font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 hover:bg-[#FF4F00] transition-colors border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[4px] active:translate-y-[4px]"
+                        className="flex-1 bg-black text-white py-3 font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 hover:bg-[#FF4F00] transition-colors border border-black/5 shadow-[4px_4px_0px_rgba(0,0,0,0.1)] hover:translate-y-[-1px] active:translate-y-[0px] active:shadow-none"
                       >
                         <Check size={16} />
                         {selectedOption === 'tags' ? 'Aplicar Tags' : 'Aplicar na Nota'}
                       </button>
                       <button
                         onClick={() => handleAction(selectedOption!)}
-                        className="px-4 bg-[var(--muted)] border-2 border-black flex items-center justify-center hover:bg-black hover:text-white transition-colors"
+                        className="px-4 bg-[var(--muted)] border border-black/5 shadow-[4px_4px_0px_rgba(0,0,0,0.1)] flex items-center justify-center hover:bg-black hover:text-white transition-colors"
                         title="Tentar Novamente"
                       >
                         <RotateCcw size={18} />
@@ -264,13 +264,13 @@ export default function AIAssistantModal({ isOpen, onClose, content, onApply, on
                       <div className="flex gap-3">
                         <button
                           onClick={() => handleApply('replace')}
-                          className="flex-1 bg-white text-black py-3 font-bold uppercase tracking-widest text-[10px] border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:bg-black hover:text-white transition-all active:shadow-none active:translate-x-[4px] active:translate-y-[4px]"
+                          className="flex-1 bg-white text-black py-3 font-bold uppercase tracking-widest text-[10px] border border-black/5 shadow-[4px_4px_0px_rgba(0,0,0,0.1)] hover:translate-y-[-1px] transition-all active:shadow-none active:translate-y-[0px]"
                         >
                           Substituir Tudo
                         </button>
                         <button
                           onClick={() => handleApply('append')}
-                          className="flex-1 bg-black text-white py-3 font-bold uppercase tracking-widest text-[10px] border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:bg-[#FF4F00] transition-all active:shadow-none active:translate-x-[4px] active:translate-y-[4px]"
+                          className="flex-1 bg-black text-white py-3 font-bold uppercase tracking-widest text-[10px] border border-black/5 shadow-[4px_4px_0px_rgba(0,0,0,0.1)] hover:translate-y-[-1px] transition-all active:shadow-none active:translate-y-[0px]"
                         >
                           Adicionar ao Final
                         </button>

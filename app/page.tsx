@@ -1422,7 +1422,7 @@ export default function Home() {
             <div className="flex items-center gap-1">
               <button 
                 onClick={() => window.dispatchEvent(new CustomEvent('open-specialist-chat'))}
-                className="p-2 bg-[#FF4F00]/10 text-[#FF4F00] border border-[#FF4F00]/20 active:scale-95 transition-all"
+                className="p-2 bg-[#FF4F00] text-white shadow-[4px_4px_0px_rgba(0,0,0,0.1)] active:scale-95 transition-all border border-black/5"
                 title="Especialista Neural"
               >
                 <Brain className="w-4 h-4" />

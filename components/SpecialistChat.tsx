@@ -22,6 +22,42 @@ export default function SpecialistChat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [size, setSize] = useState({ width: 380, height: 480 });
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeDir, setResizeDir] = useState<string | null>(null);
+
+  // Resize handler
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (resizeDir === 'top') {
+        const newHeight = window.innerHeight - e.clientY - 96; // 96 is bottom-24
+        if (newHeight > 300 && newHeight < 800) setSize(prev => ({ ...prev, height: newHeight }));
+      } else if (resizeDir === 'left') {
+        const newWidth = window.innerWidth - e.clientX - 32; // 32 is right-8
+        if (newWidth > 300 && newWidth < 800) setSize(prev => ({ ...prev, width: newWidth }));
+      } else if (resizeDir === 'both') {
+        const newHeight = window.innerHeight - e.clientY - 96;
+        const newWidth = window.innerWidth - e.clientX - 32;
+        if (newHeight > 300 && newHeight < 800) setSize(prev => ({ ...prev, height: newHeight }));
+        if (newWidth > 300 && newWidth < 800) setSize(prev => ({ ...prev, width: newWidth }));
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      setResizeDir(null);
+      document.body.style.cursor = 'default';
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, resizeDir]);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -181,7 +217,7 @@ export default function SpecialistChat() {
       {/* Botão Flutuante Responsivo */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[100] w-14 h-14 bg-[#FF4F00] text-[var(--accent-foreground)] border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hidden md:flex items-center justify-center hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all active:translate-x-[4px] active:translate-y-[4px] active:shadow-none"
+        className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[100] w-14 h-14 bg-[#FF4F00] text-white rounded-none shadow-[4px_4px_0px_rgba(0,0,0,0.1)] flex items-center justify-center hover:translate-y-[-2px] hover:shadow-[4px_6px_0px_rgba(0,0,0,0.15)] transition-all active:translate-y-[0px] active:shadow-none border border-black/5"
       >
         {isOpen ? <X size={24} /> : <Brain size={24} />}
       </button>
@@ -195,16 +231,34 @@ export default function SpecialistChat() {
           />
 
           {/* Modal / Bottom Sheet Responsivo */}
-          <div className={`
-            fixed z-[100] bg-[var(--background)] text-[var(--foreground)] border-black flex flex-col transition-all duration-300 ease-out
+          <div 
+            style={{ 
+              width: typeof window !== 'undefined' && window.innerWidth >= 768 ? `${size.width}px` : undefined, 
+              height: typeof window !== 'undefined' && window.innerWidth >= 768 ? `${size.height}px` : undefined 
+            }}
+            className={`
+            fixed z-[100] bg-[var(--background)] text-[var(--foreground)] border-black flex flex-col transition-[opacity,transform] duration-300 ease-out
             /* Desktop Styles - Optimized for 1366x768 */
-            md:bottom-24 md:right-8 md:w-[380px] md:h-[480px] md:border-2 md:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] md:animate-in md:fade-in md:slide-in-from-bottom-4 md:rounded-none
+             md:bottom-24 md:right-8 md:border md:border-black/10 md:shadow-[12px_12px_0px_rgba(0,0,0,0.1)] md:animate-in md:fade-in md:slide-in-from-bottom-4 md:rounded-none
             /* Mobile Styles (Bottom Sheet) */
             max-md:bottom-0 max-md:left-0 max-md:right-0 max-md:w-full max-md:h-[85vh] max-md:rounded-t-[2.5rem] max-md:border-t-2 max-md:animate-in max-md:slide-in-from-bottom-full
           `}>
+            {/* Resize Handles (Desktop Only) */}
+            <div 
+              className="absolute top-0 left-0 w-4 h-4 cursor-nwse-resize z-[110] hidden md:block" 
+              onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); setResizeDir('both'); document.body.style.cursor = 'nwse-resize'; }}
+            />
+            <div 
+              className="absolute top-0 left-4 right-4 h-1 cursor-ns-resize z-[110] hidden md:block" 
+              onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); setResizeDir('top'); document.body.style.cursor = 'ns-resize'; }}
+            />
+            <div 
+              className="absolute left-0 top-4 bottom-4 w-1 cursor-ew-resize z-[110] hidden md:block" 
+              onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); setResizeDir('left'); document.body.style.cursor = 'ew-resize'; }}
+            />
 
             {/* Header com Handle para Mobile */}
-            <div className="relative p-4 bg-[#FF4F00] text-white border-b-2 border-black flex items-center justify-between md:rounded-none rounded-t-[2.5rem]">
+            <div className="relative p-4 bg-[#FF4F00] text-white border-b border-black/10 flex items-center justify-between md:rounded-none rounded-t-[2.5rem]">
               {/* Drag handle visual para mobile */}
               <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-black/20 rounded-full md:hidden" />
 
@@ -262,10 +316,10 @@ export default function SpecialistChat() {
 
               {messages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] w-fit border-2 border-black relative group ${
+                  <div className={`max-w-[85%] w-fit border border-black/5 relative group ${
                     msg.role === 'user' 
-                      ? 'bg-[#FF4F00] text-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] px-3 py-1.5' 
-                      : 'bg-[var(--muted)] text-[var(--foreground)] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] p-3'
+                      ? 'bg-[#FF4F00] text-white shadow-[2px_2px_0px_rgba(0,0,0,0.1)] px-3 py-1.5' 
+                      : 'bg-[var(--muted)] text-[var(--foreground)] shadow-[2px_2px_0px_rgba(0,0,0,0.1)] p-3'
                   }`}>
                     {msg.role === 'assistant' && (
                       <button
@@ -296,7 +350,7 @@ export default function SpecialistChat() {
               ))}
               {(isLoading || isUploading) && (
                 <div className="flex justify-start">
-                  <div className="bg-[var(--muted)] p-3 border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2">
+                  <div className="bg-[var(--muted)] p-3 border border-black/5 shadow-[2px_2px_0px_rgba(0,0,0,0.1)] flex items-center gap-2">
                     <Loader2 size={14} className="animate-spin text-[#FF4F00]" />
                     <span className="text-[9px] font-bold uppercase text-[var(--foreground)]">
                       {isUploading ? 'Analisando Mídia...' : 'Processando Sinapses...'}
@@ -306,8 +360,8 @@ export default function SpecialistChat() {
               )}
             </div>
 
-            <form onSubmit={handleSendMessage} className="p-4 bg-[var(--background)] border-t-2 border-black">
-              <div className="flex flex-col bg-[var(--muted)] border-2 border-black focus-within:ring-2 focus-within:ring-[#FF4F00] transition-all">
+            <form onSubmit={handleSendMessage} className="p-4 bg-[var(--background)] border-t border-black/10">
+              <div className="flex flex-col bg-[var(--muted)] border border-black/10 focus-within:ring-2 focus-within:ring-[#FF4F00] transition-all shadow-[4px_4px_0px_rgba(0,0,0,0.05)]">
                 <textarea
                   ref={textareaRef}
                   value={queryText}
