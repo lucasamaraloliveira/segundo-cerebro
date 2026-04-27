@@ -16,6 +16,7 @@ import OrderedList from '@tiptap/extension-ordered-list';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import Placeholder from '@tiptap/extension-placeholder';
+import { Markdown } from 'tiptap-markdown';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Bold, 
@@ -252,6 +253,11 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
 
   const editor = useEditor({
     extensions: [
+      Markdown.configure({
+        html: true,
+        transformPastedText: true,
+        transformCopiedText: true,
+      }),
       StarterKit.configure({
         bulletList: false,
         orderedList: false,

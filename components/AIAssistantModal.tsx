@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
+import { motion, AnimatePresence } from 'motion/react';
+import { useState } from 'react';
 import { 
   Sparkles, 
   X, 
@@ -9,12 +10,32 @@ import {
   ListChecks, 
   FileText, 
   Tag as TagIcon, 
-  MessageSquare,
+  Type,
   Loader2,
   Check,
-  RotateCcw,
-  Type
+  RotateCcw
 } from 'lucide-react';
+
+// Simple helper to convert markdown-style response from AI to HTML for the editor
+const markdownToHtml = (markdown: string) => {
+  if (!markdown) return '';
+  
+  return markdown
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n/g, '<br>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+    .replace(/^\- (.*$)/gim, '<li>$1</li>')
+    .replace(/^\* (.*$)/gim, '<li>$1</li>')
+    .split('<li>')
+    .map((s, i) => i === 0 ? s : `<li>${s}`)
+    .join('')
+    .replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>')
+    .replace(/<\/ul><ul>/g, '');
+};
 
 interface AIAssistantModalProps {
   isOpen: boolean;
@@ -111,10 +132,10 @@ export default function AIAssistantModal({ isOpen, onClose, content, onApply, on
       const tags = result.split(',').map(t => t.trim().toLowerCase()).filter(t => t !== '');
       onAddTags(tags);
     } else if (mode === 'replace') {
-      onApply(result);
+      onApply(markdownToHtml(result));
     } else if (mode === 'append') {
-      const separator = content.trim() ? '\n\n<hr>\n\n' : '';
-      onApply(content + separator + result);
+      const separator = content.trim() ? '<br><hr><br>' : '';
+      onApply(content + separator + markdownToHtml(result));
     }
 
     onClose();
@@ -213,7 +234,9 @@ export default function AIAssistantModal({ isOpen, onClose, content, onApply, on
                             ))}
                           </div>
                         ) : (
-                          <p className="whitespace-pre-wrap text-sm leading-relaxed">{result}</p>
+                          <div className="markdown-preview text-sm leading-relaxed">
+                            <ReactMarkdown>{result}</ReactMarkdown>
+                          </div>
                         )}
                       </div>
                     </div>
