@@ -352,10 +352,11 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
       return;
     }
 
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     const recognition = new SpeechRecognition();
     recognition.lang = 'pt-BR';
     recognition.continuous = true;
-    recognition.interimResults = true;
+    recognition.interimResults = !isMobile; // Disable interim results on mobile to avoid duplication with native Android
 
     recognition.onresult = (event: any) => {
       let finalTranscript = '';
@@ -414,8 +415,8 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
   return (
     <div className="flex flex-col w-full relative">
       {/* Modern Floating Command Dock - Evaluation: Minimalist & Pro */}
-      <div className="sticky top-4 z-50 px-4 md:px-0 flex justify-center w-full pointer-events-none">
-        <div className="pointer-events-auto bg-[var(--background)]/80 backdrop-blur-xl border border-[var(--border)] shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.3)] rounded-full px-4 py-1.5 flex items-center gap-1 max-w-full overflow-x-visible no-scrollbar transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
+      <div className="sticky top-4 z-50 px-2 md:px-0 flex justify-center w-full pointer-events-none">
+        <div className="pointer-events-auto bg-[var(--background)]/80 backdrop-blur-xl border border-[var(--border)] shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.3)] rounded-full px-4 py-1.5 flex items-center gap-1 max-w-[95vw] md:max-w-full overflow-x-auto md:overflow-x-visible no-scrollbar transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
         <div className="flex items-center gap-0.5 pr-2 mr-2 border-r border-[var(--border)]">
           <ToolbarButton onClick={() => editor.chain().focus().undo().run()} title="Desfazer">
             <Undo className="w-3.5 h-3.5" />
@@ -452,7 +453,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
         </div>
 
         {isFocusMode && (
-          <div className="flex items-center gap-2 pr-2 mr-2 border-r border-[var(--border)] animate-in fade-in slide-in-from-left-2 duration-300">
+          <div className="hidden md:flex items-center gap-2 pr-2 mr-2 border-r border-[var(--border)] animate-in fade-in slide-in-from-left-2 duration-300">
             <CustomSelect 
               label="Fonte"
               icon={Type}
@@ -545,7 +546,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
         </div>
 
         {isFocusMode && (
-          <div className="flex items-center gap-0.5 pr-2 mr-2 border-r border-[var(--border)] animate-in fade-in slide-in-from-left-2 duration-300">
+          <div className="hidden md:flex items-center gap-0.5 pr-2 mr-2 border-r border-[var(--border)] animate-in fade-in slide-in-from-left-2 duration-300">
             <CustomSelect 
               label="Alinhar"
               icon={AlignLeft}

@@ -134,6 +134,7 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
   const [localTitle, setLocalTitle] = useState(activeNote.title || '');
   const [localContent, setLocalContent] = useState(activeNote.content || '');
   const [showAllTags, setShowAllTags] = useState(false);
+  const localTitleRef = useRef(activeNote.id);
 
   // Auto-resize title textarea
   React.useLayoutEffect(() => {
@@ -144,9 +145,14 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
   }, [localTitle]);
 
   useEffect(() => {
-    setLocalTitle(activeNote.title || '');
+    // Only update local title if it's currently empty or the default, 
+    // or if the note ID changed
+    if (activeNote.id !== localTitleRef.current || !localTitle) {
+      setLocalTitle(activeNote.title || '');
+      localTitleRef.current = activeNote.id;
+    }
     setLocalContent(activeNote.content || '');
-  }, [activeNote.id, refreshKey]);
+  }, [activeNote.id, activeNote.title, refreshKey]);
 
   useEffect(() => {
     if (localTitle === activeNote.title) return;
@@ -1780,9 +1786,10 @@ export default function Home() {
                   <button 
                     onClick={() => {
                       if (currentReminderNote) {
-                        setActiveNoteId(currentReminderNote.id);
+                        const noteId = currentReminderNote.id;
                         setIsReminderAlertOpen(false);
-                        if (window.innerWidth < 768) setMobileView('editor');
+                        setActiveNoteId(noteId);
+                        setMobileView('editor');
                       }
                     }}
                     className="w-full py-4 bg-[var(--accent)] text-white text-[10px] font-bold uppercase tracking-[0.2em] shadow-[4px_4px_0px_rgba(0,0,0,0.2)] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none transition-all flex items-center justify-center gap-2"
