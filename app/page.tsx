@@ -72,6 +72,9 @@ const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), {
 
 const CommandPalette = dynamic(() => import('@/components/CommandPalette'), { ssr: false });
 const AIAssistantModal = dynamic(() => import('@/components/AIAssistantModal'), { ssr: false });
+const PushPermissionModal = dynamic(() => import('@/components/PushPermissionModal'), { ssr: false });
+
+import { requestNotificationPermission } from '@/lib/push-notifications';
 
 // Helper to strip HTML for previews
 const stripHtml = (html: string) => {
@@ -327,6 +330,11 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
                     const d = new Date(val);
                     if (!isNaN(d.getTime())) {
                       updateNote(activeNote.id, { reminder: Timestamp.fromDate(d) });
+                      
+                      // Trigger push permission if not granted
+                      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+                        setIsPushModalOpen(true);
+                      }
                     }
                   }
                 }}
@@ -459,6 +467,7 @@ export default function Home() {
   const [notifiedReminders, setNotifiedReminders] = useState<Set<string>>(new Set());
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isReminderAlertOpen, setIsReminderAlertOpen] = useState(false);
+  const [isPushModalOpen, setIsPushModalOpen] = useState(false);
   const [currentReminderNote, setCurrentReminderNote] = useState<Note | null>(null);
   const [alarmType, setAlarmType] = useState<'neural' | 'crystal' | 'pulsar' | 'zen'>('neural');
 
@@ -823,10 +832,17 @@ export default function Home() {
   const updateNote = async (id: string, data: Partial<Note>) => {
     try {
       const noteRef = doc(db, 'notes', id);
-      await updateDoc(noteRef, {
+      const updateData: any = {
         ...data,
         updatedAt: serverTimestamp()
-      });
+      };
+
+      // Se o lembrete for atualizado, resetamos o status de notificado
+      if ('reminder' in data) {
+        updateData.notified = false;
+      }
+
+      await updateDoc(noteRef, updateData);
     } catch (error) {
       console.error("Error updating note:", error);
     }
@@ -1925,6 +1941,19 @@ export default function Home() {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* PUSH PERMISSION MODAL */}
+      <AnimatePresence>
+        {isPushModalOpen && user && (
+          <PushPermissionModal 
+            onConfirm={async () => {
+              await requestNotificationPermission(user.uid);
+              setIsPushModalOpen(false);
+            }}
+            onCancel={() => setIsPushModalOpen(false)}
+          />
         )}
       </AnimatePresence>
     </div>
