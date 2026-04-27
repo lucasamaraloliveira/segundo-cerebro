@@ -5,7 +5,7 @@ import { Note } from '@/lib/types';
 import { db, auth } from '@/lib/firebase';
 import { doc, updateDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { X, Send, Brain, Loader2, Info, ChevronDown } from 'lucide-react';
+import { X, Send, Brain, Loader2, Info, ChevronDown, Paperclip, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 export default function SpecialistChat() {
@@ -18,6 +18,10 @@ export default function SpecialistChat() {
   const [isIndexing, setIsIndexing] = useState(false);
   const [indexProgress, setIndexProgress] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -42,7 +46,14 @@ export default function SpecialistChat() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages.length, isLoading]);
+  }, [messages.length, isLoading, isUploading]);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+    }
+  }, [queryText]);
 
   // Listen for global open events (for mobile nav integration)
   useEffect(() => {
@@ -64,7 +75,7 @@ export default function SpecialistChat() {
         body: JSON.stringify({ texts })
       });
       const data = await res.json();
-      
+
       if (data.embeddings && Array.isArray(data.embeddings)) {
         setIndexProgress(50);
         for (let i = 0; i < notesWithoutEmbeddings.length; i++) {
@@ -87,6 +98,51 @@ export default function SpecialistChat() {
     }
   };
 
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('audio/') && !file.type.startsWith('video/')) {
+      alert('Por favor, selecione um arquivo de áudio ou vídeo.');
+      return;
+    }
+
+    setIsUploading(true);
+    setMessages(prev => [...prev, { role: 'user', content: `📎 Anexou arquivo: ${file.name}` }]);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/ai/transcribe', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+
+      if (data.text) {
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: `### Transcrição concluída: ${file.name}\n\n${data.text}`
+        }]);
+      } else {
+        throw new Error(data.error || 'Falha na transcrição');
+      }
+    } catch (error: any) {
+      setMessages(prev => [...prev, { role: 'assistant', content: `Erro ao transcrever arquivo: ${error.message}` }]);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!queryText.trim() || isLoading) return;
@@ -105,8 +161,8 @@ export default function SpecialistChat() {
       const data = await res.json();
 
       if (data.text) {
-        setMessages(prev => [...prev, { 
-          role: 'assistant', 
+        setMessages(prev => [...prev, {
+          role: 'assistant',
           content: data.text,
           sources: data.sources
         }]);
@@ -133,7 +189,7 @@ export default function SpecialistChat() {
       {isOpen && (
         <>
           {/* Backdrop apenas para Mobile */}
-          <div 
+          <div
             className="fixed inset-0 bg-black/40 z-[90] md:hidden animate-in fade-in duration-200"
             onClick={() => setIsOpen(false)}
           />
@@ -146,19 +202,19 @@ export default function SpecialistChat() {
             /* Mobile Styles (Bottom Sheet) */
             max-md:bottom-0 max-md:left-0 max-md:right-0 max-md:w-full max-md:h-[85vh] max-md:rounded-t-[2.5rem] max-md:border-t-2 max-md:animate-in max-md:slide-in-from-bottom-full
           `}>
-            
+
             {/* Header com Handle para Mobile */}
             <div className="relative p-4 bg-[#FF4F00] text-white border-b-2 border-black flex items-center justify-between md:rounded-none rounded-t-[2.5rem]">
               {/* Drag handle visual para mobile */}
               <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-black/20 rounded-full md:hidden" />
-              
+
               <div className="flex items-center gap-2 mt-2 md:mt-0">
                 <Brain size={20} />
                 <span className="font-bold uppercase tracking-widest text-xs">Especialista Neural</span>
               </div>
-              
-              <button 
-                onClick={() => setIsOpen(false)} 
+
+              <button
+                onClick={() => setIsOpen(false)}
                 className="hover:opacity-60 transition-opacity p-2 -mr-2"
               >
                 <span className="hidden md:block"><X size={20} /></span>
@@ -173,7 +229,7 @@ export default function SpecialistChat() {
                   <Info size={12} className="text-[#FF4F00]" />
                   <span>{notesWithoutEmbeddings.length} Notas pendentes de indexação</span>
                 </div>
-                <button 
+                <button
                   onClick={handleIndexNotes}
                   className="text-[9px] font-bold underline text-[#FF4F00] hover:text-white"
                 >
@@ -191,9 +247,9 @@ export default function SpecialistChat() {
               </div>
             )}
 
-            <div 
+            <div
               ref={scrollRef}
-            className="flex-1 overflow-y-auto p-4 space-y-3 bg-[var(--background)] border-b border-[var(--border)] custom-scrollbar"
+              className="flex-1 overflow-y-auto p-4 space-y-3 bg-[var(--background)] border-b border-[var(--border)] custom-scrollbar"
             >
               {messages.length === 0 && (
                 <div className="h-full flex flex-col items-center justify-center text-center p-6 opacity-30">
@@ -203,20 +259,29 @@ export default function SpecialistChat() {
                   </p>
                 </div>
               )}
-              
+
               {messages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] w-fit border-2 border-black ${
+                  <div className={`max-w-[85%] w-fit border-2 border-black relative group ${
                     msg.role === 'user' 
                       ? 'bg-[#FF4F00] text-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] px-3 py-1.5' 
                       : 'bg-[var(--muted)] text-[var(--foreground)] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] p-3'
                   }`}>
-                  <div className={msg.role === 'user' 
-                    ? "text-sm leading-tight whitespace-pre-wrap" 
-                    : "text-sm leading-snug prose prose-sm dark:prose-invert max-w-none prose-p:my-0.5 prose-ul:my-1 prose-li:my-0 prose-headings:text-[var(--foreground)] prose-strong:text-inherit"
-                  }>
-                    {msg.role === 'user' ? msg.content : <ReactMarkdown>{msg.content}</ReactMarkdown>}
-                  </div>
+                    {msg.role === 'assistant' && (
+                      <button
+                        onClick={() => copyToClipboard(msg.content, i.toString())}
+                        className="absolute -top-2 -right-2 w-7 h-7 bg-black text-white border border-white flex items-center justify-center hover:bg-[#FF4F00] transition-colors z-10 opacity-0 group-hover:opacity-100 shadow-md"
+                        title="Copiar transcrição"
+                      >
+                        {copiedId === i.toString() ? <Check size={14} /> : <Copy size={14} />}
+                      </button>
+                    )}
+                    <div className={msg.role === 'user' 
+                      ? "text-sm leading-tight whitespace-pre-wrap" 
+                      : "text-sm leading-snug prose prose-sm dark:prose-invert max-w-none prose-p:my-0.5 prose-ul:my-1 prose-li:my-0 prose-headings:text-[var(--foreground)] prose-strong:text-inherit"
+                    }>
+                      {msg.role === 'user' ? msg.content : <ReactMarkdown>{msg.content}</ReactMarkdown>}
+                    </div>
                     {msg.sources && msg.sources.length > 0 && (
                       <div className="mt-4 pt-2 border-t border-[var(--border)] flex flex-wrap gap-2">
                         {msg.sources.map((s: { id: string, title: string }) => (
@@ -229,33 +294,64 @@ export default function SpecialistChat() {
                   </div>
                 </div>
               ))}
-              {isLoading && (
+              {(isLoading || isUploading) && (
                 <div className="flex justify-start">
                   <div className="bg-[var(--muted)] p-3 border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2">
                     <Loader2 size={14} className="animate-spin text-[#FF4F00]" />
-                    <span className="text-[9px] font-bold uppercase text-[var(--foreground)]">Processando Sinapses...</span>
+                    <span className="text-[9px] font-bold uppercase text-[var(--foreground)]">
+                      {isUploading ? 'Analisando Mídia...' : 'Processando Sinapses...'}
+                    </span>
                   </div>
                 </div>
               )}
             </div>
 
-            <form onSubmit={handleSendMessage} className="p-6 bg-[var(--background)] border-t-2 border-black pb-8 md:pb-6">
-              <div className="flex gap-2">
-                <input
-                  type="text"
+            <form onSubmit={handleSendMessage} className="p-4 bg-[var(--background)] border-t-2 border-black">
+              <div className="flex flex-col bg-[var(--muted)] border-2 border-black focus-within:ring-2 focus-within:ring-[#FF4F00] transition-all">
+                <textarea
+                  ref={textareaRef}
                   value={queryText}
                   onChange={(e) => setQueryText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage(e as any);
+                    }
+                  }}
                   placeholder="Pergunte ao seu cérebro..."
-                  className="flex-1 bg-[var(--muted)] text-[var(--foreground)] border-2 border-black p-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#FF4F00] placeholder:text-[var(--foreground)]/30"
+                  className="w-full bg-transparent text-[var(--foreground)] p-4 text-sm focus:outline-none placeholder:text-[var(--foreground)]/30 resize-none max-h-[160px] custom-scrollbar min-h-[60px]"
+                  rows={1}
                 />
-                <button
-                  type="submit"
-                  disabled={isLoading || isIndexing}
-                  className="bg-black text-white px-5 py-2 border-2 border-black hover:bg-[#FF4F00] hover:text-black disabled:opacity-50 transition-colors"
-                >
-                  <Send size={20} />
-                </button>
+                <div className="flex justify-between items-center px-4 pb-4">
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-2 text-[var(--foreground)]/60 hover:text-[#FF4F00] hover:bg-black/5 dark:hover:bg-white/5 transition-all"
+                      title="Anexar áudio ou vídeo"
+                    >
+                      <Paperclip size={20} />
+                    </button>
+                    <input 
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileUpload}
+                      accept="audio/*,video/*"
+                      className="hidden"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isLoading || isIndexing || isUploading || !queryText.trim()}
+                    className="p-2 bg-black text-white hover:bg-[#FF4F00] hover:text-black disabled:opacity-30 disabled:hover:bg-black disabled:hover:text-white transition-all flex items-center justify-center"
+                  >
+                    <Send size={18} />
+                  </button>
+                </div>
               </div>
+              <p className="mt-2 text-[8px] text-center opacity-30 font-bold uppercase tracking-widest">
+                IA pode cometer erros. Verifique informações importantes.
+              </p>
             </form>
           </div>
         </>

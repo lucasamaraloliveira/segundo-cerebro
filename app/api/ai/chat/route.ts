@@ -55,8 +55,11 @@ export async function POST(req: Request) {
       ? relevantNotes.map((n: any) => `[NOTA: ${n.title}]\n${n.content}`).join('\n\n---\n\n')
       : "Nenhuma nota relevante encontrada.";
 
-    // 4. Generate Answer using Gemini 2.0 Flash
-    const chatModel = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite-preview" });
+    // 4. Generate Answer using Gemini 3.1 Flash Lite Preview
+    const chatModel = genAI.getGenerativeModel(
+      { model: "gemini-3.1-flash-lite-preview" },
+      { apiVersion: 'v1beta' }
+    );
     const prompt = `
 Você é o "Especialista Neural" do sistema Segundo Cérebro. 
 Seu objetivo é ajudar o usuário com base exclusivamente no conhecimento contido nas notas dele.
