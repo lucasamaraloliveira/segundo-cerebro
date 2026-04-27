@@ -17,6 +17,7 @@ O sistema é construído sobre uma stack moderna e de alta performance:
 *   **Visualização de Dados**: [react-force-graph-2d](https://github.com/vasturiano/react-force-graph) - Motor de grafos baseado em D3.js para o mapeamento neural.
 *   **Estilização**: Tailwind CSS (v4) com um sistema de design brutalista/minimalista customizado.
 *   **Exportação**: jsPDF + html2canvas para geração de PDFs com fidelidade visual de 2x.
+*   **Guia de UI**: [Ajustes Visuais & Mobile](./DOCUMENTATION_UI.md) - Guia detalhado para manutenção da interface.
 
 ---
 

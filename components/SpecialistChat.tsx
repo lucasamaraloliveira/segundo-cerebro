@@ -215,6 +215,13 @@ export default function SpecialistChat() {
 
   return (
     <>
+      {/* Botão Flutuante (Apenas Desktop) */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="hidden md:flex fixed bottom-8 right-8 z-[100] w-14 h-14 bg-[#FF4F00] text-white rounded-none shadow-[12px_12px_0px_rgba(0,0,0,0.1)] items-center justify-center hover:translate-y-[-2px] hover:shadow-[12px_14px_0px_rgba(0,0,0,0.15)] transition-all active:translate-y-[0px] active:shadow-none border border-black/5"
+      >
+        {isOpen ? <X size={24} /> : <Brain size={24} />}
+      </button>
 
 
       <AnimatePresence>
