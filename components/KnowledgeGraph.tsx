@@ -24,6 +24,28 @@ interface KnowledgeGraphProps {
   selectedTag?: string | null;
 }
 
+const NEURAL_COLORS = [
+  '#FF4F00', // Neural Orange
+  '#3B82F6', // Tech Blue
+  '#10B981', // Bio Green
+  '#F59E0B', // Creative Amber
+  '#EF4444', // Urgent Red
+  '#0D9488', // Deep Teal
+  '#6366F1', // Indigo
+  '#EC4899', // Pink
+];
+
+const getTagColor = (tags: string[] = []) => {
+  if (tags.length === 0) return '#FF4F00';
+  const tag = tags[0];
+  // Simple hash for consistent color
+  let hash = 0;
+  for (let i = 0; i < tag.length; i++) {
+    hash = tag.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return NEURAL_COLORS[Math.abs(hash) % NEURAL_COLORS.length];
+};
+
 export default function KnowledgeGraph({ notes, width, height, selectedTag }: KnowledgeGraphProps) {
   const router = useRouter();
   const fgRef = useRef<any>(null);
@@ -77,6 +99,7 @@ export default function KnowledgeGraph({ notes, width, height, selectedTag }: Kn
         content: note.content || '',
         val: Math.sqrt(note.content?.length || 0) / 4 + 6,
         tags: note.tags || [],
+        color: getTagColor(note.tags),
         x, y,
         vx: Math.cos(angle) * 35,
         vy: Math.sin(angle) * 35
@@ -160,9 +183,9 @@ export default function KnowledgeGraph({ notes, width, height, selectedTag }: Kn
               (l.source.id === hoveredNode.id && l.target.id === node.id) || 
               (l.target.id === hoveredNode.id && l.source.id === node.id)
             );
-            return (isHovered || isNeighbor) ? '#FF4F00' : 'rgba(128, 128, 128, 0.05)';
+            return (isHovered || isNeighbor) ? (node.color || '#FF4F00') : 'rgba(128, 128, 128, 0.05)';
           }
-          return (!selectedTag || isNodeHighlighted) ? '#FF4F00' : 'rgba(128, 128, 128, 0.1)';
+          return (!selectedTag || isNodeHighlighted) ? (node.color || '#FF4F00') : 'rgba(128, 128, 128, 0.1)';
         }}
         linkColor={(link: any) => {
           if (hoveredNode) {
@@ -201,13 +224,15 @@ export default function KnowledgeGraph({ notes, width, height, selectedTag }: Kn
           ctx.beginPath();
           ctx.moveTo(start.x, start.y);
           ctx.lineTo(end.x, end.y);
-          ctx.strokeStyle = `rgba(255, 79, 0, ${breathing * alpha})`;
+          ctx.globalAlpha = breathing * alpha;
+          ctx.strokeStyle = start.color || '#FF4F00';
           ctx.lineWidth = 3 * alpha;
           ctx.lineCap = 'round';
           ctx.stroke();
           ctx.shadowBlur = 15 * alpha;
-          ctx.shadowColor = 'rgba(255, 79, 0, 0.4)';
+          ctx.shadowColor = start.color || '#FF4F00';
           ctx.stroke();
+          ctx.globalAlpha = 1;
           ctx.shadowBlur = 0;
         }}
         nodeRelSize={6}
@@ -260,8 +285,9 @@ export default function KnowledgeGraph({ notes, width, height, selectedTag }: Kn
               glowOpacity = (baseOpacity + pulseIntensity) * alpha;
             }
             const gradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, nodeR * (isHoveredNode ? 6 : 4));
-            gradient.addColorStop(0, `rgba(255, 79, 0, ${glowOpacity})`);
-            gradient.addColorStop(1, 'rgba(255, 79, 0, 0)');
+            const nodeColor = node.color || '#FF4F00';
+            gradient.addColorStop(0, `${nodeColor}${Math.floor(glowOpacity * 255).toString(16).padStart(2, '0')}`);
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
             ctx.fillStyle = gradient;
             ctx.beginPath();
             ctx.arc(node.x, node.y, nodeR * (isHoveredNode ? 6 : 4), 0, 2 * Math.PI, false);
@@ -269,7 +295,7 @@ export default function KnowledgeGraph({ notes, width, height, selectedTag }: Kn
           } catch (e) {}
           ctx.beginPath();
           ctx.arc(node.x, node.y, nodeR * (isHoveredNode ? 1.2 : 1), 0, 2 * Math.PI, false);
-          ctx.fillStyle = shouldHighlight ? '#FF4F00' : 'rgba(128, 128, 128, 0.1)';
+          ctx.fillStyle = shouldHighlight ? (node.color || '#FF4F00') : 'rgba(128, 128, 128, 0.1)';
           ctx.fill();
           if (globalScale > 1.2) {
             ctx.font = `${fontSize}px Georgia, serif`;
