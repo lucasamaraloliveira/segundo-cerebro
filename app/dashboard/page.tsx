@@ -6,20 +6,16 @@ import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Note } from '@/lib/types';
 import dynamic from 'next/dynamic';
-import { ArrowLeft, Brain, Layers, Tag as TagIcon, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Brain, Layers, Tag as TagIcon, BarChart3, Clock } from 'lucide-react';
 import Link from 'next/link';
 
-// Dynamically import our unified KnowledgeGraph component
 const KnowledgeGraph = dynamic(() => import('@/components/KnowledgeGraph'), { 
   ssr: false,
-  loading: () => (
-    <div className="h-full w-full flex items-center justify-center">
-      <div className="text-[10px] font-bold uppercase tracking-[0.3em] animate-pulse opacity-40">
-        Iniciando Matriz Neural...
-      </div>
-    </div>
-  )
+  loading: () => <div className="h-full w-full flex items-center justify-center opacity-20">Iniciando Matriz...</div>
 });
+
+const NeuralTimeline = dynamic(() => import('@/components/NeuralTimeline'), { ssr: false });
+const NeuralHeatmap = dynamic(() => import('@/components/NeuralHeatmap'), { ssr: false });
 
 export default function Dashboard() {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -27,6 +23,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [dimensions, setDimensions] = useState<{ width: number, height: number } | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<'graph' | 'timeline' | 'heatmap'>('graph');
 
   useEffect(() => {
     const updateDimensions = () => {
@@ -130,13 +127,26 @@ export default function Dashboard() {
         </div>
 
         <div className="hidden md:flex items-center gap-12">
+          <div className="flex gap-2 p-1 bg-[var(--muted)] border border-[var(--border)] shadow-[4px_4px_0px_rgba(0,0,0,0.1)]">
+            {[
+              { id: 'graph', label: 'Mapa Neural', icon: Layers },
+              { id: 'timeline', label: 'Linha do Tempo', icon: Clock },
+              { id: 'heatmap', label: 'Heatmaps', icon: BarChart3 }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveView(tab.id as any)}
+                className={`flex items-center gap-2 px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${activeView === tab.id ? 'bg-[var(--accent)] text-white' : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-50'}`}
+              >
+                <tab.icon className="w-3.5 h-3.5" />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          <div className="w-[1px] h-4 bg-[var(--border)]" />
           <div className="text-right">
             <p className="text-[10px] font-bold uppercase tracking-widest opacity-30">Total de Notas</p>
             <p className="text-xl font-serif italic">{stats.totalNotes}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] font-bold uppercase tracking-widest opacity-30">Etiquetas Ativas</p>
-            <p className="text-xl font-serif italic">{stats.totalTags}</p>
           </div>
         </div>
       </header>
@@ -150,72 +160,77 @@ export default function Dashboard() {
           Grid System // Lat: 0.00 Lon: 0.00
         </div>
         
-        {/* Left Stats Sidebar (HUD Style) */}
-        <div className="absolute top-10 left-10 z-20 hidden lg:block">
-          <div className="space-y-10">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 opacity-40">
-                <BarChart3 className="w-4 h-4" />
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Principais Tópicos</p>
+        {/* Left Stats Sidebar (HUD Style) - Only visible in Graph mode */}
+        {activeView === 'graph' && (
+          <div className="absolute top-10 left-10 z-20 hidden lg:block animate-in fade-in slide-in-from-left-4">
+            <div className="space-y-10">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 opacity-40">
+                  <BarChart3 className="w-4 h-4" />
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Principais Tópicos</p>
+                </div>
+                <div className="space-y-3 pointer-events-auto">
+                  {stats.topTags.map(([tag, count]: any) => (
+                    <button 
+                      key={tag} 
+                      onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                      className={`flex items-center gap-4 w-full text-left transition-all group ${selectedTag && selectedTag !== tag ? 'opacity-30' : 'opacity-100'}`}
+                    >
+                      <div className={`w-2 h-2 transition-all ${selectedTag === tag ? 'bg-[var(--accent)] scale-150 rotate-45 shadow-[0_0_10px_var(--accent)]' : 'bg-[var(--accent)]/40 group-hover:bg-[var(--accent)]'}`} />
+                      <div>
+                        <p className={`text-sm font-serif italic leading-none transition-colors ${selectedTag === tag ? 'text-[var(--accent)]' : 'text-[var(--foreground)]'}`}>{tag}</p>
+                        <p className="text-[9px] font-bold uppercase tracking-tighter opacity-30">{count} conexões</p>
+                      </div>
+                    </button>
+                  ))}
+                  {selectedTag && (
+                    <button 
+                      onClick={() => setSelectedTag(null)}
+                      className="mt-4 text-[8px] font-bold uppercase tracking-widest text-[var(--accent)] hover:underline"
+                    >
+                      × Limpar Filtro
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="space-y-3 pointer-events-auto">
-                {stats.topTags.map(([tag, count]: any) => (
-                  <button 
-                    key={tag} 
-                    onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
-                    className={`flex items-center gap-4 w-full text-left transition-all group ${selectedTag && selectedTag !== tag ? 'opacity-30' : 'opacity-100'}`}
-                  >
-                    <div className={`w-2 h-2 transition-all ${selectedTag === tag ? 'bg-[var(--accent)] scale-150 rotate-45 shadow-[0_0_10px_var(--accent)]' : 'bg-[var(--accent)]/40 group-hover:bg-[var(--accent)]'}`} />
-                    <div>
-                      <p className={`text-sm font-serif italic leading-none transition-colors ${selectedTag === tag ? 'text-[var(--accent)]' : 'text-[var(--foreground)]'}`}>{tag}</p>
-                      <p className="text-[9px] font-bold uppercase tracking-tighter opacity-30">{count} conexões</p>
-                    </div>
-                  </button>
-                ))}
-                {selectedTag && (
-                  <button 
-                    onClick={() => setSelectedTag(null)}
-                    className="mt-4 text-[8px] font-bold uppercase tracking-widest text-[var(--accent)] hover:underline"
-                  >
-                    × Limpar Filtro
-                  </button>
-                )}
-              </div>
-            </div>
 
-            <div className="space-y-4 border-t border-[var(--border)] pt-8 max-w-[200px]">
-              <div className="flex items-center gap-2 opacity-40">
-                <TagIcon className="w-4 h-4" />
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Guia de Leitura</p>
+              <div className="space-y-4 border-t border-[var(--border)] pt-8 max-w-[200px]">
+                <div className="flex items-center gap-2 opacity-40">
+                  <TagIcon className="w-4 h-4" />
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Guia de Leitura</p>
+                </div>
+                <p className="text-xs leading-relaxed opacity-60">
+                  Cada nodo representa uma nota. O tamanho indica a densidade do conteúdo. Linhas conectam notas que compartilham etiquetas.
+                </p>
               </div>
-              <p className="text-xs leading-relaxed opacity-60">
-                Cada nodo representa uma nota. O tamanho indica a densidade do conteúdo. Linhas conectam notas que compartilham etiquetas.
-              </p>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Graph Area */}
-        <div className="flex-1 relative">
+        {/* Content Area */}
+        <div className="flex-1 relative h-full">
           {notes.length === 0 ? (
             <div className="absolute inset-0 flex items-center justify-center text-center p-8">
               <p className="font-serif italic text-2xl opacity-20 max-w-md">
                 Aguardando a primeira sinapse... Adicione tags às suas notas para gerar o mapeamento.
               </p>
             </div>
-          ) : dimensions ? (
-            <KnowledgeGraph 
-              key={`${dimensions.width}-${dimensions.height}-${notes.length}`}
-              notes={notes} 
-              width={dimensions.width} 
-              height={dimensions.height} 
-              selectedTag={selectedTag}
-            />
           ) : (
-            <div className="h-full w-full flex items-center justify-center">
-              <div className="text-[10px] font-bold uppercase tracking-[0.3em] animate-pulse opacity-40">
-                Calculando Dimensões...
-              </div>
+            <div className={`absolute inset-0 ${activeView !== 'graph' ? 'overflow-y-auto custom-scrollbar' : 'overflow-hidden'}`}>
+              {activeView === 'graph' && dimensions && (
+                <KnowledgeGraph 
+                  key={`${dimensions.width}-${dimensions.height}-${notes.length}`}
+                  notes={notes} 
+                  width={dimensions.width} 
+                  height={dimensions.height} 
+                  selectedTag={selectedTag}
+                />
+              )}
+              {activeView === 'timeline' && <NeuralTimeline notes={notes} />}
+              {activeView === 'heatmap' && <NeuralHeatmap notes={notes} />}
+              {!dimensions && activeView === 'graph' && (
+                <div className="h-full w-full flex items-center justify-center opacity-20">Calculando...</div>
+              )}
             </div>
           )}
         </div>
