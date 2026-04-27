@@ -50,7 +50,10 @@ import {
   AlertTriangle,
   RotateCcw,
   Mic,
-  X
+  X,
+  CheckCircle,
+  Circle,
+  Check
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -81,26 +84,38 @@ const stripHtml = (html: string) => {
 const NoteCard = React.memo(({ 
   note, 
   isActive, 
-  onClick 
+  onClick,
+  onToggleComplete
 }: { 
   note: Note, 
   isActive: boolean, 
-  onClick: () => void 
+  onClick: () => void,
+  onToggleComplete: (e: React.MouseEvent) => void
 }) => {
   return (
     <motion.div
       layout
       onClick={onClick}
-      className={`p-6 border transition-all cursor-pointer mb-3 rounded-none ${isActive ? 'bg-[var(--muted)] border-[var(--accent)] shadow-sm' : 'border-[var(--border)] hover:border-[var(--foreground)]/10 hover:bg-[var(--muted)]/50'}`}
+      className={`p-6 border transition-all cursor-pointer mb-3 rounded-none group ${isActive ? 'bg-[var(--muted)] border-[var(--accent)] shadow-sm' : 'border-[var(--border)] hover:border-[var(--foreground)]/10 hover:bg-[var(--muted)]/50'} ${note.isCompleted ? 'opacity-60' : 'opacity-100'}`}
     >
       <div className="flex items-start justify-between mb-2">
         <p className="text-[10px] font-bold uppercase tracking-tighter opacity-40 text-[var(--foreground)]">
           {note.updatedAt ? format(note.updatedAt.toDate(), 'dd MMM', { locale: ptBR }) : 'Agora'}
         </p>
-        {note.isBookmarked && <Bookmark className="w-3 h-3 fill-[var(--accent)] text-[var(--accent)] opacity-30" />}
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={onToggleComplete}
+            className={`w-5 h-5 border-2 rounded-full flex items-center justify-center transition-all ${note.isCompleted ? 'bg-[#FF4F00] border-[#FF4F00] text-white' : 'border-[var(--border)] hover:border-[#FF4F00] text-transparent'}`}
+          >
+            {note.isCompleted && <Check size={12} strokeWidth={3} />}
+          </button>
+          {note.isBookmarked && <Bookmark className="w-3 h-3 fill-[var(--accent)] text-[var(--accent)] opacity-30" />}
+        </div>
       </div>
-      <h3 className="font-serif font-bold text-base md:text-lg leading-snug mb-1 line-clamp-3 text-[var(--foreground)]">{note.title || 'Sem título'}</h3>
-      <p className="text-[13px] opacity-60 line-clamp-2 leading-tight text-[var(--foreground)]">
+      <h3 className={`font-serif font-bold text-base md:text-lg leading-snug mb-1 line-clamp-3 text-[var(--foreground)] ${note.isCompleted ? 'line-through opacity-40' : ''}`}>
+        {note.title || 'Sem título'}
+      </h3>
+      <p className={`text-[13px] opacity-60 line-clamp-2 leading-tight text-[var(--foreground)] ${note.isCompleted ? 'line-through opacity-40' : ''}`}>
         {stripHtml(note.content) || 'Sem conteúdo...'}
       </p>
     </motion.div>
@@ -187,6 +202,13 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
             title="Favoritar"
           >
             <Bookmark className={`w-3.5 h-3.5 ${activeNote.isBookmarked ? 'fill-white' : ''}`} />
+          </button>
+          <button
+            onClick={() => updateNote(activeNote.id, { isCompleted: !activeNote.isCompleted })}
+            className={`p-1.5 transition-all ${activeNote.isCompleted ? 'bg-green-500 text-white rounded-md' : 'text-[var(--foreground)]/40 hover:text-[var(--foreground)]'}`}
+            title={activeNote.isCompleted ? "Marcar como Ativa" : "Concluir Nota"}
+          >
+            <CheckCircle className="w-3.5 h-3.5" />
           </button>
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 bg-green-500 rounded-none animate-pulse" />
@@ -428,7 +450,7 @@ export default function Home() {
   const [lastDeletedNote, setLastDeletedNote] = useState<Note | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mobileView, setMobileView] = useState<'list' | 'editor'>('list');
-  const [view, setView] = useState<'all' | 'favorites' | 'reminders'>('all');
+  const [view, setView] = useState<'all' | 'favorites' | 'reminders' | 'completed'>('all');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isTagModalOpen, setIsTagModalOpen] = useState(false);
   const [isMobileTagsModalOpen, setIsMobileTagsModalOpen] = useState(false);
@@ -696,7 +718,8 @@ export default function Home() {
       const matchesTag = activeTag ? note.tags?.includes(activeTag) : true;
       const matchesView = 
         view === 'favorites' ? note.isBookmarked : 
-        view === 'reminders' ? !!note.reminder : true;
+        view === 'reminders' ? !!note.reminder : 
+        view === 'completed' ? note.isCompleted : true;
       return matchesSearch && matchesTag && matchesView;
     });
   }, [notes, searchQuery, activeTag, view, isSemanticSearch, semanticKeywords]);
@@ -1172,6 +1195,19 @@ export default function Home() {
                     </div>
                     <span className="text-[10px] opacity-60 font-mono">{notes.filter(n => n.reminder).length}</span>
                   </button>
+                  <button
+                    onClick={() => {
+                      setView('completed');
+                      setActiveTag(null);
+                    }}
+                    className={`w-full flex items-center justify-between px-2 py-2 rounded-none transition-all text-sm font-medium ${view === 'completed' ? 'bg-[var(--muted)] text-[var(--foreground)]' : 'text-[var(--foreground)] opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className={`w-4 h-4 ${view === 'completed' ? 'text-green-500' : 'opacity-40'}`} />
+                      Notas Concluídas
+                    </div>
+                    <span className="text-[10px] opacity-60 font-mono">{notes.filter(n => n.isCompleted).length}</span>
+                  </button>
                 </div>
                 <Link
                   href="/dashboard"
@@ -1362,6 +1398,10 @@ export default function Home() {
               onClick={() => {
                 setActiveNoteId(note.id);
                 setMobileView('editor');
+              }}
+              onToggleComplete={(e) => {
+                e.stopPropagation();
+                updateNote(note.id, { isCompleted: !note.isCompleted });
               }}
             />
           ))}

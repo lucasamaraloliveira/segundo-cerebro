@@ -8,6 +8,7 @@ export interface Note {
   reminder?: Timestamp | null;
   expiryDate?: Timestamp | null;
   isBookmarked: boolean;
+  isCompleted?: boolean;
   userId: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
