@@ -358,11 +358,12 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
             </div>
           </div>
         </div>
-        <RichTextEditor
+          <RichTextEditor
             content={localContent}
             onChange={(html: string) => setLocalContent(html)}
             isFocusMode={isFullscreen}
             notes={allNotes}
+            activeNoteId={activeNote.id}
           />
 
           {/* Related Notes (AI Auto-Linker) */}

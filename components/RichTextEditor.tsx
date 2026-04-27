@@ -123,6 +123,7 @@ interface RichTextEditorProps {
   placeholder?: string;
   isFocusMode?: boolean;
   notes?: any[];
+  activeNoteId?: string;
 }
 
 
@@ -238,13 +239,16 @@ const CustomSelect = ({
   );
 };
 
-export default function RichTextEditor({ content, onChange, placeholder, isFocusMode = false, notes = [] }: RichTextEditorProps) {
+export default function RichTextEditor({ content, onChange, placeholder, isFocusMode = false, notes = [], activeNoteId }: RichTextEditorProps) {
   const [pasteModal, setPasteModal] = useState<{ show: boolean, text: string, html: string } | null>(null);
   const [noteLinkModal, setNoteLinkModal] = useState(false);
   const [noteSearch, setNoteSearch] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [interimText, setInterimText] = useState('');
   const recognitionRef = useRef<any>(null);
+  const [neuralSuggestion, setNeuralSuggestion] = useState<{ id: string, title: string, score: number } | null>(null);
+  const [ignoredSuggestions, setIgnoredSuggestions] = useState<Set<string>>(new Set());
+  const lastAnalyzedText = useRef('');
 
   const editor = useEditor({
     extensions: [
@@ -407,6 +411,59 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
       console.error(e);
     }
   };
+
+  // Neural Suggestion Logic (Debounced)
+  useEffect(() => {
+    if (!editor || !notes || notes.length < 2) return;
+
+    const timer = setTimeout(() => {
+      const currentText = editor.getText();
+      // Only analyze if text changed significantly (at least 20 chars)
+      if (Math.abs(currentText.length - lastAnalyzedText.current.length) < 20) return;
+      lastAnalyzedText.current = currentText;
+
+      // Simple keyword-based similarity for instant client-side feedback
+      const words = currentText.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+      if (words.length < 5) return;
+
+      let bestMatch: { id: string, title: string, score: number } | null = null;
+      let maxScore = 0;
+
+      const currentHtml = editor.getHTML();
+
+      for (const note of notes) {
+        if (note.id === activeNoteId || ignoredSuggestions.has(note.id)) continue;
+        
+        // Skip if already linked
+        if (currentHtml.includes(`data-internal-note-id="${note.id}"`)) continue;
+
+        const noteText = (note.title + ' ' + (note.content || '')).toLowerCase();
+        let score = 0;
+        
+        // Match words
+        words.forEach(word => {
+          if (noteText.includes(word)) score += 1;
+        });
+
+        // Normalize score
+        const finalScore = score / words.length;
+        if (finalScore > 0.3 && finalScore > maxScore) {
+          maxScore = finalScore;
+          bestMatch = { id: note.id, title: note.title, score: Math.round(finalScore * 100) };
+        }
+      }
+
+      if (bestMatch && bestMatch.score > 40) {
+        setNeuralSuggestion(bestMatch);
+        // Auto-hide suggestion after 10 seconds if not acted upon
+        setTimeout(() => setNeuralSuggestion(null), 10000);
+      } else {
+        setNeuralSuggestion(null);
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [content, notes, editor, activeNoteId, ignoredSuggestions]);
 
   if (!editor) {
     return null;
@@ -592,8 +649,55 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
       </div>
     </div>
 
-    <div className="flex-1 px-8 md:px-16 lg:px-24 py-8">
+    <div className="flex-1 px-8 md:px-16 lg:px-24 py-8 relative">
       <EditorContent editor={editor} />
+      
+      {/* Neural Suggestion Toast */}
+      <AnimatePresence>
+        {neuralSuggestion && (
+          <motion.div
+            initial={{ opacity: 0, x: 20, y: 0 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            className="fixed bottom-24 right-8 z-40 max-w-xs"
+          >
+            <div className="bg-[var(--background)]/90 backdrop-blur-xl border-l-4 border-[var(--accent)] p-4 shadow-[15px_15px_30px_rgba(0,0,0,0.1)] border border-[var(--border)] group">
+              <div className="flex items-start gap-3">
+                <div className="mt-1">
+                  <div className="w-2 h-2 bg-[var(--accent)] rounded-full animate-pulse" />
+                </div>
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-widest opacity-40 mb-1">Conexão Neural ({neuralSuggestion.score}%)</p>
+                  <p className="text-sm font-serif italic mb-3 leading-tight">
+                    Esta nota tem forte relação com <span className="font-bold">"{neuralSuggestion.title}"</span>.
+                  </p>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => {
+                        editor.chain().focus().insertContent(`<br><a href="/?note=${neuralSuggestion.id}" class="internal-link" data-internal-note-id="${neuralSuggestion.id}">${neuralSuggestion.title}</a> `).run();
+                        setIgnoredSuggestions(prev => new Set(prev).add(neuralSuggestion.id));
+                        setNeuralSuggestion(null);
+                      }}
+                      className="text-[9px] font-bold uppercase tracking-widest px-3 py-1.5 bg-[var(--accent)] text-white hover:opacity-90 transition-all"
+                    >
+                      Criar Link
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setIgnoredSuggestions(prev => new Set(prev).add(neuralSuggestion.id));
+                        setNeuralSuggestion(null);
+                      }}
+                      className="text-[9px] font-bold uppercase tracking-widest px-3 py-1.5 hover:bg-[var(--muted)] transition-all opacity-40 hover:opacity-100"
+                    >
+                      Ignorar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
 
       {/* Transcription Status Modal */}
@@ -698,7 +802,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
                     <button
                       key={n.id}
                       onClick={() => {
-                        editor.chain().focus().insertContent(`<a href="/?note=${n.id}" class="internal-link" data-internal-note-id="${n.id}">[[${n.title || 'Sem título'}]]</a> `).run();
+                        editor.chain().focus().insertContent(`<a href="/?note=${n.id}" class="internal-link" data-internal-note-id="${n.id}">${n.title || 'Sem título'}</a> `).run();
                         setNoteLinkModal(false);
                         setNoteSearch('');
                       }}
