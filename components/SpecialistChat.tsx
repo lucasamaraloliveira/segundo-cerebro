@@ -7,6 +7,7 @@ import { doc, updateDoc, collection, query, where, onSnapshot } from 'firebase/f
 import { onAuthStateChanged } from 'firebase/auth';
 import { X, Send, Brain, Loader2, Info, ChevronDown, Paperclip, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { motion, AnimatePresence } from 'motion/react';
 
 export default function SpecialistChat() {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -214,53 +215,61 @@ export default function SpecialistChat() {
 
   return (
     <>
-      {/* Botão Flutuante Responsivo */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[100] w-14 h-14 bg-[#FF4F00] text-white rounded-none shadow-[4px_4px_0px_rgba(0,0,0,0.1)] flex items-center justify-center hover:translate-y-[-2px] hover:shadow-[4px_6px_0px_rgba(0,0,0,0.15)] transition-all active:translate-y-[0px] active:shadow-none border border-black/5"
-      >
-        {isOpen ? <X size={24} /> : <Brain size={24} />}
-      </button>
 
-      {isOpen && (
-        <>
-          {/* Backdrop apenas para Mobile */}
-          <div
-            className="fixed inset-0 bg-black/40 z-[90] md:hidden animate-in fade-in duration-200"
-            onClick={() => setIsOpen(false)}
-          />
 
-          {/* Modal / Bottom Sheet Responsivo */}
-          <div 
-            style={{ 
-              width: typeof window !== 'undefined' && window.innerWidth >= 768 ? `${size.width}px` : undefined, 
-              height: typeof window !== 'undefined' && window.innerWidth >= 768 ? `${size.height}px` : undefined 
-            }}
-            className={`
-            fixed z-[100] bg-[var(--background)] text-[var(--foreground)] border-black flex flex-col transition-[opacity,transform] duration-300 ease-out
-            /* Desktop Styles - Optimized for 1366x768 */
-             md:bottom-24 md:right-8 md:border md:border-black/10 md:shadow-[12px_12px_0px_rgba(0,0,0,0.1)] md:animate-in md:fade-in md:slide-in-from-bottom-4 md:rounded-none
-            /* Mobile Styles (Bottom Sheet) */
-            max-md:bottom-0 max-md:left-0 max-md:right-0 max-md:w-full max-md:h-[85vh] max-md:rounded-t-[2.5rem] max-md:border-t-2 max-md:animate-in max-md:slide-in-from-bottom-full
-          `}>
-            {/* Resize Handles (Desktop Only) */}
-            <div 
-              className="absolute top-0 left-0 w-4 h-4 cursor-nwse-resize z-[110] hidden md:block" 
-              onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); setResizeDir('both'); document.body.style.cursor = 'nwse-resize'; }}
-            />
-            <div 
-              className="absolute top-0 left-4 right-4 h-1 cursor-ns-resize z-[110] hidden md:block" 
-              onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); setResizeDir('top'); document.body.style.cursor = 'ns-resize'; }}
-            />
-            <div 
-              className="absolute left-0 top-4 bottom-4 w-1 cursor-ew-resize z-[110] hidden md:block" 
-              onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); setResizeDir('left'); document.body.style.cursor = 'ew-resize'; }}
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            {/* Backdrop apenas para Mobile */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/40 z-[90] md:hidden backdrop-blur-sm"
+              onClick={() => setIsOpen(false)}
             />
 
-            {/* Header com Handle para Mobile */}
-            <div className="relative p-4 bg-[#FF4F00] text-white border-b border-black/10 flex items-center justify-between md:rounded-none rounded-t-[2.5rem]">
-              {/* Drag handle visual para mobile */}
-              <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-black/20 rounded-full md:hidden" />
+            {/* Modal / Bottom Sheet Responsivo */}
+            <motion.div 
+              style={{ 
+                width: typeof window !== 'undefined' && window.innerWidth >= 768 ? `${size.width}px` : undefined, 
+                height: typeof window !== 'undefined' && window.innerWidth >= 768 ? `${size.height}px` : undefined 
+              }}
+              initial={typeof window !== 'undefined' && window.innerWidth >= 768 ? { scale: 0.9, opacity: 0 } : { y: "100%" }}
+              animate={typeof window !== 'undefined' && window.innerWidth >= 768 ? { scale: 1, opacity: 1 } : { y: 0 }}
+              exit={typeof window !== 'undefined' && window.innerWidth >= 768 ? { scale: 0.9, opacity: 0 } : { y: "100%" }}
+              transition={typeof window !== 'undefined' && window.innerWidth >= 768 ? { type: "spring", damping: 25, stiffness: 200 } : { type: "spring", damping: 30, stiffness: 300 }}
+              drag={typeof window !== 'undefined' && window.innerWidth < 768 ? "y" : false}
+              dragConstraints={{ top: 0, bottom: 0 }}
+              dragElastic={0.2}
+              onDragEnd={(_, info) => {
+                if (info.offset.y > 150) setIsOpen(false);
+              }}
+              className={`
+              fixed z-[100] bg-[var(--background)] text-[var(--foreground)] border-black flex flex-col
+              /* Desktop Styles - Optimized for 1366x768 */
+               md:bottom-24 md:right-8 md:border md:border-black/10 md:shadow-[12px_12px_0px_rgba(0,0,0,0.1)] md:rounded-none
+              /* Mobile Styles (Bottom Sheet) */
+              max-md:bottom-0 max-md:left-0 max-md:right-0 max-md:w-full max-md:h-[85vh] max-md:rounded-t-[2.5rem] max-md:border-t-2
+            `}>
+              {/* Resize Handles (Desktop Only) */}
+              <div 
+                className="absolute top-0 left-0 w-4 h-4 cursor-nwse-resize z-[110] hidden md:block" 
+                onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); setResizeDir('both'); document.body.style.cursor = 'nwse-resize'; }}
+              />
+              <div 
+                className="absolute top-0 left-4 right-4 h-1 cursor-ns-resize z-[110] hidden md:block" 
+                onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); setResizeDir('top'); document.body.style.cursor = 'ns-resize'; }}
+              />
+              <div 
+                className="absolute left-0 top-4 bottom-4 w-1 cursor-ew-resize z-[110] hidden md:block" 
+                onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); setResizeDir('left'); document.body.style.cursor = 'ew-resize'; }}
+              />
+
+              {/* Header com Handle para Mobile */}
+              <div className="relative p-4 bg-[#FF4F00] text-white border-b border-black/10 flex items-center justify-between md:rounded-none rounded-t-[2.5rem] touch-none">
+                {/* Drag handle visual para mobile */}
+                <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-black/20 rounded-full md:hidden" />
 
               <div className="flex items-center gap-2 mt-2 md:mt-0">
                 <Brain size={20} />
@@ -407,9 +416,10 @@ export default function SpecialistChat() {
                 IA pode cometer erros. Verifique informações importantes.
               </p>
             </form>
-          </div>
-        </>
-      )}
+          </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </>
   );
 }

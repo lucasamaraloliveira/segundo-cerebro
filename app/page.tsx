@@ -144,7 +144,7 @@ const TagButton = React.memo(({
 TagButton.displayName = 'TagButton';
 
 
-const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isAiLoading, handleAiAction, exportAsPDF, deleteNote, setIsFullscreen, setIsTagModalOpen, setNewTagInput, relatedNotes, setActiveNoteId, setIsAIAssistantOpen, backlinks, allNotes, refreshKey }: any) => {
+const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isAiLoading, handleAiAction, exportAsPDF, deleteNote, setIsFullscreen, setIsTagModalOpen, setNewTagInput, relatedNotes, setActiveNoteId, setIsAIAssistantOpen, backlinks, allNotes, refreshKey, setTagToDelete, setIsTagDeleteModalOpen }: any) => {
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const [localTitle, setLocalTitle] = useState(activeNote.title || '');
   const [localContent, setLocalContent] = useState(activeNote.content || '');
@@ -268,11 +268,14 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
             <div className="space-y-1">
               <div className="flex flex-wrap gap-2">
                 {activeNote.tags?.slice(0, showAllTags ? undefined : 5).map((tag: string) => (
-                  <span key={tag} className="px-2 py-1 bg-[var(--muted)] text-[var(--foreground)] text-[10px] font-bold uppercase tracking-widest rounded flex items-center gap-1 group">
+                   <span key={tag} className="px-2 py-1 bg-[var(--muted)] text-[var(--foreground)] text-[10px] font-bold uppercase tracking-widest rounded flex items-center gap-1 group">
                     #{tag}
                     <button
-                      onClick={() => updateNote(activeNote.id, { tags: activeNote.tags.filter((t: string) => t !== tag) })}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => {
+                        setTagToDelete({ noteId: activeNote.id, tag });
+                        setIsTagDeleteModalOpen(true);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500"
                     >
                       ×
                     </button>
@@ -460,6 +463,12 @@ export default function Home() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isReminderAlertOpen, setIsReminderAlertOpen] = useState(false);
   const [currentReminderNote, setCurrentReminderNote] = useState<Note | null>(null);
+  const [isTagDeleteModalOpen, setIsTagDeleteModalOpen] = useState(false);
+  const [tagToDelete, setTagToDelete] = useState<{ noteId: string, tag: string } | null>(null);
+  const [isGlobalTagDeleteModalOpen, setIsGlobalTagDeleteModalOpen] = useState(false);
+  const [globalTagToDelete, setGlobalTagToDelete] = useState<string | null>(null);
+  const [showTagUndoToast, setShowTagUndoToast] = useState(false);
+  const [lastDeletedTag, setLastDeletedTag] = useState<{ noteId: string, tag: string, affectedNoteIds?: string[] } | null>(null);
   const [alarmType, setAlarmType] = useState<'neural' | 'crystal' | 'pulsar' | 'zen'>('neural');
 
   // Persistência do tipo de alarme
@@ -821,6 +830,78 @@ export default function Home() {
       });
     } catch (error) {
       console.error("Error updating note:", error);
+    }
+  };
+
+  const executeTagDelete = async () => {
+    if (!tagToDelete) return;
+    const { noteId, tag } = tagToDelete;
+    const note = notes.find(n => n.id === noteId);
+    if (!note) return;
+
+    try {
+      const newTags = (note.tags || []).filter(t => t !== tag);
+      await updateNote(noteId, { tags: newTags });
+      
+      setLastDeletedTag({ noteId, tag });
+      setIsTagDeleteModalOpen(false);
+      setTagToDelete(null);
+      setShowTagUndoToast(true);
+      setTimeout(() => setShowTagUndoToast(false), 5000);
+    } catch (error) {
+      console.error("Error deleting tag:", error);
+    }
+  };
+
+  const undoTagDelete = async () => {
+    if (!lastDeletedTag) return;
+    const { noteId, tag, affectedNoteIds } = lastDeletedTag;
+
+    try {
+      if (affectedNoteIds) {
+        // Undo Global Delete
+        for (const id of affectedNoteIds) {
+          const note = notes.find(n => n.id === id);
+          if (note) {
+            await updateNote(id, { tags: [...(note.tags || []), tag] });
+          }
+        }
+      } else {
+        // Undo Single Delete
+        const note = notes.find(n => n.id === noteId);
+        if (note) {
+          await updateNote(noteId, { tags: [...(note.tags || []), tag] });
+        }
+      }
+      setShowTagUndoToast(false);
+      setLastDeletedTag(null);
+    } catch (error) {
+      console.error("Error undoing tag delete:", error);
+    }
+  };
+
+  const executeGlobalTagDelete = async () => {
+    if (!globalTagToDelete) return;
+    const tag = globalTagToDelete;
+    const affectedNotes = notes.filter(n => n.tags?.includes(tag));
+    const affectedNoteIds = affectedNotes.map(n => n.id);
+
+    try {
+      for (const noteId of affectedNoteIds) {
+        const note = notes.find(n => n.id === noteId);
+        if (note) {
+          const newTags = (note.tags || []).filter(t => t !== tag);
+          await updateNote(noteId, { tags: newTags });
+        }
+      }
+      
+      setLastDeletedTag({ noteId: '', tag, affectedNoteIds });
+      setIsGlobalTagDeleteModalOpen(false);
+      setGlobalTagToDelete(null);
+      setShowTagUndoToast(true);
+      setTimeout(() => setShowTagUndoToast(false), 5000);
+    } catch (error) {
+      console.error("Error deleting global tag:", error);
     }
   };
 
@@ -1461,6 +1542,8 @@ export default function Home() {
               backlinks={backlinks}
               allNotes={notes}
               refreshKey={editorRefreshKey}
+              setTagToDelete={setTagToDelete}
+              setIsTagDeleteModalOpen={setIsTagDeleteModalOpen}
             />
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
@@ -1485,44 +1568,57 @@ export default function Home() {
       {/* MOBILE NAVBAR */}
       {!isFullscreen && (
         <>
-          <div className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-[var(--background)]/80 backdrop-blur-xl border-t border-[var(--border)] flex items-center justify-around z-40 px-6 pb-2">
-            <button 
-              onClick={() => { setView('all'); setMobileView('list'); setActiveTag(null); }}
-              className={`flex flex-col items-center gap-1 transition-all ${view === 'all' && !activeTag ? 'text-[var(--foreground)] scale-105' : 'text-[var(--foreground)]/30'}`}
-              title="Notas"
-            >
-              <FileText className={`w-4.5 h-4.5 ${view === 'all' && !activeTag ? 'opacity-100' : 'opacity-40'}`} />
-              <span className="text-[8px] font-bold uppercase tracking-widest">Notas</span>
-            </button>
-            
-            <button 
-              onClick={() => { setView('favorites'); setMobileView('list'); setActiveTag(null); }}
-              className={`flex flex-col items-center gap-1 transition-all ${view === 'favorites' ? 'text-[var(--foreground)] scale-105' : 'text-[var(--foreground)]/30'}`}
-              title="Favoritos"
-            >
-              <Star className={`w-4.5 h-4.5 ${view === 'favorites' ? 'fill-current opacity-100' : 'opacity-40'}`} />
-              <span className="text-[8px] font-bold uppercase tracking-widest">Favoritos</span>
-            </button>
+          <div className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-[var(--background)]/80 backdrop-blur-xl border-t border-[var(--border)] flex items-center z-40 px-4 pb-2">
+            <div className="flex-1 flex justify-around pr-8">
+              <button 
+                onClick={() => { setView('all'); setMobileView('list'); setActiveTag(null); }}
+                className={`flex flex-col items-center gap-1 transition-all ${view === 'all' && !activeTag ? 'text-[var(--foreground)] scale-105' : 'text-[var(--foreground)]/30'}`}
+                title="Notas"
+              >
+                <FileText className={`w-4.5 h-4.5 ${view === 'all' && !activeTag ? 'opacity-100' : 'opacity-40'}`} />
+                <span className="text-[8px] font-bold uppercase tracking-widest">Notas</span>
+              </button>
+              
+              <button 
+                onClick={() => { setView('favorites'); setMobileView('list'); setActiveTag(null); }}
+                className={`flex flex-col items-center gap-1 transition-all ${view === 'favorites' ? 'text-[var(--foreground)] scale-105' : 'text-[var(--foreground)]/30'}`}
+                title="Favoritos"
+              >
+                <Star className={`w-4.5 h-4.5 ${view === 'favorites' ? 'fill-current opacity-100' : 'opacity-40'}`} />
+                <span className="text-[8px] font-bold uppercase tracking-widest">Favoritos</span>
+              </button>
+            </div>
 
-            <div className="w-10"></div> {/* Center space for FAB */}
+            <div className="w-16"></div> {/* Center space for FAB */}
 
-            <Link 
-              href="/dashboard"
-              className="flex flex-col items-center gap-1 text-[var(--foreground)]/30 hover:text-[var(--foreground)] transition-all"
-              title="Dashboard Neural"
-            >
-              <Brain className="w-4.5 h-4.5 opacity-40" />
-              <span className="text-[8px] font-bold uppercase tracking-widest">Dash</span>
-            </Link>
+            <div className="flex-1 flex justify-around pl-4">
+              <Link 
+                href="/dashboard"
+                className="flex flex-col items-center gap-1 text-[var(--foreground)]/30 hover:text-[var(--foreground)] transition-all"
+                title="Dashboard Neural"
+              >
+                <Brain className="w-4.5 h-4.5 opacity-40" />
+                <span className="text-[8px] font-bold uppercase tracking-widest">Dash</span>
+              </Link>
 
-            <button 
-              onClick={() => setIsMobileTagsModalOpen(true)}
-              className={`flex flex-col items-center gap-1 transition-all ${activeTag ? 'text-[var(--foreground)] scale-105' : 'text-[var(--foreground)]/30'}`}
-              title="Tags"
-            >
-              <TagIcon className={`w-4.5 h-4.5 ${activeTag ? 'opacity-100' : 'opacity-40'}`} />
-              <span className="text-[8px] font-bold uppercase tracking-widest">{activeTag ? `#${activeTag}` : 'Tags'}</span>
-            </button>
+              <button 
+                onClick={() => setIsMobileTagsModalOpen(true)}
+                className={`flex flex-col items-center gap-1 transition-all ${activeTag ? 'text-[var(--foreground)] scale-105' : 'text-[var(--foreground)]/30'}`}
+                title="Tags"
+              >
+                <TagIcon className={`w-4.5 h-4.5 ${activeTag ? 'opacity-100' : 'opacity-40'}`} />
+                <span className="text-[8px] font-bold uppercase tracking-widest">{activeTag ? `#${activeTag}` : 'Tags'}</span>
+              </button>
+
+              <button 
+                onClick={() => setIsSettingsOpen(true)}
+                className={`flex flex-col items-center gap-1 transition-all ${isSettingsOpen ? 'text-[var(--foreground)] scale-105' : 'text-[var(--foreground)]/30'}`}
+                title="Configurações"
+              >
+                <Settings className={`w-4.5 h-4.5 ${isSettingsOpen ? 'opacity-100' : 'opacity-40'}`} />
+                <span className="text-[8px] font-bold uppercase tracking-widest">Config</span>
+              </button>
+            </div>
           </div>
 
           {/* FLOATING ACTION BUTTON (FAB) */}
@@ -1532,7 +1628,7 @@ export default function Home() {
             initial={{ scale: 0, y: 100 }}
             animate={{ scale: 1, y: 0 }}
             onClick={createNewNote}
-            className="md:hidden fixed bottom-10 left-1/2 -translate-x-1/2 w-14 h-14 bg-[var(--accent)] text-[var(--accent-foreground)] rounded-none shadow-[4px_4px_0px_rgba(0,0,0,0.1)] flex items-center justify-center z-50 border border-black/5 group"
+            className="md:hidden fixed bottom-8 left-1/2 -translate-x-1/2 w-14 h-14 bg-[var(--accent)] text-[var(--accent-foreground)] rounded-none shadow-[4px_4px_0px_rgba(0,0,0,0.1)] flex items-center justify-center z-50 border border-black/5 group"
           >
             <Plus className="w-7 h-7 transition-transform group-active:rotate-180" />
           </motion.button>
@@ -1581,8 +1677,13 @@ export default function Home() {
                       setActiveTag(tag === activeTag ? null : tag);
                       setIsMobileTagsModalOpen(false);
                     }}
-                    className={`px-4 py-3 rounded-none text-xs font-bold uppercase tracking-widest transition-all ${activeTag === tag ? 'bg-[var(--accent)] text-[var(--accent-foreground)] shadow-lg' : 'bg-[var(--muted)] text-[var(--foreground)]'}`}
+                    className={`px-5 py-4 rounded-none text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 border-2 ${
+                      activeTag === tag 
+                        ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--foreground)] shadow-inner' 
+                        : 'border-transparent bg-[var(--muted)] text-[var(--foreground)]/60'
+                    }`}
                   >
+                    {activeTag === tag && <div className="w-2 h-2 bg-[var(--accent)] animate-pulse" />}
                     #{tag}
                   </button>
                 ))}
@@ -1854,69 +1955,203 @@ export default function Home() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="relative w-full max-w-lg bg-[var(--background)] border border-[var(--border)] p-10 shadow-[40px_40px_0px_rgba(0,0,0,0.1)]"
+              className="relative w-full max-w-lg bg-[var(--background)] border border-[var(--border)] shadow-[40px_40px_0px_rgba(0,0,0,0.1)] flex flex-col max-h-[90vh]"
             >
-              <div className="flex items-center justify-between mb-10">
-                <div>
-                  <h2 className="text-3xl font-serif italic mb-2 tracking-tight">Configurações</h2>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] opacity-40">Personalize sua interface neural</p>
+              <div className="p-6 md:p-10 overflow-y-auto custom-scrollbar">
+                <div className="flex items-center justify-between mb-10">
+                  <div>
+                    <h2 className="text-3xl font-serif italic mb-2 tracking-tight">Configurações</h2>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.3em] opacity-40">Personalize sua interface neural</p>
+                  </div>
+                  <button onClick={() => setIsSettingsOpen(false)} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 transition-all">
+                    <X className="w-5 h-5 opacity-40" />
+                  </button>
                 </div>
-                <button onClick={() => setIsSettingsOpen(false)} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 transition-all">
-                  <X className="w-5 h-5 opacity-40" />
-                </button>
-              </div>
 
-              <div className="space-y-10">
-                <section className="space-y-6">
-                  <div className="flex items-center gap-3 border-l-4 border-[var(--accent)] pl-4">
-                    <Bell className="w-5 h-5 text-[var(--accent)]" />
-                    <h3 className="text-sm font-bold uppercase tracking-widest">Alarme Neural</h3>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    {[
-                      { id: 'neural', name: 'Neural', desc: 'Sutil e decrescente' },
-                      { id: 'crystal', name: 'Crystal', desc: 'Agudo e direto' },
-                      { id: 'pulsar', name: 'Pulsar', desc: 'Alerta duplo' },
-                      { id: 'zen', name: 'Zen', desc: 'Harmônico longo' }
-                    ].map(type => (
-                      <button
-                        key={type.id}
-                        onClick={() => {
-                          setAlarmType(type.id as any);
-                          localStorage.setItem('alarmType', type.id);
-                          playNeuralSound(type.id);
-                        }}
-                        className={`text-left p-4 border-2 transition-all group ${
-                          alarmType === type.id 
-                            ? 'border-[var(--accent)] bg-[var(--accent)]/5' 
-                            : 'border-[var(--border)] hover:border-[var(--accent)]/30'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className={`text-[10px] font-bold uppercase tracking-widest ${alarmType === type.id ? 'text-[var(--accent)]' : 'opacity-40'}`}>
-                            {type.name}
+                <div className="space-y-10">
+                  <section className="space-y-6">
+                    <div className="flex items-center gap-3 border-l-4 border-[var(--accent)] pl-4">
+                      <Bell className="w-5 h-5 text-[var(--accent)]" />
+                      <h3 className="text-sm font-bold uppercase tracking-widest">Alarme Neural</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      {[
+                        { id: 'neural', name: 'Neural', desc: 'Sutil e decrescente' },
+                        { id: 'crystal', name: 'Crystal', desc: 'Agudo e direto' },
+                        { id: 'pulsar', name: 'Pulsar', desc: 'Alerta duplo' },
+                        { id: 'zen', name: 'Zen', desc: 'Harmônico longo' }
+                      ].map(type => (
+                        <button
+                          key={type.id}
+                          onClick={() => {
+                            setAlarmType(type.id as any);
+                            localStorage.setItem('alarmType', type.id);
+                            playNeuralSound(type.id);
+                          }}
+                          className={`text-left p-4 border-2 transition-all group ${
+                            alarmType === type.id 
+                              ? 'border-[var(--accent)] bg-[var(--accent)]/5' 
+                              : 'border-[var(--border)] hover:border-[var(--accent)]/30'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className={`text-[10px] font-bold uppercase tracking-widest ${alarmType === type.id ? 'text-[var(--accent)]' : 'opacity-40'}`}>
+                              {type.name}
+                            </span>
+                            {alarmType === type.id && <div className="w-2 h-2 bg-[var(--accent)]" />}
+                          </div>
+                          <p className="text-[10px] opacity-60 leading-relaxed">{type.desc}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="space-y-6">
+                    <div className="flex items-center gap-3 border-l-4 border-[var(--accent)] pl-4">
+                      <TagIcon className="w-5 h-5 text-[var(--accent)]" />
+                      <h3 className="text-sm font-bold uppercase tracking-widest">Gerenciar Tags</h3>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto custom-scrollbar pr-2 p-1">
+                      {allTags.map(tag => (
+                        <div key={tag} className="group relative">
+                          <span className="px-3 py-2 bg-[var(--muted)] text-[var(--foreground)] text-[10px] font-bold uppercase tracking-widest border border-[var(--border)] flex items-center gap-2">
+                            #{tag}
+                            <button 
+                              onClick={() => {
+                                setGlobalTagToDelete(tag);
+                                setIsGlobalTagDeleteModalOpen(true);
+                              }}
+                              className="text-red-500 opacity-40 hover:opacity-100 transition-opacity"
+                              title="Excluir de todas as notas"
+                            >
+                              <Trash2 size={12} />
+                            </button>
                           </span>
-                          {alarmType === type.id && <div className="w-2 h-2 bg-[var(--accent)]" />}
                         </div>
-                        <p className="text-[10px] opacity-60 leading-relaxed">{type.desc}</p>
-                      </button>
-                    ))}
-                  </div>
-                </section>
+                      ))}
+                      {allTags.length === 0 && (
+                        <p className="text-[10px] opacity-30 italic">Nenhuma etiqueta criada ainda.</p>
+                      )}
+                    </div>
+                  </section>
+                </div>
 
+                <div className="mt-12 pt-8 border-t border-[var(--border)]">
+                  <button
+                    onClick={() => setIsSettingsOpen(false)}
+                    className="w-full py-4 bg-[var(--foreground)] text-[var(--background)] text-[10px] font-bold uppercase tracking-[0.2em] shadow-[8px_8px_0px_rgba(0,0,0,0.1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
+                  >
+                    Salvar e Fechar
+                  </button>
+                </div>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
-              <div className="mt-12 pt-8 border-t border-[var(--border)]">
-                <button
-                  onClick={() => setIsSettingsOpen(false)}
-                  className="w-full py-4 bg-[var(--foreground)] text-[var(--background)] text-[10px] font-bold uppercase tracking-[0.2em] shadow-[8px_8px_0px_rgba(0,0,0,0.1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
+      {/* TAG DELETE MODAL */}
+      <AnimatePresence>
+        {isTagDeleteModalOpen && tagToDelete && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setIsTagDeleteModalOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="relative w-full max-w-sm bg-[var(--background)] border border-red-500/30 p-8 shadow-[20px_20px_0px_rgba(239,68,68,0.1)]"
+            >
+              <div className="flex items-center gap-3 text-red-500 mb-6">
+                <TagIcon className="w-6 h-6" />
+                <h2 className="text-xl font-bold uppercase tracking-widest">Remover Tag?</h2>
+              </div>
+              <p className="text-sm text-[var(--foreground)]/60 mb-8 leading-relaxed">
+                Deseja remover a etiqueta <span className="font-bold text-[var(--foreground)]">#{tagToDelete.tag}</span> deste pensamento?
+              </p>
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setIsTagDeleteModalOpen(false)}
+                  className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest border border-[var(--border)] hover:bg-[var(--muted)] transition-all"
                 >
-                  Salvar e Fechar
+                  Cancelar
+                </button>
+                <button 
+                  onClick={executeTagDelete}
+                  className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest bg-red-500 text-white hover:bg-red-600 shadow-[4px_4px_0px_rgba(0,0,0,0.2)] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all"
+                >
+                  Confirmar
                 </button>
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* GLOBAL TAG DELETE MODAL */}
+      <AnimatePresence>
+        {isGlobalTagDeleteModalOpen && globalTagToDelete && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setIsGlobalTagDeleteModalOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="relative w-full max-w-sm bg-[var(--background)] border border-red-500/30 p-8 shadow-[20px_20px_0px_rgba(239,68,68,0.1)]"
+            >
+              <div className="flex items-center gap-3 text-red-500 mb-6">
+                <AlertTriangle className="w-6 h-6" />
+                <h2 className="text-xl font-bold uppercase tracking-widest">Exclusão Global</h2>
+              </div>
+              <p className="text-sm text-[var(--foreground)]/60 mb-8 leading-relaxed">
+                Você está prestes a remover a tag <span className="font-bold text-[var(--foreground)]">#{globalTagToDelete}</span> de <span className="font-bold text-[var(--foreground)] font-serif italic">{notes.filter(n => n.tags?.includes(globalTagToDelete)).length} notas</span>. Deseja continuar?
+              </p>
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setIsGlobalTagDeleteModalOpen(false)}
+                  className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest border border-[var(--border)] hover:bg-[var(--muted)] transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={executeGlobalTagDelete}
+                  className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest bg-red-500 text-white hover:bg-red-600 shadow-[4px_4px_0px_rgba(0,0,0,0.2)] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* TAG UNDO TOAST */}
+      <AnimatePresence>
+        {showTagUndoToast && (
+          <motion.div 
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[120] bg-black text-white px-6 py-4 flex items-center gap-6 shadow-2xl border border-white/10"
+          >
+            <div className="flex items-center gap-3">
+              <TagIcon className="w-4 h-4 text-accent" />
+              <span className="text-xs font-bold uppercase tracking-widest">
+                {lastDeletedTag?.affectedNoteIds ? `Tag removida de ${lastDeletedTag.affectedNoteIds.length} notas` : `Tag removida: #${lastDeletedTag?.tag}`}
+              </span>
+            </div>
+            <button 
+              onClick={undoTagDelete}
+              className="flex items-center gap-2 text-accent text-xs font-bold uppercase tracking-widest hover:underline"
+            >
+              <RotateCcw className="w-3 h-3" /> Desfazer
+            </button>
+          </motion.div>
         )}
       </AnimatePresence>
 
