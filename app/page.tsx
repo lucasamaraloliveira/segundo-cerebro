@@ -1328,20 +1328,27 @@ export default function Home() {
               className="p-2 bg-[#FF4F00]/10 text-[#FF4F00] border border-[#FF4F00]/20 shadow-[2px_2px_0px_rgba(0,0,0,0.05)] transition-all active:scale-95"
               title="Especialista Neural"
             >
-              <Brain className="w-4 h-4" />
+              <Brain className="w-5 h-5" />
             </button>
             <button 
               onClick={toggleTheme}
               className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 transition-colors"
             >
-              {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+              {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+            </button>
+            <button 
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 transition-colors"
+              title="Configurações"
+            >
+              <Settings className="w-5 h-5" />
             </button>
             <button 
               onClick={logOut}
               className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 transition-colors"
               title="Sair"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -1421,19 +1428,26 @@ export default function Home() {
                 className="p-2 bg-[#FF4F00] text-white shadow-[4px_4px_0px_rgba(0,0,0,0.1)] active:scale-95 transition-all border border-black/5"
                 title="Especialista Neural"
               >
-                <Brain className="w-4 h-4" />
+                <Brain className="w-5 h-5" />
               </button>
               <button 
                 onClick={toggleTheme}
                 className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 transition-colors"
               >
-                {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+              </button>
+              <button 
+                onClick={() => setIsSettingsOpen(true)}
+                className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 transition-colors"
+                title="Configurações"
+              >
+                <Settings className="w-5 h-5" />
               </button>
               <button 
                 onClick={logOut}
                 className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 transition-colors"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-5 h-5" />
               </button>
             </div>
          </div>
@@ -1490,8 +1504,8 @@ export default function Home() {
                 className={`flex flex-col items-center gap-1 transition-all ${view === 'all' && !activeTag ? 'text-[var(--foreground)] scale-105' : 'text-[var(--foreground)]/30'}`}
                 title="Notas"
               >
-                <FileText className={`w-4.5 h-4.5 ${view === 'all' && !activeTag ? 'opacity-100' : 'opacity-40'}`} />
-                <span className="text-[8px] font-bold uppercase tracking-widest">Notas</span>
+                <FileText className={`w-5.5 h-5.5 ${view === 'all' && !activeTag ? 'opacity-100' : 'opacity-40'}`} />
+                <span className="text-[9px] font-bold uppercase tracking-widest">Notas</span>
               </button>
               
               <button 
@@ -1499,8 +1513,8 @@ export default function Home() {
                 className={`flex flex-col items-center gap-1 transition-all ${view === 'favorites' ? 'text-[var(--foreground)] scale-105' : 'text-[var(--foreground)]/30'}`}
                 title="Favoritos"
               >
-                <Star className={`w-4.5 h-4.5 ${view === 'favorites' ? 'fill-current opacity-100' : 'opacity-40'}`} />
-                <span className="text-[8px] font-bold uppercase tracking-widest">Favoritos</span>
+                <Star className={`w-5.5 h-5.5 ${view === 'favorites' ? 'fill-current opacity-100' : 'opacity-40'}`} />
+                <span className="text-[9px] font-bold uppercase tracking-widest">Favoritos</span>
               </button>
             </div>
 
@@ -1512,8 +1526,8 @@ export default function Home() {
                 className="flex flex-col items-center gap-1 text-[var(--foreground)]/30 hover:text-[var(--foreground)] transition-all"
                 title="Dashboard Neural"
               >
-                <Brain className="w-4.5 h-4.5 opacity-40" />
-                <span className="text-[8px] font-bold uppercase tracking-widest">Dash</span>
+                <Brain className="w-5.5 h-5.5 opacity-40" />
+                <span className="text-[9px] font-bold uppercase tracking-widest">Dash</span>
               </Link>
 
               <button 
@@ -1521,17 +1535,8 @@ export default function Home() {
                 className={`flex flex-col items-center gap-1 transition-all ${activeTag ? 'text-[var(--foreground)] scale-105' : 'text-[var(--foreground)]/30'}`}
                 title="Tags"
               >
-                <TagIcon className={`w-4.5 h-4.5 ${activeTag ? 'opacity-100' : 'opacity-40'}`} />
-                <span className="text-[8px] font-bold uppercase tracking-widest">{activeTag ? `#${activeTag}` : 'Tags'}</span>
-              </button>
-
-              <button 
-                onClick={() => setIsSettingsOpen(true)}
-                className={`flex flex-col items-center gap-1 transition-all ${isSettingsOpen ? 'text-[var(--foreground)] scale-105' : 'text-[var(--foreground)]/30'}`}
-                title="Configurações"
-              >
-                <Settings className={`w-4.5 h-4.5 ${isSettingsOpen ? 'opacity-100' : 'opacity-40'}`} />
-                <span className="text-[8px] font-bold uppercase tracking-widest">Config</span>
+                <TagIcon className={`w-5.5 h-5.5 ${activeTag ? 'opacity-100' : 'opacity-40'}`} />
+                <span className="text-[9px] font-bold uppercase tracking-widest">{activeTag ? `#${activeTag}` : 'Tags'}</span>
               </button>
             </div>
           </div>
