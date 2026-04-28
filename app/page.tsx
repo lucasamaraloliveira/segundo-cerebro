@@ -624,10 +624,9 @@ export default function Home() {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Note[];
+      const data = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter((note: any) => note.title !== '__neural_chat_history__') as Note[];
       setNotes(data);
     }, (error) => {
       console.error("Firestore error:", error);

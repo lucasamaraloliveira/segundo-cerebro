@@ -49,10 +49,9 @@ export default function Dashboard() {
         );
 
         const unsubscribeNotes = onSnapshot(q, (snapshot) => {
-          const notesData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          })) as Note[];
+          const notesData = snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter((note: any) => note.title !== '__neural_chat_history__') as Note[];
           setNotes(notesData);
           setLoading(false);
         });
