@@ -315,12 +315,12 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
             onChange={(e) => setLocalTitle(e.target.value)}
             className="w-full text-3xl md:text-3xl lg:text-4xl xl:text-6xl font-serif font-bold tracking-tighter leading-[1.1] bg-transparent border-none focus:outline-none mb-1 placeholder:text-[var(--foreground)]/40 text-[var(--foreground)] resize-none overflow-hidden"
           />
-          <div className="grid grid-cols-2 gap-4 md:gap-8 mb-0 pb-1 border-b border-[var(--border)]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-8 mb-0 pb-3 border-b border-[var(--border)]">
             <div className="space-y-1">
               <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Lembrete</p>
               <input
                 type="datetime-local"
-                className="w-full bg-[var(--muted)] text-[var(--foreground)] px-3 py-2 text-xs font-bold uppercase tracking-wider rounded border-none focus:outline-none"
+                className="w-full bg-[var(--muted)] text-[var(--foreground)] px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold uppercase tracking-normal sm:tracking-wider rounded border-none focus:outline-none"
                 value={activeNote.reminder ? format(activeNote.reminder.toDate(), "yyyy-MM-dd'T'HH:mm") : ''}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -339,7 +339,7 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
               <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Vencimento</p>
               <input
                 type="datetime-local"
-                className="w-full bg-[var(--muted)] text-[var(--foreground)] px-3 py-2 text-xs font-bold uppercase tracking-wider rounded border-none focus:outline-none"
+                className="w-full bg-[var(--muted)] text-[var(--foreground)] px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold uppercase tracking-normal sm:tracking-wider rounded border-none focus:outline-none"
                 value={activeNote.expiryDate ? format(activeNote.expiryDate.toDate(), "yyyy-MM-dd'T'HH:mm") : ''}
                 onChange={(e) => {
                   const val = e.target.value;
