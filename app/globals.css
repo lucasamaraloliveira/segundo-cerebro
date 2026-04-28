@@ -227,6 +227,15 @@ select option {
   font-family: inherit;
 }
 
+.tiptap blockquote, .prose blockquote {
+  @apply border-l-2 border-[var(--foreground)] pl-6 italic my-8 text-xl font-serif opacity-90 relative;
+}
+
+.tiptap blockquote::before {
+  content: '"';
+  @apply absolute -left-2 top-0 text-4xl opacity-20 font-serif leading-none;
+}
+
 /* Code Styles */
 .tiptap code {
   @apply bg-[var(--muted)] text-[var(--foreground)] px-1.5 py-0.5 rounded text-[0.9em] font-mono font-medium;

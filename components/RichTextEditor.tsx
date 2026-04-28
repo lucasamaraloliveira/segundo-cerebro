@@ -18,6 +18,8 @@ import TaskItem from '@tiptap/extension-task-item';
 import Placeholder from '@tiptap/extension-placeholder';
 import { Markdown } from 'tiptap-markdown';
 import { motion, AnimatePresence } from 'motion/react';
+import { Plugin, PluginKey } from 'prosemirror-state';
+import { Decoration, DecorationSet } from 'prosemirror-view';
 import { 
   Bold, 
   Italic, 
@@ -46,7 +48,8 @@ import {
   ChevronDown,
   Mic,
   Maximize2,
-  Layers
+  Layers,
+  Sparkles
 } from 'lucide-react';
 
 declare module '@tiptap/core' {
@@ -117,6 +120,71 @@ const FontSize = Extension.create({
     }
   },
 })
+
+export const GhostTextPluginKey = new PluginKey('ghostText');
+
+export const GhostText = Extension.create({
+  name: 'ghostText',
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: GhostTextPluginKey,
+        state: {
+          init() {
+            return DecorationSet.empty;
+          },
+          apply(tr, set) {
+            set = set.map(tr.mapping, tr.doc);
+            const action = tr.getMeta(GhostTextPluginKey);
+            if (action && action.type === 'set') {
+              const widget = document.createElement('span');
+              widget.className = 'text-[var(--foreground)] opacity-30 font-serif italic pointer-events-none select-none';
+              widget.textContent = action.text;
+              const deco = Decoration.widget(action.pos, widget, {
+                side: 1, // insert after cursor
+                suggestionText: action.text
+              });
+              return DecorationSet.create(tr.doc, [deco]);
+            } else if (action && action.type === 'clear') {
+              return DecorationSet.empty;
+            }
+            // Clear if user types
+            if (tr.docChanged && !tr.getMeta(GhostTextPluginKey)) {
+               return DecorationSet.empty;
+            }
+            return set;
+          },
+        },
+        props: {
+          decorations(state) {
+            return this.getState(state);
+          },
+          handleKeyDown(view, event) {
+            const state = this.getState(view.state);
+            const hasDecoration = state && state.find().length > 0;
+            
+            if (hasDecoration) {
+              if (event.key === 'Tab' || event.key === 'ArrowRight') {
+                const deco = state.find()[0];
+                const text = deco.spec.suggestionText;
+                view.dispatch(
+                  view.state.tr
+                    .insertText(text, deco.from)
+                    .setMeta(GhostTextPluginKey, { type: 'clear' })
+                );
+                return true; // prevent default (don't insert tab, just accept text)
+              } else if (event.key !== 'Shift' && event.key !== 'Control' && event.key !== 'Alt') {
+                view.dispatch(view.state.tr.setMeta(GhostTextPluginKey, { type: 'clear' }));
+              }
+            }
+            return false;
+          }
+        },
+      }),
+    ];
+  },
+});
 
 interface RichTextEditorProps {
   content: string;
@@ -251,8 +319,12 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
   const [ignoredSuggestions, setIgnoredSuggestions] = useState<Set<string>>(new Set());
   const lastAnalyzedText = useRef('');
 
+  const [isAiAutocompleteEnabled, setIsAiAutocompleteEnabled] = useState(false);
+  const autocompleteTimer = useRef<NodeJS.Timeout | null>(null);
+
   const editor = useEditor({
     extensions: [
+      GhostText,
       Markdown.configure({
         html: true,
         transformPastedText: true,
@@ -347,6 +419,77 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
     }
     setPasteModal(null);
   };
+
+  // Auto-complete logic
+  useEffect(() => {
+    if (!editor) return;
+
+    if (!isAiAutocompleteEnabled) {
+      editor.view.dispatch(editor.state.tr.setMeta(GhostTextPluginKey, { type: 'clear' }));
+      return;
+    }
+
+    const handleInteraction = () => {
+      if (autocompleteTimer.current) {
+        clearTimeout(autocompleteTimer.current);
+      }
+      
+      // We clear the ghost text right away when typing happens within the extension's apply logic,
+      // but we also reset the timer here.
+      
+      autocompleteTimer.current = setTimeout(async () => {
+        // Double check state inside timeout just in case it was toggled off
+        if (!isAiAutocompleteEnabled) return;
+        
+        const text = editor.getText();
+        if (text.length < 5) return; 
+        
+        const { from, to } = editor.state.selection;
+        if (from !== to) return; // Don't suggest if text is highlighted
+
+        try {
+          const context = text.slice(Math.max(0, text.length - 800)); // Get last 800 chars
+          const res = await fetch('/api/ai/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              prompt: `Você é uma IA de autocompletar texto trabalhando de forma invisível. Analise o contexto abaixo e preveja APENAS AS PRÓXIMAS PALAVRAS (1 a 8 palavras no máximo) que completariam a frase atual de forma natural e fluida. Retorne APENAS o texto da sugestão, sem aspas, sem formatação e sem comentários. Se não houver nada natural a sugerir ou se a frase já estiver perfeitamente concluída, retorne vazio.\n\nCONTEXTO:\n${context}` 
+            })
+          });
+          const data = await res.json();
+          
+          if (data.text && data.text.trim().length > 0) {
+             const suggestion = data.text.trim();
+             // Ensure cursor hasn't moved while fetching
+             if (editor.state.selection.from === from && isAiAutocompleteEnabled) {
+                const textBeforeCursor = editor.state.doc.textBetween(Math.max(0, from - 1), from);
+                const needsSpace = textBeforeCursor && !textBeforeCursor.match(/\s/) && !suggestion.match(/^\s/);
+                const finalSuggestion = needsSpace ? ` ${suggestion}` : suggestion;
+                
+                editor.view.dispatch(
+                  editor.state.tr.setMeta(GhostTextPluginKey, {
+                    type: 'set',
+                    text: finalSuggestion,
+                    pos: from
+                  })
+                );
+             }
+          }
+        } catch (e) {
+          console.error('Autocomplete error:', e);
+        }
+      }, 1200); // 1.2s debounce
+    };
+
+    editor.on('update', handleInteraction);
+    editor.on('selectionUpdate', handleInteraction);
+
+    return () => {
+      editor.off('update', handleInteraction);
+      editor.off('selectionUpdate', handleInteraction);
+      if (autocompleteTimer.current) clearTimeout(autocompleteTimer.current);
+    };
+  }, [editor, isAiAutocompleteEnabled]);
 
   const toggleTranscription = () => {
     if (isRecording) {
@@ -631,6 +774,13 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
         )}
 
         <div className="flex items-center gap-1">
+          <ToolbarButton 
+            onClick={() => setIsAiAutocompleteEnabled(!isAiAutocompleteEnabled)} 
+            isActive={isAiAutocompleteEnabled} 
+            title="Autocompletar com IA"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+          </ToolbarButton>
           <button
             onClick={toggleTranscription}
             className={`w-8 h-8 flex items-center justify-center rounded-full transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60'}`}
