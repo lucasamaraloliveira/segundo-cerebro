@@ -18,7 +18,7 @@ function cosineSimilarity(vecA: number[], vecB: number[]) {
 
 export async function POST(req: Request) {
   try {
-    const { query, notes } = await req.json();
+    const { query, notes, file } = await req.json();
 
     if (!query || !notes) {
       return NextResponse.json({ error: 'Query and notes are required' }, { status: 400 });
@@ -40,7 +40,6 @@ export async function POST(req: Request) {
     const queryEmbedding = embedResult.embedding.values;
 
     // 2. Search for relevant notes
-    // Filter notes that have embeddings and calculate similarity
     const relevantNotes = notes
       .filter((n: any) => n.embedding && Array.isArray(n.embedding))
       .map((n: any) => ({
@@ -48,18 +47,19 @@ export async function POST(req: Request) {
         similarity: cosineSimilarity(queryEmbedding, n.embedding)
       }))
       .sort((a: any, b: any) => b.similarity - a.similarity)
-      .slice(0, 5); // Take top 5
+      .slice(0, 5);
 
     // 3. Construct Context
     const context = relevantNotes.length > 0
       ? relevantNotes.map((n: any) => `[NOTA: ${n.title}]\n${n.content}`).join('\n\n---\n\n')
       : "Nenhuma nota relevante encontrada.";
 
-    // 4. Generate Answer using Gemini 3.1 Flash Lite Preview
+    // 4. Generate Answer
     const chatModel = genAI.getGenerativeModel(
       { model: "gemini-3.1-flash-lite-preview" },
       { apiVersion: 'v1beta' }
     );
+    
     const prompt = `
 Você é o "Especialista Neural" do sistema Segundo Cérebro. 
 Seu objetivo é ajudar o usuário com base exclusivamente no conhecimento contido nas notas dele.
@@ -77,7 +77,18 @@ PERGUNTA DO USUÁRIO:
 ${query}
     `;
 
-    const result = await chatModel.generateContent(prompt);
+    let contentParts: any[] = [prompt];
+    
+    if (file && file.data && file.mimeType) {
+      contentParts.push({
+        inlineData: {
+          data: file.data,
+          mimeType: file.mimeType
+        }
+      });
+    }
+
+    const result = await chatModel.generateContent(contentParts);
     const text = result.response.text();
 
     return NextResponse.json({

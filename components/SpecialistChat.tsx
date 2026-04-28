@@ -41,6 +41,13 @@ export default function SpecialistChat() {
   const [deletedSessionBuffer, setDeletedSessionBuffer] = useState<any | null>(null);
   const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Pending attachment for multimodal chat
+  const [pendingFile, setPendingFile] = useState<{
+    data: string;
+    mimeType: string;
+    name: string;
+  } | null>(null);
+
   // Resize handler
   useEffect(() => {
     if (!isResizing) return;
@@ -191,7 +198,37 @@ export default function SpecialistChat() {
     if (!file) return;
 
     if (!file.type.startsWith('audio/') && !file.type.startsWith('video/')) {
-      alert('Por favor, selecione um arquivo de áudio ou vídeo.');
+      const isImage = file.type.startsWith('image/');
+      const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf');
+      const isText = file.type.startsWith('text/') || file.name.endsWith('.txt') || file.name.endsWith('.md');
+      const isDoc = file.name.endsWith('.doc') || file.name.endsWith('.docx');
+
+      if (!isImage && !isPdf && !isText && !isDoc) {
+        alert('Formato não suportado. Envie PDFs, DOCs, Imagens, Áudios ou Vídeos.');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string;
+        const base64Data = base64.split(',')[1];
+        
+        let mime = file.type;
+        if (!mime) {
+          if (file.name.endsWith('.pdf')) mime = 'application/pdf';
+          else if (file.name.endsWith('.docx')) mime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+          else if (file.name.endsWith('.doc')) mime = 'application/msword';
+          else if (file.name.endsWith('.txt')) mime = 'text/plain';
+          else mime = 'application/octet-stream';
+        }
+
+        setPendingFile({
+          data: base64Data,
+          mimeType: mime,
+          name: file.name
+        });
+      };
+      reader.readAsDataURL(file);
       return;
     }
 
@@ -358,7 +395,10 @@ export default function SpecialistChat() {
     e.preventDefault();
     if (!queryText.trim() || isLoading) return;
 
-    const userMessage = queryText.trim();
+    let userMessage = queryText.trim();
+    if (pendingFile) {
+      userMessage = `📎 [Anexo: ${pendingFile.name}]\n\n${userMessage}`;
+    }
     setQueryText('');
     
     const newMessages = [...messages, { role: 'user', content: userMessage }];
@@ -403,7 +443,11 @@ export default function SpecialistChat() {
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: userMessage, notes })
+        body: JSON.stringify({ 
+          query: userMessage, 
+          notes,
+          file: pendingFile 
+        })
       });
       const data = await res.json();
 
@@ -437,6 +481,7 @@ export default function SpecialistChat() {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Erro ao processar consulta. Tente novamente.' }]);
     } finally {
       setIsLoading(false);
+      setPendingFile(null);
     }
   };
 
@@ -630,6 +675,20 @@ export default function SpecialistChat() {
 
                 <form onSubmit={handleSendMessage} className="p-4 bg-[var(--background)] border-t border-black/10">
                   <div className="flex flex-col bg-[var(--muted)] border border-black/10 focus-within:ring-2 focus-within:ring-[#FF4F00] transition-all shadow-[4px_4px_0px_rgba(0,0,0,0.05)]">
+                    {pendingFile && (
+                      <div className="px-4 py-2 bg-black/5 dark:bg-white/5 border-b border-black/10 flex justify-between items-center z-10">
+                        <span className="text-[10px] font-bold text-[#FF4F00] truncate max-w-[80%] flex items-center gap-1">
+                          📎 Pronto para análise: {pendingFile.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setPendingFile(null)}
+                          className="text-[var(--foreground)]/40 hover:text-red-500 text-[9px] font-bold uppercase tracking-widest transition-colors"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    )}
                     <textarea
                       ref={textareaRef}
                       value={queryText}
@@ -650,7 +709,7 @@ export default function SpecialistChat() {
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
                           className="p-2 text-[var(--foreground)]/60 hover:text-[#FF4F00] hover:bg-black/5 dark:hover:bg-white/5 transition-all"
-                          title="Anexar áudio ou vídeo"
+                          title="Anexar arquivo (PDF, DOC, Imagens, Áudio/Vídeo)"
                         >
                           <Paperclip size={20} />
                         </button>
@@ -658,7 +717,7 @@ export default function SpecialistChat() {
                           type="file"
                           ref={fileInputRef}
                           onChange={handleFileUpload}
-                          accept="audio/*,video/*"
+                          accept="audio/*,video/*,image/*,.pdf,.doc,.docx,.txt,.md"
                           className="hidden"
                         />
                       </div>
