@@ -33,7 +33,7 @@ import {
   Star,
   Bell,
   Sparkles,
-  Download,
+  Printer,
   Maximize2,
   Trash2,
   Calendar,
@@ -163,7 +163,7 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
     // Only update local title if it's currently empty or the default, 
     // or if the note ID changed
     if (activeNote.id !== localTitleRef.current || !localTitle) {
-      setLocalTitle(activeNote.title || '');
+      setLocalTitle((activeNote.title || '').replace(/\n/g, ''));
       localTitleRef.current = activeNote.id;
     }
     setLocalContent(activeNote.content || '');
@@ -228,8 +228,8 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
             onClick={() => exportAsPDF(activeNote)}
             className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter hover:text-[var(--foreground)] transition-all group text-[var(--foreground)]"
           >
-            <Download className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100" />
-            <span className="whitespace-nowrap">Exportar</span>
+            <Printer className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100" />
+            <span className="whitespace-nowrap">Imprimir</span>
           </button>
           <button
             onClick={() => setIsFullscreen(!isFullscreen)}
@@ -312,10 +312,15 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
             rows={1}
             value={localTitle}
             placeholder="Título da nota"
-            onChange={(e) => setLocalTitle(e.target.value)}
-            className="w-full text-3xl md:text-3xl lg:text-4xl xl:text-6xl font-serif font-bold tracking-tighter leading-[1.1] bg-transparent border-none focus:outline-none mb-1 placeholder:text-[var(--foreground)]/40 text-[var(--foreground)] resize-none overflow-hidden"
+            onChange={(e) => setLocalTitle(e.target.value.replace(/\n/g, ''))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+              }
+            }}
+            className="w-full text-3xl md:text-3xl lg:text-4xl xl:text-6xl font-serif font-bold tracking-tighter leading-[1.1] bg-transparent border-none focus:outline-none mb-0 p-0 placeholder:text-[var(--foreground)]/40 text-[var(--foreground)] resize-none overflow-hidden"
           />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-8 mb-0 pb-3 border-b border-[var(--border)]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-4 mb-0 pb-3 border-b border-[var(--border)] mt-4 md:mt-6">
             <div className="space-y-1">
               <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Lembrete</p>
               <input
@@ -757,7 +762,7 @@ export default function Home() {
     if (!activeNote || !activeNote.tags?.length) return [];
 
     return notes
-      .filter(n => n.id !== activeNote.id)
+      .filter(n => n.id !== activeNote.id && !activeNote.content?.includes(n.id))
       .map(n => ({
         ...n,
         sharedTagsCount: n.tags?.filter(t => activeNote.tags?.includes(t)).length || 0
@@ -980,160 +985,90 @@ export default function Home() {
     }
   };
 
-  const exportAsPDF = async (note: Note) => {
-    const element = document.createElement('div');
-    // Definimos uma largura fixa robusta para o renderizador
-    element.style.width = '800px'; 
-    element.style.padding = '60px';
-    element.style.backgroundColor = '#ffffff';
-    element.style.color = '#000000';
-    element.style.position = 'absolute';
-    element.style.left = '-9999px';
-    element.style.top = '0';
+  const exportAsPDF = (note: Note) => {
+    // 1. Cria um container nativo que será a ÚNICA coisa visível durante a impressão
+    const printContainer = document.createElement('div');
+    printContainer.id = 'printable-note-container';
     
+    // Força fundo branco sem padding excessivo (as margens são controladas pelo @page)
+    printContainer.style.backgroundColor = 'white';
+    printContainer.style.width = '100%';
+    printContainer.style.margin = '0';
+    printContainer.style.padding = '0';
+
     const dateStr = note.updatedAt 
       ? format(note.updatedAt.toDate(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) 
       : 'Agora';
 
-    element.innerHTML = `
+    // 2. Injeta o HTML. Usamos classes prose nativas para paridade 1:1 com o editor.
+    printContainer.innerHTML = `
       <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Playfair+Display:ital,wght@0,700;1,700&display=swap');
-        
-        .pdf-container { 
-          font-family: 'Inter', sans-serif; 
-          width: 100%; 
-          box-sizing: border-box;
-        }
-        .pdf-title { 
-          font-family: 'Playfair Display', serif; 
-          font-size: 36pt; 
-          margin: 0; 
-          font-weight: 700; 
-          line-height: 1.2; 
-          color: #000;
-          word-wrap: break-word;
-          overflow-wrap: break-word;
-          margin-bottom: 20pt;
-          display: block;
-          width: 100%;
-        }
-        .pdf-header { 
-          border-bottom: 3pt solid #000; 
-          padding-bottom: 20pt; 
-          margin-bottom: 40pt; 
-          display: block;
-          width: 100%;
-        }
-        .pdf-content { 
-          font-family: 'Georgia', serif; 
-          font-size: 12pt; 
-          line-height: 1.6; 
-          color: #111; 
-          width: 100%;
-          word-wrap: break-word;
-          overflow-wrap: break-word;
-        }
-        .pdf-content p, .pdf-content li, .pdf-content h1, .pdf-content h2, .pdf-content h3, 
-        .pdf-content h4, .pdf-content blockquote, .pdf-content pre { 
-          margin-bottom: 15pt;
-          max-width: 100%;
-        }
-        .pdf-content h1, .pdf-content h2, .pdf-content h3 {
-          margin-top: 30pt;
-          font-family: 'Playfair Display', serif;
-          font-weight: 700;
-          line-height: 1.3;
-        }
-        .pdf-content blockquote {
-          border-left: 4pt solid #000;
-          padding-left: 15pt;
-          font-style: italic;
-          margin: 20pt 0;
-          color: #333;
-        }
-        .pdf-content pre {
-          background: #f8f8f8;
-          padding: 15pt;
-          font-family: monospace;
-          font-size: 10pt;
-          border: 0.5pt solid #eee;
-          white-space: pre-wrap;
-          word-wrap: break-word;
-        }
-        .pdf-content img {
-          max-width: 100% !important;
-          height: auto !important;
-        }
-        .pdf-footer {
-          margin-top: 60pt; 
-          border-top: 0.5pt solid #eee; 
-          padding-top: 20pt; 
-          text-align: center;
+        /* Regras de impressão estritas */
+        @media print {
+          @page { margin: 20mm; }
+          
+          /* Reseta o tamanho da tela para evitar páginas em branco no final */
+          html, body {
+            height: auto !important;
+            min-height: auto !important;
+            background: white !important;
+            overflow: visible !important;
+          }
+
+          /* Esconde todo o aplicativo, mostra apenas a nota */
+          body.is-printing-note > *:not(#printable-note-container) {
+            display: none !important;
+          }
+          
+          #printable-note-container {
+            display: block !important;
+          }
+
+          /* FORÇA ABSOLUTA de cor preta, esmagando qualquer herança do Tailwind/Dark Mode */
+          #printable-note-container,
+          #printable-note-container * {
+            color: #000000 !important;
+          }
+
+          /* Oculta URLs injetadas pelo Chrome no rodapé dos links */
+          a[href]:after { content: none !important; }
         }
       </style>
-      <div class="pdf-container">
-        <div class="pdf-header">
-          <h1 class="pdf-title">${note.title || 'Sem título'}</h1>
-          <div style="display: flex; align-items: center; gap: 10pt;">
-            <span style="font-size: 8pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; background: #000; color: #fff; padding: 3pt 6pt;">MEMÓRIA NEURAL</span>
-            <span style="font-size: 9pt; font-weight: 500; color: #666;">${dateStr}</span>
-          </div>
+      <div style="border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 30px;">
+        <h1 style="font-family: Georgia, 'Times New Roman', serif; font-size: 28pt; margin: 0 0 15px 0; font-weight: 700; line-height: 1.2; color: #000;">
+          ${note.title || 'Sem título'}
+        </h1>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 10pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; background: #000; color: #fff; padding: 4px 8px;">MEMÓRIA NEURAL</span>
+          <span style="font-size: 11pt; font-weight: 500; color: #666;">${dateStr}</span>
         </div>
-        
-        <div class="pdf-content">
-          ${note.content}
-        </div>
-
-        <div class="pdf-footer">
-          <p style="font-size: 7pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.4em; color: #bbb;">Cérebro² Neural Export • Autenticado via Mente+</p>
-        </div>
+      </div>
+      <!-- Classe prose garante o exato mesmo visual do editor -->
+      <div class="prose prose-sm max-w-none text-black" style="color: #000;">
+        ${note.content}
       </div>
     `;
 
-    document.body.appendChild(element);
+    // 3. Salva o título original do site e aplica temporariamente o título da nota
+    // O navegador usa o <title> do documento como o nome padrão do arquivo "Salvar como PDF"
+    const originalTitle = document.title;
+    document.title = note.title ? note.title.trim() : 'Nota sem título';
 
-    try {
-      const doc = new jsPDF({
-        orientation: 'p',
-        unit: 'pt',
-        format: 'a4'
-      });
+    // 4. Acopla ao body e ativa o modo de impressão global
+    document.body.appendChild(printContainer);
+    document.body.classList.add('is-printing-note');
 
-      // Usando html2canvas explicitamente para melhor controle antes de passar para o jsPDF
-      const canvas = await html2canvas(element, {
-        scale: 2, // Melhor qualidade
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        windowWidth: 800
-      });
-
-      const imgData = canvas.toDataURL('image/jpeg', 1.0);
-      const pdfWidth = doc.internal.pageSize.getWidth();
-      const pdfHeight = doc.internal.pageSize.getHeight();
-      const imgWidth = pdfWidth - 80; // Margens de 40pt
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    // 5. Aguarda um instante para o navegador reprocessar o layout e invoca a impressão nativa
+    setTimeout(() => {
+      window.print();
       
-      let heightLeft = imgHeight;
-      let position = 40; // Margem superior
-
-      doc.addImage(imgData, 'JPEG', 40, position, imgWidth, imgHeight);
-      heightLeft -= (pdfHeight - 80);
-
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight + 40;
-        doc.addPage();
-        doc.addImage(imgData, 'JPEG', 40, position, imgWidth, imgHeight);
-        heightLeft -= pdfHeight;
+      // 6. Limpeza (Cleanup) - Volta o app ao normal imediatamente após a janela de impressão fechar
+      document.title = originalTitle; // Devolve o título original do site
+      document.body.classList.remove('is-printing-note');
+      if (document.body.contains(printContainer)) {
+        document.body.removeChild(printContainer);
       }
-
-      doc.save(`${note.title || 'nota'}.pdf`);
-    } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
-      alert('Erro ao gerar PDF. Tente novamente.');
-    } finally {
-      document.body.removeChild(element);
-    }
+    }, 150);
   };
 
 

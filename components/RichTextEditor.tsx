@@ -214,7 +214,7 @@ const ToolbarButton = ({
       onClick();
     }}
     title={title}
-    className={`p-2 md:p-1.5 rounded-full transition-all relative shrink-0 ${
+    className={`p-1.5 md:p-1 rounded-full transition-all relative shrink-0 ${
       isActive 
         ? 'bg-[var(--accent)] text-white shadow-md' 
         : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-70 hover:opacity-100 hover:scale-105 active:scale-95'
@@ -259,10 +259,10 @@ const CustomSelect = ({
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--muted)]/50 text-[var(--foreground)] border border-[var(--border)]/10 hover:border-[var(--accent)]/50 transition-all min-w-[70px] md:min-w-[75px] group ${isOpen ? 'ring-1 ring-[var(--accent)] border-[var(--accent)]/50' : ''}`}
+        className={`flex items-center gap-1 px-2 py-1 rounded-full bg-[var(--muted)]/50 text-[var(--foreground)] border border-[var(--border)]/10 hover:border-[var(--accent)]/50 transition-all group ${isOpen ? 'ring-1 ring-[var(--accent)] border-[var(--accent)]/50' : ''}`}
       >
         <Icon className="w-3.5 h-3.5 md:w-3 md:h-3 opacity-50 group-hover:opacity-100 transition-opacity" />
-        <span className="text-[9px] md:text-[8px] font-bold uppercase tracking-wider truncate max-w-[40px] md:max-w-[50px]">
+        <span className="text-[9px] md:text-[8px] font-bold uppercase tracking-wider truncate max-w-[40px] md:max-w-[45px]">
           {selectedLabel}
         </span>
         <ChevronDown className={`w-2.5 h-2.5 ml-auto opacity-20 group-hover:opacity-100 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
@@ -584,7 +584,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
         if (note.id === activeNoteId || ignoredSuggestions.has(note.id)) continue;
         
         // Skip if already linked
-        if (currentHtml.includes(`data-internal-note-id="${note.id}"`)) continue;
+        if (currentHtml.includes(note.id)) continue;
 
         const noteText = (note.title + ' ' + (note.content || '')).toLowerCase();
         let score = 0;
@@ -621,9 +621,9 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
   return (
     <div className="flex flex-col w-full relative">
       {/* Modern Floating Command Dock - Evaluation: Minimalist & Pro */}
-      <div className="sticky top-4 z-50 px-2 md:px-0 flex justify-center w-full pointer-events-none">
-        <div className="pointer-events-auto bg-[var(--background)]/80 backdrop-blur-xl border border-[var(--border)] shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.3)] rounded-full px-4 py-1.5 flex items-center gap-1 max-w-[95vw] md:max-w-full overflow-x-auto md:overflow-x-visible no-scrollbar transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
-        <div className="flex items-center gap-0.5 pr-2 mr-2 border-r border-[var(--border)]">
+      <div className="sticky top-4 z-50 flex justify-center w-full pointer-events-none">
+        <div className="pointer-events-auto bg-[var(--background)]/80 backdrop-blur-xl border border-[var(--border)] shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.3)] rounded-full px-3 py-1.5 flex items-center gap-0.5 max-w-[95vw] md:max-w-full overflow-x-auto md:overflow-visible no-scrollbar transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
+        <div className="flex items-center mr-1">
           <ToolbarButton onClick={() => editor.chain().focus().undo().run()} title="Desfazer">
             <Undo className="w-3.5 h-3.5" />
           </ToolbarButton>
@@ -632,7 +632,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
           </ToolbarButton>
         </div>
 
-        <div className="flex items-center gap-0.5 pr-2 mr-2 border-r border-[var(--border)]">
+        <div className="flex items-center mr-1 bg-[var(--muted)]/10 rounded-full px-0.5 py-0.5">
           <ToolbarButton 
             onClick={() => editor.chain().focus().toggleBold().run()} 
             isActive={editor.isActive('bold')} 
@@ -647,19 +647,17 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
           >
             <Italic className="w-3.5 h-3.5" />
           </ToolbarButton>
-          {isFocusMode && (
-             <ToolbarButton 
-                onClick={() => editor.chain().focus().toggleUnderline().run()} 
-                isActive={editor.isActive('underline')} 
-                title="Sublinhado"
-              >
-                <UnderlineIcon className="w-3.5 h-3.5" />
-              </ToolbarButton>
-          )}
+          <ToolbarButton 
+            onClick={() => editor.chain().focus().toggleUnderline().run()} 
+            isActive={editor.isActive('underline')} 
+            title="Sublinhado"
+          >
+            <UnderlineIcon className="w-3.5 h-3.5" />
+          </ToolbarButton>
         </div>
 
         {isFocusMode && (
-          <div className="hidden md:flex items-center gap-2 pr-2 mr-2 border-r border-[var(--border)] animate-in fade-in slide-in-from-left-2 duration-300">
+          <div className="hidden md:flex items-center gap-1 mr-1 animate-in fade-in slide-in-from-left-2 duration-300">
             <CustomSelect 
               label="Fonte"
               icon={Type}
@@ -693,6 +691,26 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
                 { label: '36px', value: '36px' },
               ]}
             />
+            <CustomSelect 
+              label="Cor"
+              icon={Palette}
+              value={editor.getAttributes('textStyle').color || 'Padrão'}
+              onChange={(val) => {
+                if (val === 'default') editor.chain().focus().unsetColor().run();
+                else editor.chain().focus().setColor(val).run();
+              }}
+              options={[
+                { label: 'Padrão', value: 'default' },
+                { label: 'Preto', value: '#000000' },
+                { label: 'Cinza', value: '#666666' },
+                { label: 'Vermelho', value: '#EF4444' },
+                { label: 'Laranja', value: '#F97316' },
+                { label: 'Amarelo', value: '#EAB308' },
+                { label: 'Verde', value: '#22C55E' },
+                { label: 'Azul', value: '#3B82F6' },
+                { label: 'Roxo', value: '#A855F7' },
+              ]}
+            />
             <ToolbarButton 
               onClick={() => editor.chain().focus().toggleBlockquote().run()} 
               isActive={editor.isActive('blockquote')} 
@@ -710,7 +728,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
           </div>
         )}
 
-        <div className="flex items-center gap-0.5 pr-2 mr-2 border-r border-[var(--border)]">
+        <div className="flex items-center mr-1">
           <ToolbarButton 
             onClick={() => editor.chain().focus().toggleBulletList().run()} 
             isActive={editor.isActive('bulletList')} 
@@ -752,7 +770,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
         </div>
 
         {isFocusMode && (
-          <div className="hidden md:flex items-center gap-0.5 pr-2 mr-2 border-r border-[var(--border)] animate-in fade-in slide-in-from-left-2 duration-300">
+          <div className="hidden md:flex items-center mr-1 animate-in fade-in slide-in-from-left-2 duration-300">
             <CustomSelect 
               label="Alinhar"
               icon={AlignLeft}
@@ -773,7 +791,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
           </div>
         )}
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <ToolbarButton 
             onClick={() => setIsAiAutocompleteEnabled(!isAiAutocompleteEnabled)} 
             isActive={isAiAutocompleteEnabled} 
