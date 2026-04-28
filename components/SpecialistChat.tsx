@@ -3,9 +3,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Note } from '@/lib/types';
 import { db, auth } from '@/lib/firebase';
-import { doc, updateDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, onSnapshot, setDoc, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { X, Send, Brain, Loader2, Info, ChevronDown, Paperclip, Copy, Check, History, ArrowLeft, Plus } from 'lucide-react';
+import { X, Send, Brain, Loader2, Info, ChevronDown, Paperclip, Copy, Check, History, ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -32,6 +32,14 @@ export default function SpecialistChat() {
   const [currentSessionId, setCurrentSessionId] = useState<string>('');
   const [viewMode, setViewMode] = useState<'chat' | 'history' | 'history-detail'>('chat');
   const [selectedSession, setSelectedSession] = useState<any | null>(null);
+  const [historyNoteId, setHistoryNoteId] = useState<string | null>(null);
+
+  // Delete & Undo States
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
+  const [sessionToDelete, setSessionToDelete] = useState<any | null>(null);
+  const [isUndoVisible, setIsUndoVisible] = useState<boolean>(false);
+  const [deletedSessionBuffer, setDeletedSessionBuffer] = useState<any | null>(null);
+  const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Resize handler
   useEffect(() => {
@@ -70,65 +78,54 @@ export default function SpecialistChat() {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        const q = query(collection(db, 'notes'), where('userId', '==', currentUser.uid));
-        const unsubscribeNotes = onSnapshot(q, (snapshot) => {
+        const qNotes = query(collection(db, 'notes'), where('userId', '==', currentUser.uid));
+        const unsubscribeNotes = onSnapshot(qNotes, async (snapshot) => {
           const notesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Note[];
-          setNotes(notesData);
+          
+          let historyNote = notesData.find(n => n.title === '__neural_chat_history__');
+          
+          if (!historyNote) {
+            try {
+              const newNoteRef = await addDoc(collection(db, 'notes'), {
+                userId: currentUser.uid,
+                title: '__neural_chat_history__',
+                content: '[]',
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+              });
+              setHistoryNoteId(newNoteRef.id);
+            } catch (e) {
+              console.error('Error creating hidden history note', e);
+            }
+          } else {
+            setHistoryNoteId(historyNote.id);
+            if (historyNote.content) {
+              try {
+                setChatHistory(JSON.parse(historyNote.content));
+              } catch (e) {
+                console.error('Error parsing hidden history note', e);
+              }
+            }
+          }
+          
+          const visibleNotes = notesData.filter(n => n.title !== '__neural_chat_history__');
+          setNotes(visibleNotes);
         });
-        return () => unsubscribeNotes();
+
+        setCurrentSessionId(Date.now().toString());
+
+        return () => {
+          unsubscribeNotes();
+
+        };
       } else {
         setNotes([]);
+        setChatHistory([]);
       }
     });
     return () => unsubscribeAuth();
   }, []);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedHistory = localStorage.getItem('neural_chat_history');
-      if (savedHistory) {
-        try {
-          setChatHistory(JSON.parse(savedHistory));
-        } catch (e) {
-          console.error('Error parsing chat history', e);
-        }
-      }
-      setCurrentSessionId(Date.now().toString());
-    }
-  }, []);
-
-  useEffect(() => {
-    if (messages.length === 0 || !currentSessionId) return;
-
-    setChatHistory(prev => {
-      const existingIndex = prev.findIndex((s: any) => s.id === currentSessionId);
-      const updatedHistory = [...prev];
-
-      if (existingIndex >= 0) {
-        updatedHistory[existingIndex] = {
-          ...updatedHistory[existingIndex],
-          messages: messages,
-          updatedAt: Date.now()
-        };
-      } else {
-        const firstUserMessage = messages.find(m => m.role === 'user')?.content || 'Consulta sem título';
-        const title = firstUserMessage.substring(0, 30) + (firstUserMessage.length > 30 ? '...' : '');
-
-        updatedHistory.push({
-          id: currentSessionId,
-          title: title,
-          timestamp: Date.now(),
-          updatedAt: Date.now(),
-          messages: messages
-        });
-      }
-
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('neural_chat_history', JSON.stringify(updatedHistory));
-      }
-      return updatedHistory;
-    });
-  }, [messages, currentSessionId]);
 
   const notesWithoutEmbeddings = notes.filter(n => !n.embedding);
 
@@ -199,12 +196,47 @@ export default function SpecialistChat() {
     }
 
     setIsUploading(true);
-    setMessages(prev => [...prev, { role: 'user', content: `📎 Anexou arquivo: ${file.name}` }]);
+    const userMsg = { role: 'user', content: `📎 Anexou arquivo: ${file.name}` };
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
 
-    const formData = new FormData();
-    formData.append('file', file);
+    let sessionId = currentSessionId;
+    if (!sessionId) {
+      sessionId = Date.now().toString();
+      setCurrentSessionId(sessionId);
+    }
 
     try {
+      let updatedHistory = [...chatHistory];
+      const existingIndex = updatedHistory.findIndex((s: any) => s.id === currentSessionId);
+      
+      if (existingIndex >= 0) {
+        updatedHistory[existingIndex] = {
+          ...updatedHistory[existingIndex],
+          messages: newMessages,
+          updatedAt: Date.now()
+        };
+      } else {
+        updatedHistory.push({
+          id: currentSessionId,
+          title: `Arquivo: ${file.name}`,
+          timestamp: Date.now(),
+          updatedAt: Date.now(),
+          messages: newMessages
+        });
+      }
+
+      if (historyNoteId) {
+        const historyNoteRef = doc(db, 'notes', historyNoteId);
+        await updateDoc(historyNoteRef, {
+          content: JSON.stringify(updatedHistory),
+          updatedAt: serverTimestamp()
+        });
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
       const res = await fetch('/api/ai/transcribe', {
         method: 'POST',
         body: formData
@@ -212,15 +244,53 @@ export default function SpecialistChat() {
       const data = await res.json();
 
       if (data.text) {
-        setMessages(prev => [...prev, { 
+        const finalMessages = [...newMessages, { 
           role: 'assistant', 
           content: `### Transcrição concluída: ${file.name}\n\n${data.text}`
-        }]);
+        }];
+        setMessages(finalMessages);
+
+        let finalHistory = [...updatedHistory];
+        const idx = finalHistory.findIndex((s: any) => s.id === currentSessionId);
+        if (idx >= 0) {
+          finalHistory[idx] = {
+            ...finalHistory[idx],
+            messages: finalMessages,
+            updatedAt: Date.now()
+          };
+        }
+
+        if (historyNoteId) {
+          const historyNoteRef = doc(db, 'notes', historyNoteId);
+          await updateDoc(historyNoteRef, {
+            content: JSON.stringify(finalHistory),
+            updatedAt: serverTimestamp()
+          });
+        }
       } else {
         throw new Error(data.error || 'Falha na transcrição');
       }
     } catch (error: any) {
-      setMessages(prev => [...prev, { role: 'assistant', content: `Erro ao transcrever arquivo: ${error.message}` }]);
+      const errMessages = [...newMessages, { role: 'assistant', content: `Erro ao transcrever arquivo: ${error.message}` }];
+      setMessages(errMessages);
+      
+      let finalHistory = [...chatHistory];
+      const idx = finalHistory.findIndex((s: any) => s.id === currentSessionId);
+      if (idx >= 0) {
+        finalHistory[idx] = {
+          ...finalHistory[idx],
+          messages: errMessages,
+          updatedAt: Date.now()
+        };
+      }
+      
+      if (historyNoteId) {
+        const historyNoteRef = doc(db, 'notes', historyNoteId);
+        await updateDoc(historyNoteRef, {
+          content: JSON.stringify(finalHistory),
+          updatedAt: serverTimestamp()
+        });
+      }
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -232,17 +302,104 @@ export default function SpecialistChat() {
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
+  const handleDeleteSession = async () => {
+    if (!sessionToDelete) return;
+    
+    const updatedHistory = chatHistory.filter((s: any) => s.id !== sessionToDelete.id);
+    setDeletedSessionBuffer(sessionToDelete);
+    setChatHistory(updatedHistory);
+    setIsUndoVisible(true);
+    setIsDeleteModalOpen(false);
+    setSessionToDelete(null);
 
+    if (historyNoteId) {
+      try {
+        const historyNoteRef = doc(db, 'notes', historyNoteId);
+        await updateDoc(historyNoteRef, {
+          content: JSON.stringify(updatedHistory),
+          updatedAt: serverTimestamp()
+        });
+      } catch (e) {
+        console.error('Error deleting session from note', e);
+      }
+    }
+
+    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+    undoTimeoutRef.current = setTimeout(() => {
+      setIsUndoVisible(false);
+      setDeletedSessionBuffer(null);
+    }, 5000);
+  };
+
+  const handleUndoDelete = async () => {
+    if (!deletedSessionBuffer) return;
+
+    const restoredHistory = [deletedSessionBuffer, ...chatHistory];
+    restoredHistory.sort((a: any, b: any) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    
+    setChatHistory(restoredHistory);
+    setIsUndoVisible(false);
+    setDeletedSessionBuffer(null);
+    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+
+    if (historyNoteId) {
+      try {
+        const historyNoteRef = doc(db, 'notes', historyNoteId);
+        await updateDoc(historyNoteRef, {
+          content: JSON.stringify(restoredHistory),
+          updatedAt: serverTimestamp()
+        });
+      } catch (e) {
+        console.error('Error restoring session to note', e);
+      }
+    }
+  };
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!queryText.trim() || isLoading) return;
 
     const userMessage = queryText.trim();
     setQueryText('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    
+    const newMessages = [...messages, { role: 'user', content: userMessage }];
+    setMessages(newMessages);
     setIsLoading(true);
 
+    let sessionId = currentSessionId;
+    if (!sessionId) {
+      sessionId = Date.now().toString();
+      setCurrentSessionId(sessionId);
+    }
+
     try {
+      let updatedHistory = [...chatHistory];
+      const existingIndex = updatedHistory.findIndex((s: any) => s.id === currentSessionId);
+      
+      if (existingIndex >= 0) {
+        updatedHistory[existingIndex] = {
+          ...updatedHistory[existingIndex],
+          messages: newMessages,
+          updatedAt: Date.now()
+        };
+      } else {
+        const title = userMessage.substring(0, 30) + (userMessage.length > 30 ? '...' : '');
+        updatedHistory.push({
+          id: currentSessionId,
+          title: title,
+          timestamp: Date.now(),
+          updatedAt: Date.now(),
+          messages: newMessages
+        });
+      }
+
+      if (historyNoteId) {
+        const historyNoteRef = doc(db, 'notes', historyNoteId);
+        await updateDoc(historyNoteRef, {
+          content: JSON.stringify(updatedHistory),
+          updatedAt: serverTimestamp()
+        });
+      }
+
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -251,11 +408,30 @@ export default function SpecialistChat() {
       const data = await res.json();
 
       if (data.text) {
-        setMessages(prev => [...prev, {
+        const finalMessages = [...newMessages, {
           role: 'assistant',
           content: data.text,
           sources: data.sources
-        }]);
+        }];
+        setMessages(finalMessages);
+
+        let finalHistory = [...updatedHistory];
+        const idx = finalHistory.findIndex((s: any) => s.id === currentSessionId);
+        if (idx >= 0) {
+          finalHistory[idx] = {
+            ...finalHistory[idx],
+            messages: finalMessages,
+            updatedAt: Date.now()
+          };
+        }
+
+        if (historyNoteId) {
+          const historyNoteRef = doc(db, 'notes', historyNoteId);
+          await updateDoc(historyNoteRef, {
+            content: JSON.stringify(finalHistory),
+            updatedAt: serverTimestamp()
+          });
+        }
       }
     } catch (error) {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Erro ao processar consulta. Tente novamente.' }]);
@@ -515,7 +691,7 @@ export default function SpecialistChat() {
                   <p className="text-xs opacity-40 text-center py-16 italic font-serif">Nenhuma conversa registrada.</p>
                 ) : (
                   <div className="space-y-3">
-                    {[...chatHistory].reverse().map((session) => (
+                    {chatHistory.map((session) => (
                       <div
                         key={session.id}
                         onClick={() => {
@@ -537,9 +713,22 @@ export default function SpecialistChat() {
                             })}
                           </span>
                         </div>
-                        <span className="text-[8px] font-bold uppercase tracking-widest bg-black/10 dark:bg-white/10 px-2.5 py-1 text-[var(--foreground)]/60 shrink-0">
-                          {session.messages.length} msgs
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[8px] font-bold uppercase tracking-widest bg-black/10 dark:bg-white/10 px-2.5 py-1 text-[var(--foreground)]/60">
+                            {session.messages.length} msgs
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSessionToDelete(session);
+                              setIsDeleteModalOpen(true);
+                            }}
+                            className="p-1.5 text-[var(--foreground)]/40 hover:text-red-500 hover:bg-red-500/10 rounded transition-all"
+                            title="Excluir conversa"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -580,6 +769,47 @@ export default function SpecialistChat() {
                 </div>
               </div>
             )}
+              {/* Modal de Confirmação de Exclusão */}
+              {isDeleteModalOpen && (
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[120] p-4">
+                  <div className="bg-[var(--background)] border-2 border-black p-6 shadow-[8px_8px_0px_rgba(0,0,0,0.2)] max-w-xs w-full text-center">
+                    <p className="text-xs font-bold uppercase tracking-wide text-[var(--foreground)] mb-4">
+                      Deseja realmente excluir esta conversa?
+                    </p>
+                    <div className="flex gap-3 justify-center">
+                      <button
+                        onClick={handleDeleteSession}
+                        className="px-3 py-1.5 bg-red-500 text-white text-[10px] font-bold uppercase tracking-wider hover:bg-red-600 transition-colors shadow-[3px_3px_0px_rgba(0,0,0,0.1)]"
+                      >
+                        Excluir
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsDeleteModalOpen(false);
+                          setSessionToDelete(null);
+                        }}
+                        className="px-3 py-1.5 bg-[var(--muted)] text-[var(--foreground)]/70 text-[10px] font-bold uppercase tracking-wider hover:bg-[var(--muted)]/80 transition-colors border border-black/10 shadow-[3px_3px_0px_rgba(0,0,0,0.1)]"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Toast de Desfazer */}
+              {isUndoVisible && (
+                <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-[120] bg-black text-white text-[10px] font-bold uppercase tracking-widest px-4 py-2 shadow-[4px_4px_0px_rgba(0,0,0,0.2)] flex items-center gap-3">
+                  <span>Conversa excluída</span>
+                  <button
+                    onClick={handleUndoDelete}
+                    className="text-[#FF4F00] underline hover:text-white transition-colors"
+                  >
+                    Desfazer
+                  </button>
+                </div>
+              )}
+
               <p className="mt-2 text-[8px] text-center opacity-30 font-bold uppercase tracking-widest">
                 IA pode cometer erros. Verifique informações importantes.
               </p>
