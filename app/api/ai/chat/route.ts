@@ -18,7 +18,7 @@ function cosineSimilarity(vecA: number[], vecB: number[]) {
 
 export async function POST(req: Request) {
   try {
-    const { query, notes, file } = await req.json();
+    const { query, notes, file, urlsContent } = await req.json();
 
     if (!query || !notes) {
       return NextResponse.json({ error: 'Query and notes are required' }, { status: 400 });
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
 
     // 2. Search for relevant notes
     const relevantNotes = notes
-      .filter((n: any) => n.embedding && Array.isArray(n.embedding))
+      .filter((n: any) => !n.isTemporary && n.embedding && Array.isArray(n.embedding))
       .map((n: any) => ({
         ...n,
         similarity: cosineSimilarity(queryEmbedding, n.embedding)
@@ -62,16 +62,19 @@ export async function POST(req: Request) {
     
     const prompt = `
 Você é o "Especialista Neural" do sistema Segundo Cérebro. 
-Seu objetivo é ajudar o usuário com base exclusivamente no conhecimento contido nas notas dele.
+Seu objetivo é ajudar o usuário com base no conhecimento contido nas notas dele e cruzando com fontes externas se fornecidas.
 
 REGRAS:
-1. Use as notas fornecidas no CONTEXTO abaixo para responder.
-2. Se a informação não estiver nas notas, admita que você ainda não tem esse conhecimento registrado, mas tente sugerir algo relacionado se possível.
-3. Mantenha um tom profissional, analítico e brutalista (direto ao ponto).
-4. Sempre mencione o título da nota de onde tirou a informação (ex: "Conforme sua nota [Título]...").
+1. Use as notas fornecidas no CONTEXTO DAS NOTAS abaixo para responder.
+2. Se houver CONTEXTO EXTERNO (Links), faça o cruzamento analítico dessas fontes com suas anotações.
+3. Se a informação não estiver nas notas nem nos links, admita isso, mas dê sugestões lógicas.
+4. Mantenha um tom profissional, analítico e brutalista (direto ao ponto).
+5. Sempre mencione o título da nota de onde tirou a informação.
 
 CONTEXTO DAS NOTAS DO USUÁRIO:
 ${context}
+
+${urlsContent ? `\nCONTEXTO EXTERNO FORNECIDO (LINKS):\n${urlsContent}` : ''}
 
 PERGUNTA DO USUÁRIO:
 ${query}
@@ -98,6 +101,6 @@ ${query}
 
   } catch (error: any) {
     console.error('Chat Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message, stack: error.stack }, { status: 500 });
   }
 }

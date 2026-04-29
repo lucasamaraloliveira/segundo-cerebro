@@ -13,6 +13,8 @@ export interface Note {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   embedding?: number[];
+  isTemporary?: boolean;
+  expiresAt?: number | null;
 }
 
 export type NoteInput = Omit<Note, 'id' | 'createdAt' | 'updatedAt'>;

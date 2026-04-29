@@ -53,7 +53,8 @@ import {
   X,
   CheckCircle,
   Circle,
-  Check
+  Check,
+  Clock
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -99,9 +100,16 @@ const NoteCard = React.memo(({
       className={`p-6 border transition-all cursor-pointer mb-3 rounded-none group ${isActive ? 'bg-[var(--muted)] border-[var(--accent)] shadow-sm' : 'border-[var(--border)] hover:border-[var(--foreground)]/10 hover:bg-[var(--muted)]/50'} ${note.isCompleted ? 'opacity-60' : 'opacity-100'}`}
     >
       <div className="flex items-start justify-between mb-2">
-        <p className="text-[10px] font-bold uppercase tracking-tighter opacity-40 text-[var(--foreground)]">
-          {note.updatedAt ? format(note.updatedAt.toDate(), 'dd MMM', { locale: ptBR }) : 'Agora'}
-        </p>
+        <div className="flex items-center gap-2">
+          <p className="text-[10px] font-bold uppercase tracking-tighter opacity-40 text-[var(--foreground)]">
+            {note.updatedAt ? format(note.updatedAt.toDate(), 'dd MMM', { locale: ptBR }) : 'Agora'}
+          </p>
+          {note.isTemporary && (
+            <span className="text-[7px] font-bold bg-[#FF4F00] text-white px-1.5 py-0.5 rounded flex items-center gap-0.5 animate-pulse tracking-widest uppercase">
+              <Clock size={8} /> Temp
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <button 
             onClick={onToggleComplete}
@@ -149,6 +157,7 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
   const [localTitle, setLocalTitle] = useState(activeNote.title || '');
   const [localContent, setLocalContent] = useState(activeNote.content || '');
   const [showAllTags, setShowAllTags] = useState(false);
+  const [isTempModalOpen, setIsTempModalOpen] = useState(false);
   const localTitleRef = useRef(activeNote.id);
 
   // Auto-resize title textarea
@@ -196,6 +205,8 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
       {!isFullscreen && (
         <div className="px-4 md:px-12 py-4 md:py-6 border-b border-[var(--border)] flex items-center justify-between bg-[var(--background)]/80 backdrop-blur-sm sticky top-0 z-20">
         <div className="flex items-center gap-3 md:gap-6">
+          <div className="w-1.5 h-1.5 bg-green-500 rounded-none animate-pulse flex-shrink-0" title="Sincronizado" />
+          
           <button
             onClick={() => updateNote(activeNote.id, { isBookmarked: !activeNote.isBookmarked })}
             className={`p-1.5 transition-all ${activeNote.isBookmarked ? 'bg-[var(--accent)] text-[var(--accent-foreground)] rounded-md' : 'text-[var(--foreground)]/40 hover:text-[var(--foreground)]'}`}
@@ -210,9 +221,58 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
           >
             <CheckCircle className="w-3.5 h-3.5" />
           </button>
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 bg-green-500 rounded-none animate-pulse" />
-            <p className="hidden sm:block text-[10px] md:text-[11px] opacity-40 font-bold uppercase tracking-widest text-[var(--foreground)]">Sincronizado</p>
+          <div
+            onClick={() => setIsTempModalOpen(!isTempModalOpen)}
+            className={`p-1.5 transition-all relative cursor-pointer ${activeNote.isTemporary ? 'bg-[#FF4F00] text-white rounded-md' : 'text-[var(--foreground)]/40 hover:text-[var(--foreground)]'}`}
+            title={activeNote.isTemporary ? "Ajustar Tempo / Remover" : "Tornar Nota Temporária (Auto-Destruição)"}
+          >
+            <Clock className="w-3.5 h-3.5" />
+
+            {isTempModalOpen && (
+              <div 
+                onClick={(e) => e.stopPropagation()} 
+                className="absolute top-full left-0 mt-2 z-[150] bg-[var(--background)] border border-black/20 dark:border-white/20 p-2 shadow-[8px_8px_0px_rgba(0,0,0,0.1)] flex flex-col gap-1.5 w-36 text-left"
+              >
+                <p className="text-[7px] font-bold uppercase tracking-[0.1em] text-[var(--foreground)]/50 mb-1 text-center">Auto-Destruição</p>
+                
+                {(['5m', '1h', '24h'] as const).map((dur) => {
+                  let durationMs = 3600000;
+                  if (dur === '5m') durationMs = 5 * 60 * 1000;
+                  if (dur === '24h') durationMs = 24 * 60 * 60 * 1000;
+
+                  return (
+                    <button
+                      key={dur}
+                      onClick={() => {
+                        updateNote(activeNote.id, { 
+                          isTemporary: true, 
+                          expiresAt: Date.now() + durationMs 
+                        });
+                        setIsTempModalOpen(false);
+                      }}
+                      className="text-[8px] font-bold uppercase py-1.5 px-2 border border-black/10 dark:border-white/10 bg-[var(--muted)] hover:bg-[#FF4F00] hover:text-white transition-colors text-[var(--foreground)] text-center rounded shadow-[2px_2px_0px_rgba(0,0,0,0.05)]"
+                    >
+                      {dur === '5m' ? '5 minutos' : dur === '1h' ? '1 hora' : '24 horas'}
+                    </button>
+                  );
+                })}
+
+                {activeNote.isTemporary && (
+                  <button
+                    onClick={() => {
+                      updateNote(activeNote.id, { 
+                        isTemporary: false, 
+                        expiresAt: null 
+                      });
+                      setIsTempModalOpen(false);
+                    }}
+                    className="text-[8px] font-bold uppercase py-1.5 px-2 mt-1 border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors text-center rounded"
+                  >
+                    Desativar
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-3 md:gap-6 h-8 overflow-x-auto no-scrollbar flex-nowrap pr-4">
@@ -262,7 +322,13 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
         </div>
       )}
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-12 lg:p-20 bg-[var(--muted)]/30 custom-scrollbar">
-        <div className="max-w-[850px] mx-auto w-full bg-[var(--background)] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] min-h-[1100px] border border-[var(--border)] overflow-visible">
+        <div className="max-w-[850px] mx-auto w-full bg-[var(--background)] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] min-h-[1100px] border border-[var(--border)] overflow-visible relative">
+          {activeNote.isTemporary && (
+            <div className="bg-[#FF4F00] text-white text-[9px] font-bold uppercase tracking-[0.2em] py-2.5 px-4 text-center animate-pulse border-b border-black/10 flex items-center justify-center gap-2 z-10">
+              <Clock className="w-3.5 h-3.5" />
+              <span>Esta nota é temporária e se auto-destruirá.</span>
+            </div>
+          )}
           <div className="px-8 md:px-16 lg:px-24 py-6 md:py-8">
           <div className="mb-2 flex justify-between items-end border-b border-[var(--border)] pb-2">
             <div className="space-y-1">
@@ -566,6 +632,12 @@ export default function Home() {
           if (expiryTime < now) {
             updateNote(note.id, { reminder: null });
           }
+        }
+
+        // 3. Handle isTemporary garbage collection
+        if (note.isTemporary && note.expiresAt && note.expiresAt < now.getTime()) {
+          deleteDoc(doc(db, 'notes', note.id)).catch(err => console.error("Failed to auto-delete note", err));
+          if (activeNoteId === note.id) setActiveNoteId(null);
         }
       });
     };

@@ -5,7 +5,7 @@ import { Note } from '@/lib/types';
 import { db, auth } from '@/lib/firebase';
 import { doc, updateDoc, collection, query, where, onSnapshot, setDoc, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { X, Send, Brain, Loader2, Info, ChevronDown, Paperclip, Copy, Check, History, ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { X, Send, Brain, Loader2, Info, ChevronDown, Paperclip, Copy, Check, History, ArrowLeft, Plus, Trash2, Link2, Globe } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -47,6 +47,11 @@ export default function SpecialistChat() {
     mimeType: string;
     name: string;
   } | null>(null);
+
+  // Pending external links for cross-referencing
+  const [pendingUrls, setPendingUrls] = useState<string[]>([]);
+  const [isUrlModalOpen, setIsUrlModalOpen] = useState<boolean>(false);
+  const [newUrlInput, setNewUrlInput] = useState<string>('');
 
   // Resize handler
   useEffect(() => {
@@ -134,7 +139,7 @@ export default function SpecialistChat() {
   }, []);
 
 
-  const notesWithoutEmbeddings = notes.filter(n => !n.embedding);
+  const notesWithoutEmbeddings = notes.filter(n => !n.isTemporary && !n.embedding);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -440,13 +445,37 @@ export default function SpecialistChat() {
         });
       }
 
+      let urlsContent = '';
+      if (pendingUrls.length > 0) {
+        try {
+          const scrapedTexts = await Promise.all(
+            pendingUrls.map(async (url) => {
+              const scrapeRes = await fetch('/api/ai/scrape', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url })
+              });
+              const scrapeData = await scrapeRes.json();
+              if (scrapeData.text) {
+                return `[FONTE EXTERNA: ${url}]\n${scrapeData.text}`;
+              }
+              return `[FONTE EXTERNA: ${url}]\n(Falha ao carregar conteúdo)`;
+            })
+          );
+          urlsContent = scrapedTexts.join('\n\n---\n\n');
+        } catch (e) {
+          console.error('Error scraping URLs', e);
+        }
+      }
+
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           query: userMessage, 
           notes,
-          file: pendingFile 
+          file: pendingFile,
+          urlsContent
         })
       });
       const data = await res.json();
@@ -482,6 +511,7 @@ export default function SpecialistChat() {
     } finally {
       setIsLoading(false);
       setPendingFile(null);
+      setPendingUrls([]);
     }
   };
 
@@ -666,7 +696,11 @@ export default function SpecialistChat() {
                       <div className="bg-[var(--muted)] p-3 border border-black/5 shadow-[2px_2px_0px_rgba(0,0,0,0.1)] flex items-center gap-2">
                         <Loader2 size={14} className="animate-spin text-[#FF4F00]" />
                         <span className="text-[9px] font-bold uppercase text-[var(--foreground)]">
-                          {isUploading ? 'Analisando Mídia...' : 'Processando Sinapses...'}
+                          {isUploading 
+                            ? 'Analisando Mídia...' 
+                            : pendingUrls.length > 0 
+                              ? 'Extraindo fontes externas...' 
+                              : 'Processando Sinapses...'}
                         </span>
                       </div>
                     </div>
@@ -687,6 +721,23 @@ export default function SpecialistChat() {
                         >
                           Remover
                         </button>
+                      </div>
+                    )}
+                    {pendingUrls.length > 0 && (
+                      <div className="px-4 py-2 bg-black/5 dark:bg-white/5 border-b border-black/10 flex flex-wrap gap-2 z-10">
+                        {pendingUrls.map((url, uIdx) => (
+                          <div key={uIdx} className="flex items-center gap-1 bg-[var(--muted)] border border-black/10 px-2 py-0.5 shadow-[2px_2px_0px_rgba(0,0,0,0.05)] text-[9px] font-bold">
+                            <Globe size={10} className="text-[#FF4F00]" />
+                            <span className="truncate max-w-[120px]">{url}</span>
+                            <button
+                              type="button"
+                              onClick={() => setPendingUrls(prev => prev.filter((_, i) => i !== uIdx))}
+                              className="text-[var(--foreground)]/40 hover:text-red-500 ml-1"
+                            >
+                              <X size={10} />
+                            </button>
+                          </div>
+                        ))}
                       </div>
                     )}
                     <textarea
@@ -712,6 +763,14 @@ export default function SpecialistChat() {
                           title="Anexar arquivo (PDF, DOC, Imagens, Áudio/Vídeo)"
                         >
                           <Paperclip size={20} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsUrlModalOpen(true)}
+                          className="p-2 text-[var(--foreground)]/60 hover:text-[#FF4F00] hover:bg-black/5 dark:hover:bg-white/5 transition-all"
+                          title="Vincular Link Externo"
+                        >
+                          <Link2 size={20} />
                         </button>
                         <input 
                           type="file"
@@ -829,6 +888,56 @@ export default function SpecialistChat() {
               </div>
             )}
               {/* Modal de Confirmação de Exclusão */}
+              {/* Modal de Vinculação de Link */}
+              {isUrlModalOpen && (
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[120] p-4">
+                  <form 
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (newUrlInput.trim()) {
+                        let formattedUrl = newUrlInput.trim();
+                        if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
+                          formattedUrl = 'https://' + formattedUrl;
+                        }
+                        setPendingUrls(prev => [...prev, formattedUrl]);
+                        setNewUrlInput('');
+                        setIsUrlModalOpen(false);
+                      }
+                    }}
+                    className="bg-[var(--background)] border-2 border-black p-6 shadow-[8px_8px_0px_rgba(0,0,0,0.2)] max-w-sm w-full"
+                  >
+                    <p className="text-xs font-bold uppercase tracking-wide text-[var(--foreground)] mb-3 flex items-center gap-1">
+                      <Link2 size={14} className="text-[#FF4F00]" /> Vincular URL Externa
+                    </p>
+                    <input
+                      type="text"
+                      value={newUrlInput}
+                      onChange={(e) => setNewUrlInput(e.target.value)}
+                      placeholder="ex: https://wikipedia.org/wiki/AI"
+                      className="w-full bg-[var(--muted)] border border-black/10 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#FF4F00] placeholder:text-[var(--foreground)]/30 font-sans mb-4"
+                      autoFocus
+                    />
+                    <div className="flex gap-3 justify-end">
+                      <button
+                        type="submit"
+                        className="px-3 py-1.5 bg-black text-white text-[10px] font-bold uppercase tracking-wider hover:bg-[#FF4F00] hover:text-black transition-all shadow-[3px_3px_0px_rgba(0,0,0,0.1)]"
+                      >
+                        Adicionar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsUrlModalOpen(false);
+                          setNewUrlInput('');
+                        }}
+                        className="px-3 py-1.5 bg-[var(--muted)] text-[var(--foreground)]/70 text-[10px] font-bold uppercase tracking-wider hover:bg-[var(--muted)]/80 transition-colors border border-black/10 shadow-[3px_3px_0px_rgba(0,0,0,0.1)]"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
               {isDeleteModalOpen && (
                 <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[120] p-4">
                   <div className="bg-[var(--background)] border-2 border-black p-6 shadow-[8px_8px_0px_rgba(0,0,0,0.2)] max-w-xs w-full text-center">
