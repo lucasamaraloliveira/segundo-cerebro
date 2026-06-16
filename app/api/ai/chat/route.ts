@@ -56,10 +56,10 @@ export async function POST(req: Request) {
 
     // 4. Generate Answer
     const chatModel = genAI.getGenerativeModel(
-      { model: "gemini-3.1-flash-lite-preview" },
+      { model: "gemini-3.1-flash-lite" },
       { apiVersion: 'v1beta' }
     );
-    
+
     const prompt = `
 Você é o "Especialista Neural" do sistema Segundo Cérebro. 
 Seu objetivo é ajudar o usuário com base no conhecimento contido nas notas dele e cruzando com fontes externas se fornecidas.
@@ -81,7 +81,7 @@ ${query}
     `;
 
     let contentParts: any[] = [prompt];
-    
+
     if (file && file.data && file.mimeType) {
       contentParts.push({
         inlineData: {

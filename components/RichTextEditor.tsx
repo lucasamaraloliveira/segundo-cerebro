@@ -49,7 +49,13 @@ import {
   Mic,
   Maximize2,
   Layers,
-  Sparkles
+  Sparkles,
+  AudioLines,
+  Trash2,
+  Play,
+  Pause,
+  Loader2,
+  Volume2
 } from 'lucide-react';
 
 declare module '@tiptap/core' {
@@ -308,6 +314,26 @@ const CustomSelect = ({
   );
 };
 
+const markdownToHtml = (markdown: string) => {
+  if (!markdown) return '';
+  
+  return markdown
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n/g, '<br>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+    .replace(/^\- (.*$)/gim, '<li>$1</li>')
+    .replace(/^\* (.*$)/gim, '<li>$1</li>')
+    .split('<li>')
+    .map((s, i) => i === 0 ? s : `<li>${s}`)
+    .join('')
+    .replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>')
+    .replace(/<\/ul><ul>/g, '');
+};
+
 export default function RichTextEditor({ content, onChange, placeholder, isFocusMode = false, notes = [], activeNoteId }: RichTextEditorProps) {
   const [pasteModal, setPasteModal] = useState<{ show: boolean, text: string, html: string } | null>(null);
   const [noteLinkModal, setNoteLinkModal] = useState(false);
@@ -318,6 +344,166 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
   const [neuralSuggestion, setNeuralSuggestion] = useState<{ id: string, title: string, score: number } | null>(null);
   const [ignoredSuggestions, setIgnoredSuggestions] = useState<Set<string>>(new Set());
   const lastAnalyzedText = useRef('');
+
+  // Temporary Audio Recording States
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [recordingAudioDuration, setRecordingAudioDuration] = useState(0);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [showAudioProcessingModal, setShowAudioProcessingModal] = useState(false);
+  const [showAudioDeleteConfirmModal, setShowAudioDeleteConfirmModal] = useState(false);
+  const [selectedAudioFormat, setSelectedAudioFormat] = useState<'transcribe' | 'meeting_minutes' | 'email' | 'summary' | 'tasks'>('transcribe');
+  const [isProcessingAudio, setIsProcessingAudio] = useState(false);
+  const [audioProcessingError, setAudioProcessingError] = useState<string | null>(null);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingAudioIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+
+  // Audio Playback Listener
+  useEffect(() => {
+    if (audioUrl && audioPlayerRef.current) {
+      const player = audioPlayerRef.current;
+      const onPlay = () => setIsPlayingAudio(true);
+      const onPause = () => setIsPlayingAudio(false);
+      const onEnded = () => setIsPlayingAudio(false);
+
+      player.addEventListener('play', onPlay);
+      player.addEventListener('pause', onPause);
+      player.addEventListener('ended', onEnded);
+
+      return () => {
+        player.removeEventListener('play', onPlay);
+        player.removeEventListener('pause', onPause);
+        player.removeEventListener('ended', onEnded);
+      };
+    }
+  }, [audioUrl, showAudioProcessingModal]);
+
+  // Cleanup Object URL on unmount
+  useEffect(() => {
+    return () => {
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+      if (recordingAudioIntervalRef.current) {
+        clearInterval(recordingAudioIntervalRef.current);
+      }
+    };
+  }, [audioUrl]);
+
+  // Start recording audio
+  const startAudioRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setAudioBlob(blob);
+        const url = URL.createObjectURL(blob);
+        setAudioUrl(url);
+        setShowAudioProcessingModal(true);
+        
+        // Stop all tracks in the stream
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecordingAudio(true);
+      setRecordingAudioDuration(0);
+
+      recordingAudioIntervalRef.current = setInterval(() => {
+        setRecordingAudioDuration(prev => prev + 1);
+      }, 1000);
+
+    } catch (err) {
+      console.error("Erro ao acessar microfone para gravação:", err);
+      alert("Não foi possível acessar seu microfone para gravação.");
+    }
+  };
+
+  // Stop recording audio
+  const stopAudioRecording = () => {
+    if (mediaRecorderRef.current && isRecordingAudio) {
+      mediaRecorderRef.current.stop();
+      setIsRecordingAudio(false);
+      if (recordingAudioIntervalRef.current) {
+        clearInterval(recordingAudioIntervalRef.current);
+      }
+    }
+  };
+
+  // Format recording duration
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Process recorded audio with Gemini API
+  const handleProcessAudio = async () => {
+    if (!audioBlob) return;
+    setIsProcessingAudio(true);
+    setAudioProcessingError(null);
+
+    const formData = new FormData();
+    formData.append('file', audioBlob, 'temp_audio.webm');
+    formData.append('promptType', selectedAudioFormat);
+
+    try {
+      const res = await fetch('/api/ai/transcribe', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (data.text) {
+        // Apply formatted text to the editor
+        if (editor) {
+          editor.chain().focus().insertContent(markdownToHtml(data.text)).run();
+        }
+        // Success: clear audio and close modal
+        handleDeleteAudio(true); // Bypass confirmation to clean up after successful use
+      } else {
+        throw new Error(data.error || 'Falha ao processar o áudio.');
+      }
+    } catch (e: any) {
+      console.error(e);
+      setAudioProcessingError(e.message || 'Erro de rede ou de API.');
+    } finally {
+      setIsProcessingAudio(false);
+    }
+  };
+
+  // Delete recorded audio
+  const handleDeleteAudio = (bypassConfirm = false) => {
+    if (bypassConfirm) {
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+      setAudioBlob(null);
+      setAudioUrl(null);
+      setShowAudioProcessingModal(false);
+      setShowAudioDeleteConfirmModal(false);
+      setIsPlayingAudio(false);
+      setRecordingAudioDuration(0);
+      setAudioProcessingError(null);
+    } else {
+      setShowAudioDeleteConfirmModal(true);
+    }
+  };
 
   const [isAiAutocompleteEnabled, setIsAiAutocompleteEnabled] = useState(false);
   const autocompleteTimer = useRef<NodeJS.Timeout | null>(null);
@@ -806,6 +992,17 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
           >
             <Mic className="w-3.5 h-3.5" />
           </button>
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              if (isRecordingAudio) stopAudioRecording();
+              else startAudioRecording();
+            }}
+            className={`w-8 h-8 flex items-center justify-center rounded-full transition-all ${isRecordingAudio ? 'bg-[#FF4F00] text-white animate-pulse' : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60'}`}
+            title={isRecordingAudio ? "Parar Gravação" : "Gravar Áudio (Temporário)"}
+          >
+            <AudioLines className="w-3.5 h-3.5" />
+          </button>
           <ToolbarButton onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} title="Limpar">
             <Eraser className="w-3.5 h-3.5" />
           </ToolbarButton>
@@ -843,7 +1040,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-widest opacity-40 mb-1">Conexão Neural ({neuralSuggestion.score}%)</p>
                   <p className="text-sm font-serif italic mb-3 leading-tight">
-                    Esta nota tem forte relação com <span className="font-bold">"{neuralSuggestion.title}"</span>.
+                    Esta nota tem forte relação com <span className="font-bold">&quot;{neuralSuggestion.title}&quot;</span>.
                   </p>
                   <div className="flex gap-2">
                     <button 
@@ -902,7 +1099,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
                 </div>
               </div>
             </div>
-            <p className="text-[9px] font-bold uppercase tracking-widest opacity-40 bg-black/5 dark:bg-white/5 px-2 py-1">Diga "ponto final" ou "nova linha" para formatar</p>
+            <p className="text-[9px] font-bold uppercase tracking-widest opacity-40 bg-black/5 dark:bg-white/5 px-2 py-1">Diga &quot;ponto final&quot; ou &quot;nova linha&quot; para formatar</p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -995,6 +1192,197 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
               >
                 Cancelar
               </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Audio Recording Status Panel */}
+      <AnimatePresence>
+        {isRecordingAudio && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-3"
+          >
+            <div className="bg-black/90 dark:bg-white/90 text-white dark:text-black px-6 py-4 rounded-none border border-[#FF4F00] shadow-[20px_20px_0px_rgba(0,0,0,0.2)] flex items-center gap-4 min-w-[320px]">
+              <div className="relative">
+                <div className="w-10 h-10 bg-[#FF4F00] flex items-center justify-center rounded-none animate-pulse">
+                  <AudioLines className="w-5 h-5 text-white" />
+                </div>
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-ping" />
+              </div>
+              <div className="flex-1">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-50 mb-1">Gravando Áudio IA</p>
+                <div className="flex items-baseline gap-1">
+                  <p className="text-sm font-serif italic">{formatDuration(recordingAudioDuration)}</p>
+                  <span className="flex gap-0.5 ml-2">
+                    <span className="w-1 h-1 bg-[#FF4F00] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1 h-1 bg-[#FF4F00] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1 h-1 bg-[#FF4F00] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={stopAudioRecording}
+                className="px-4 py-2 bg-[#FF4F00] hover:bg-[#FF4F00]/90 text-white text-[10px] font-bold uppercase tracking-widest transition-colors"
+              >
+                Parar
+              </button>
+            </div>
+            <p className="text-[9px] font-bold uppercase tracking-widest opacity-40 bg-black/5 dark:bg-white/5 px-2 py-1">O áudio ficará temporariamente na memória</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Audio Review & Processing Modal */}
+      <AnimatePresence>
+        {showAudioProcessingModal && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => handleDeleteAudio(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative w-full max-w-2xl bg-[var(--background)] border border-[var(--border)] p-8 shadow-[30px_30px_0px_rgba(0,0,0,0.1)] max-h-[90vh] overflow-y-auto custom-scrollbar"
+            >
+              <h3 className="text-2xl font-serif mb-2 tracking-tight">Processar Gravação de Áudio</h3>
+              <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-6">Revise o áudio gravado e selecione o formato do relatório</p>
+
+              {/* Styled Audio Player */}
+              <div className="bg-[var(--muted)] p-4 border border-[var(--border)] flex items-center justify-between gap-4 mb-6 rounded-none">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      if (audioPlayerRef.current) {
+                        if (isPlayingAudio) {
+                          audioPlayerRef.current.pause();
+                        } else {
+                          audioPlayerRef.current.play();
+                        }
+                      }
+                    }}
+                    className="w-10 h-10 bg-[#FF4F00] text-white flex items-center justify-center hover:scale-105 active:scale-95 transition-transform rounded-none shadow-[2px_2px_0px_rgba(0,0,0,0.15)]"
+                  >
+                    {isPlayingAudio ? <Pause size={18} /> : <Play size={18} className="ml-0.5" />}
+                  </button>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest opacity-40">Áudio Gravado</p>
+                    <p className="text-xs font-semibold">{formatDuration(recordingAudioDuration || 0)}</p>
+                  </div>
+                </div>
+                <audio ref={audioPlayerRef} src={audioUrl || ''} className="hidden" />
+                <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-500/10 px-2 py-1 flex items-center gap-1.5">
+                  <Volume2 size={12} /> Pronto para Revisão
+                </div>
+              </div>
+
+              {/* Format Selection Grid */}
+              <p className="text-[10px] font-bold uppercase tracking-[0.15em] opacity-40 mb-3">Escolha o formato de processamento pela IA</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                {(['transcribe', 'meeting_minutes', 'email', 'summary', 'tasks'] as const).map((fmt) => {
+                  const labels = {
+                    transcribe: 'Transcrição Simples',
+                    meeting_minutes: 'Ata de Reunião',
+                    email: 'E-mail para Cliente',
+                    summary: 'Resumo Executivo',
+                    tasks: 'Extrair Tarefas'
+                  };
+                  const descs = {
+                    transcribe: 'Transcreve o áudio exatamente como falado.',
+                    meeting_minutes: 'Gera uma ata estruturada com decisões.',
+                    email: 'Redige um e-mail profissional baseado na fala.',
+                    summary: 'Cria um resumo conciso com pontos principais.',
+                    tasks: 'Extrai compromissos e tarefas como checklist.'
+                  };
+                  return (
+                    <button
+                      key={fmt}
+                      onClick={() => setSelectedAudioFormat(fmt)}
+                      className={`p-3 text-left border rounded-none transition-all flex flex-col ${selectedAudioFormat === fmt ? 'border-[#FF4F00] bg-[#FF4F00]/5 shadow-[3px_3px_0px_rgba(255,79,0,0.15)]' : 'border-[var(--border)] hover:bg-[var(--muted)]/50'}`}
+                    >
+                      <span className="text-xs font-bold uppercase tracking-wider">{labels[fmt]}</span>
+                      <span className="text-[9px] opacity-60 mt-1 leading-snug">{descs[fmt]}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Error State */}
+              {audioProcessingError && (
+                <div className="p-4 mb-6 border-2 border-red-500 bg-red-50 text-red-600 text-xs font-bold uppercase tracking-wide">
+                  {audioProcessingError}
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  disabled={isProcessingAudio}
+                  onClick={handleProcessAudio}
+                  className="flex-1 py-4 bg-black dark:bg-white text-white dark:text-black hover:bg-[#FF4F00] dark:hover:bg-[#FF4F00] hover:text-white dark:hover:text-white font-bold uppercase text-xs tracking-widest transition-all shadow-[4px_4px_0px_rgba(0,0,0,0.1)] flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  {isProcessingAudio ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Processando com Gemini...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={16} />
+                      Processar Áudio
+                    </>
+                  )}
+                </button>
+                <button
+                  disabled={isProcessingAudio}
+                  onClick={() => handleDeleteAudio(false)}
+                  className="py-4 px-6 bg-transparent text-red-500 border border-red-500/20 hover:border-red-500 hover:bg-red-500/5 font-bold uppercase text-xs tracking-widest transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-1.5"
+                >
+                  <Trash2 size={16} />
+                  Excluir
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Audio Deletion Confirmation Modal */}
+      <AnimatePresence>
+        {showAudioDeleteConfirmModal && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative w-full max-w-sm bg-[var(--background)] border border-[var(--border)] p-6 shadow-[15px_15px_0px_rgba(0,0,0,0.15)] rounded-none z-[130]"
+            >
+              <h4 className="text-lg font-bold uppercase tracking-wide mb-2 text-red-500">Excluir Gravação?</h4>
+              <p className="text-xs text-[var(--foreground)]/70 mb-6 leading-relaxed">
+                Tem certeza de que deseja descartar este áudio? Esta ação é irreversível e o áudio gravado temporariamente será perdido.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleDeleteAudio(true)}
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold uppercase text-[10px] tracking-widest transition-colors shadow-[2px_2px_0px_rgba(0,0,0,0.1)]"
+                >
+                  Sim, Excluir
+                </button>
+                <button
+                  onClick={() => setShowAudioDeleteConfirmModal(false)}
+                  className="flex-1 py-3 bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] font-bold uppercase text-[10px] tracking-widest transition-colors border border-[var(--border)] shadow-[2px_2px_0px_rgba(0,0,0,0.1)]"
+                >
+                  Cancelar
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

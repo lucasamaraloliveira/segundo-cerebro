@@ -13,7 +13,8 @@ import {
   Type,
   Loader2,
   Check,
-  RotateCcw
+  RotateCcw,
+  Wrench
 } from 'lucide-react';
 
 // Simple helper to convert markdown-style response from AI to HTML for the editor
@@ -70,6 +71,35 @@ const ASSISTANT_OPTIONS = [
     icon: ListChecks,
     color: 'bg-green-500',
     prompt: (text: string) => `Analise o texto abaixo e extraia apenas os itens de ação, tarefas ou compromissos mencionados. Formate como uma lista de tarefas. Se não houver tarefas, diga "Nenhuma tarefa identificada".\n\nTEXTO:\n${text}`
+  },
+  {
+    id: 'tech_report',
+    title: 'Reg. Assistência Técnica',
+    description: 'Formata o relato em uma ata estruturada por sistemas com ênfase estilizada.',
+    icon: Wrench,
+    color: 'bg-emerald-600',
+    prompt: (text: string) => `Você é um assistente técnico especializado. Analise o relato a seguir e formate-o como uma ata de assistência técnica estruturada.
+Organize as informações identificando os sistemas mencionados (por exemplo, "Sistema A", "Sistema B") e agrupe as atividades/tarefas relatadas sob cada sistema correspondente.
+
+Regras de Formatação:
+1. Identifique os sistemas e crie um cabeçalho para cada um usando negrito ou negrito-itálico: use **Nome do Sistema** (ex: **Sistema A**) ou ***Nome do Sistema*** (ex: ***Sistema B***).
+2. Sob cada sistema, liste as atividades como tópicos/itens de lista com marcadores (ex: - Realizado...).
+3. Aplique formatações estilizadas alternadas ou com ênfase para os itens (por exemplo, alguns itens em itálico usando asteriscos, como: *- Realizado treinamento X...* ou *- Ao chegar no setor B...*, e outros em formato normal: - Realizado ajuste...). Garanta que o resultado final reflita o estilo do exemplo fornecido abaixo.
+4. Retorne APENAS o texto formatado final (em markdown), sem introduções, explicações ou comentários adicionais.
+
+EXEMPLO DE ESTRUTURA REQUERIDA:
+**Sistema A**
+*- Realizado treinamento X do sistema A;*
+- Ao chegar no setor B, realizado ajuste no sistema A em contato com o cliente;
+*- Em contato com Fulano, verificado que o sistema A está funcionando corretamente.*
+
+***Sistema B***
+- Realizado treinamento X do sistema B;
+*- Ao chegar no setor B, realizado ajuste no sistema B em contato com o cliente;*
+- Em contato com Fulano, verificado que o sistema B está funcionando corretamente.
+
+TEXTO DO RELATO A SER FORMATADO:
+${text}`
   },
   {
     id: 'tags',
@@ -216,7 +246,7 @@ export default function AIAssistantModal({ isOpen, onClose, content, onApply, on
                   {isLoading ? (
                     <div className="py-20 flex flex-col items-center justify-center gap-4 text-[var(--foreground)] opacity-40">
                       <Loader2 size={40} className="animate-spin text-[#FF4F00]" />
-                      <p className="text-xs italic font-serif">"Acessando camadas neurais..."</p>
+                      <p className="text-xs italic font-serif">&quot;Acessando camadas neurais...&quot;</p>
                     </div>
                   ) : error ? (
                     <div className="p-4 border-2 border-red-500 bg-red-50 text-red-600 text-sm">
