@@ -55,7 +55,8 @@ import {
   Play,
   Pause,
   Loader2,
-  Volume2
+  Volume2,
+  MoreHorizontal
 } from 'lucide-react';
 
 declare module '@tiptap/core' {
@@ -207,12 +208,14 @@ const ToolbarButton = ({
   onClick, 
   isActive = false, 
   children, 
-  title 
+  title,
+  className = ''
 }: { 
   onClick: () => void; 
   isActive?: boolean; 
   children: React.ReactNode;
   title: string;
+  className?: string;
 }) => (
   <button
     onClick={(e) => {
@@ -220,11 +223,11 @@ const ToolbarButton = ({
       onClick();
     }}
     title={title}
-    className={`p-1.5 md:p-1 rounded-full transition-all relative shrink-0 ${
+    className={`w-9 h-9 md:w-7 md:h-7 flex items-center justify-center rounded-full transition-all relative shrink-0 ${
       isActive 
         ? 'bg-[var(--accent)] text-white shadow-md' 
         : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-70 hover:opacity-100 hover:scale-105 active:scale-95'
-    }`}
+    } ${className}`}
   >
     {children}
   </button>
@@ -343,6 +346,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
   const recognitionRef = useRef<any>(null);
   const [neuralSuggestion, setNeuralSuggestion] = useState<{ id: string, title: string, score: number } | null>(null);
   const [ignoredSuggestions, setIgnoredSuggestions] = useState<Set<string>>(new Set());
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const lastAnalyzedText = useRef('');
 
   // Temporary Audio Recording States
@@ -808,37 +812,37 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
     <div className="flex flex-col w-full relative">
       {/* Modern Floating Command Dock - Evaluation: Minimalist & Pro */}
       <div className="sticky top-4 z-50 flex justify-center w-full pointer-events-none">
-        <div className="pointer-events-auto bg-[var(--background)]/80 backdrop-blur-xl border border-[var(--border)] shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.3)] rounded-full px-3 py-1.5 flex items-center gap-0.5 max-w-[95vw] md:max-w-full overflow-x-auto md:overflow-visible no-scrollbar transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
-        <div className="flex items-center mr-1">
+        <div className="pointer-events-auto bg-[var(--background)]/80 backdrop-blur-xl border border-[var(--border)] shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.3)] rounded-full px-2.5 py-1 md:px-3 md:py-1.5 flex items-center gap-1 md:gap-0.5 max-w-[95vw] md:max-w-full overflow-visible no-scrollbar transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
+        <div className="flex items-center mr-0.5">
           <ToolbarButton onClick={() => editor.chain().focus().undo().run()} title="Desfazer">
-            <Undo className="w-3.5 h-3.5" />
+            <Undo className="w-4 h-4 md:w-3.5 md:h-3.5" />
           </ToolbarButton>
           <ToolbarButton onClick={() => editor.chain().focus().redo().run()} title="Refazer">
-            <Redo className="w-3.5 h-3.5" />
+            <Redo className="w-4 h-4 md:w-3.5 md:h-3.5" />
           </ToolbarButton>
         </div>
 
-        <div className="flex items-center mr-1 bg-[var(--muted)]/10 rounded-full px-0.5 py-0.5">
+        <div className="flex items-center mr-0.5 bg-[var(--muted)]/10 rounded-full px-0.5 py-0.5">
           <ToolbarButton 
             onClick={() => editor.chain().focus().toggleBold().run()} 
             isActive={editor.isActive('bold')} 
             title="Negrito"
           >
-            <Bold className="w-3.5 h-3.5" />
+            <Bold className="w-4 h-4 md:w-3.5 md:h-3.5" />
           </ToolbarButton>
           <ToolbarButton 
             onClick={() => editor.chain().focus().toggleItalic().run()} 
             isActive={editor.isActive('italic')} 
             title="Itálico"
           >
-            <Italic className="w-3.5 h-3.5" />
+            <Italic className="w-4 h-4 md:w-3.5 md:h-3.5" />
           </ToolbarButton>
           <ToolbarButton 
             onClick={() => editor.chain().focus().toggleUnderline().run()} 
             isActive={editor.isActive('underline')} 
             title="Sublinhado"
           >
-            <UnderlineIcon className="w-3.5 h-3.5" />
+            <UnderlineIcon className="w-4 h-4 md:w-3.5 md:h-3.5" />
           </ToolbarButton>
         </div>
 
@@ -902,32 +906,32 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
               isActive={editor.isActive('blockquote')} 
               title="Citação"
             >
-              <Quote className="w-3.5 h-3.5" />
+              <Quote className="w-4 h-4 md:w-3.5 md:h-3.5" />
             </ToolbarButton>
             <ToolbarButton 
               onClick={() => editor.chain().focus().toggleCodeBlock().run()} 
               isActive={editor.isActive('codeBlock')} 
               title="Bloco de Código"
             >
-              <SquareCode className="w-3.5 h-3.5" />
+              <SquareCode className="w-4 h-4 md:w-3.5 md:h-3.5" />
             </ToolbarButton>
           </div>
         )}
 
-        <div className="flex items-center mr-1">
+        <div className="flex items-center mr-0.5">
           <ToolbarButton 
             onClick={() => editor.chain().focus().toggleBulletList().run()} 
             isActive={editor.isActive('bulletList')} 
             title="Lista"
           >
-            <List className="w-3.5 h-3.5" />
+            <List className="w-4 h-4 md:w-3.5 md:h-3.5" />
           </ToolbarButton>
           <ToolbarButton 
             onClick={() => editor.chain().focus().toggleTaskList().run()} 
             isActive={editor.isActive('taskList')} 
             title="Tarefas"
           >
-            <CheckSquare className="w-3.5 h-3.5" />
+            <CheckSquare className="w-4 h-4 md:w-3.5 md:h-3.5" />
           </ToolbarButton>
           {isFocusMode && (
             <>
@@ -942,14 +946,15 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
                 isActive={editor.isActive('link')} 
                 title="Link Externo"
               >
-                <LinkIcon className="w-3.5 h-3.5" />
+                <LinkIcon className="w-4 h-4 md:w-3.5 md:h-3.5" />
               </ToolbarButton>
               <ToolbarButton 
                 onClick={() => setNoteLinkModal(true)} 
                 isActive={false} 
                 title="Conectar Nota"
+                className="hidden md:inline-flex"
               >
-                <Layers className="w-3.5 h-3.5 text-[var(--accent)]" />
+                <Layers className="w-4 h-4 md:w-3.5 md:h-3.5 text-[var(--accent)]" />
               </ToolbarButton>
             </>
           )}
@@ -982,15 +987,16 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
             onClick={() => setIsAiAutocompleteEnabled(!isAiAutocompleteEnabled)} 
             isActive={isAiAutocompleteEnabled} 
             title="Autocompletar com IA"
+            className="hidden md:inline-flex"
           >
-            <Sparkles className="w-3.5 h-3.5" />
+            <Sparkles className="w-4 h-4 md:w-3.5 md:h-3.5" />
           </ToolbarButton>
           <button
             onClick={toggleTranscription}
-            className={`w-8 h-8 flex items-center justify-center rounded-full transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60'}`}
+            className={`w-9 h-9 md:w-7 md:h-7 flex items-center justify-center rounded-full transition-all hidden md:flex ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60'}`}
             title="Voz para Texto"
           >
-            <Mic className="w-3.5 h-3.5" />
+            <Mic className="w-4 h-4 md:w-3.5 md:h-3.5" />
           </button>
           <button
             onClick={(e) => {
@@ -998,14 +1004,116 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
               if (isRecordingAudio) stopAudioRecording();
               else startAudioRecording();
             }}
-            className={`w-8 h-8 flex items-center justify-center rounded-full transition-all ${isRecordingAudio ? 'bg-[#FF4F00] text-white animate-pulse' : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60'}`}
+            className={`w-9 h-9 md:w-7 md:h-7 flex items-center justify-center rounded-full transition-all hidden md:flex ${isRecordingAudio ? 'bg-[#FF4F00] text-white animate-pulse' : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60'}`}
             title={isRecordingAudio ? "Parar Gravação" : "Gravar Áudio (Temporário)"}
           >
-            <AudioLines className="w-3.5 h-3.5" />
+            <AudioLines className="w-4 h-4 md:w-3.5 md:h-3.5" />
           </button>
-          <ToolbarButton onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} title="Limpar">
-            <Eraser className="w-3.5 h-3.5" />
+          <ToolbarButton 
+            onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} 
+            title="Limpar"
+            className="hidden md:inline-flex"
+          >
+            <Eraser className="w-4 h-4 md:w-3.5 md:h-3.5" />
           </ToolbarButton>
+
+          {/* Mobile "More Options" button */}
+          <div className="relative md:hidden flex items-center">
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                setIsMobileMenuOpen(!isMobileMenuOpen);
+              }}
+              className={`w-9 h-9 flex items-center justify-center rounded-full transition-all relative shrink-0 ${
+                isMobileMenuOpen 
+                  ? 'bg-[var(--accent)] text-white shadow-md' 
+                  : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-70 hover:opacity-100'
+              }`}
+              title="Mais Opções"
+            >
+              <MoreHorizontal className="w-4 h-4 md:w-3.5 md:h-3.5" />
+            </button>
+
+            <AnimatePresence>
+              {isMobileMenuOpen && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-[60]" 
+                    onClick={() => setIsMobileMenuOpen(false)} 
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 5, scale: 0.95 }}
+                    className="absolute right-0 bottom-full mb-2 z-[70] bg-[var(--background)]/95 backdrop-blur-xl border border-[var(--border)] shadow-[0_10px_40px_rgba(0,0,0,0.2)] rounded-2xl min-w-[200px] py-1.5 overflow-hidden flex flex-col"
+                  >
+                    {isFocusMode && (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setIsMobileMenuOpen(false);
+                          setNoteLinkModal(true);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2"
+                      >
+                        <Layers className="w-3.5 h-3.5 text-[var(--accent)]" />
+                        <span>Conectar Nota</span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setIsAiAutocompleteEnabled(!isAiAutocompleteEnabled);
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 ${isAiAutocompleteEnabled ? 'bg-[var(--accent)]/5 text-[var(--accent)]' : ''}`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Autocompletar IA</span>
+                    </button>
+
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setIsMobileMenuOpen(false);
+                        toggleTranscription();
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 ${isRecording ? 'bg-red-500/10 text-red-500' : ''}`}
+                    >
+                      <Mic className="w-3.5 h-3.5" />
+                      <span>Voz para Texto</span>
+                    </button>
+
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setIsMobileMenuOpen(false);
+                        if (isRecordingAudio) stopAudioRecording();
+                        else startAudioRecording();
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 ${isRecordingAudio ? 'bg-[#FF4F00]/10 text-[#FF4F00]' : ''}`}
+                    >
+                      <AudioLines className="w-3.5 h-3.5" />
+                      <span>Gravar Áudio</span>
+                    </button>
+
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setIsMobileMenuOpen(false);
+                        editor.chain().focus().unsetAllMarks().clearNodes().run();
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 border-t border-[var(--border)]/10"
+                    >
+                      <Eraser className="w-3.5 h-3.5" />
+                      <span>Limpar Estilos</span>
+                    </button>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
 
         {/* Interim Text Indicator */}
