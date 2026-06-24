@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Note } from '@/lib/types';
 import { forceManyBody, forceCollide, forceCenter } from 'd3-force';
 
-const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { 
+const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), {
   ssr: false,
   loading: () => (
     <div className="h-full w-full flex items-center justify-center">
@@ -71,7 +71,7 @@ export default function KnowledgeGraph({ notes, width, height, selectedTag }: Kn
 
   useEffect(() => {
     setMounted(true);
-    
+
     // Normalize simulation after the Big Bang burst
     const timer = setTimeout(() => {
       setSimulationParams({
@@ -137,17 +137,17 @@ export default function KnowledgeGraph({ notes, width, height, selectedTag }: Kn
   useEffect(() => {
     if (fgRef.current && mounted && notes.length > 0) {
       const { chargeStrength, centerStrength, linkDistance } = simulationParams;
-      
+
       fgRef.current.d3Force('link').distance((l: any) => linkDistance / (l.weight || 1));
       fgRef.current.d3Force('charge', forceManyBody().strength(chargeStrength).distanceMax(2000));
       fgRef.current.d3Force('collide', forceCollide(150));
-      
+
       if (centerStrength === 0) {
         fgRef.current.d3Force('center', null);
       } else {
         fgRef.current.d3Force('center', forceCenter(0, 0).strength(centerStrength));
       }
-      
+
       fgRef.current.d3ReheatSimulation();
 
       if (!hasRestored.current) {
@@ -157,11 +157,11 @@ export default function KnowledgeGraph({ notes, width, height, selectedTag }: Kn
             try {
               const { x, y, k } = JSON.parse(savedState);
               if (fgRef.current) {
-                fgRef.current.zoom(k, 800); 
+                fgRef.current.zoom(k, 800);
                 fgRef.current.centerAt(x, y, 800);
                 fgRef.current.d3ReheatSimulation();
               }
-            } catch (e) {}
+            } catch (e) { }
             hasRestored.current = true;
           }, 1200);
         } else {
@@ -185,8 +185,8 @@ export default function KnowledgeGraph({ notes, width, height, selectedTag }: Kn
           const isNodeHighlighted = !selectedTag || node.tags?.includes(selectedTag);
           if (hoveredNode) {
             const isHovered = node.id === hoveredNode.id;
-            const isNeighbor = graphData.links.some(l => 
-              (l.source.id === hoveredNode.id && l.target.id === node.id) || 
+            const isNeighbor = graphData.links.some(l =>
+              (l.source.id === hoveredNode.id && l.target.id === node.id) ||
               (l.target.id === hoveredNode.id && l.source.id === node.id)
             );
             return (isHovered || isNeighbor) ? (node.color || '#FF4F00') : 'rgba(128, 128, 128, 0.05)';
@@ -196,8 +196,8 @@ export default function KnowledgeGraph({ notes, width, height, selectedTag }: Kn
         linkColor={(link: any) => {
           const sourceColor = typeof link.source === 'object' ? link.source.color : '#FF4F00';
           if (hoveredNode) {
-            const isConnected = (typeof link.source === 'object' ? link.source.id === hoveredNode.id : link.source === hoveredNode.id) || 
-                                (typeof link.target === 'object' ? link.target.id === hoveredNode.id : link.target === hoveredNode.id);
+            const isConnected = (typeof link.source === 'object' ? link.source.id === hoveredNode.id : link.source === hoveredNode.id) ||
+              (typeof link.target === 'object' ? link.target.id === hoveredNode.id : link.target === hoveredNode.id);
             return isConnected ? hexToRgba(sourceColor, 0.4) : 'rgba(128, 128, 128, 0.02)';
           }
           if (!selectedTag) return hexToRgba(sourceColor, 0.15);
@@ -207,16 +207,16 @@ export default function KnowledgeGraph({ notes, width, height, selectedTag }: Kn
         }}
         linkWidth={(link: any) => {
           if (hoveredNode) {
-             const isConnected = (typeof link.source === 'object' ? link.source.id === hoveredNode.id : link.source === hoveredNode.id) || 
-                                 (typeof link.target === 'object' ? link.target.id === hoveredNode.id : link.target === hoveredNode.id);
-             return isConnected ? 2.5 : 1;
+            const isConnected = (typeof link.source === 'object' ? link.source.id === hoveredNode.id : link.source === hoveredNode.id) ||
+              (typeof link.target === 'object' ? link.target.id === hoveredNode.id : link.target === hoveredNode.id);
+            return isConnected ? 2.5 : 1;
           }
           return link.weight * 1.5;
         }}
         linkCanvasObjectMode={() => 'after'}
         linkCanvasObject={(link: any, ctx) => {
           const isHovered = hoveredNode && (
-            (typeof link.source === 'object' ? link.source.id === hoveredNode.id : link.source === hoveredNode.id) || 
+            (typeof link.source === 'object' ? link.source.id === hoveredNode.id : link.source === hoveredNode.id) ||
             (typeof link.target === 'object' ? link.target.id === hoveredNode.id : link.target === hoveredNode.id)
           );
           if (!isHovered) return;
@@ -272,8 +272,8 @@ export default function KnowledgeGraph({ notes, width, height, selectedTag }: Kn
           const nodeR = node.val || 4;
           const isNodeHighlighted = !selectedTag || node.tags?.includes(selectedTag);
           const isHoveredNode = hoveredNode && node.id === hoveredNode.id;
-          const isNeighbor = hoveredNode && graphData.links.some(l => 
-            (l.source.id === hoveredNode.id && l.target.id === node.id) || 
+          const isNeighbor = hoveredNode && graphData.links.some(l =>
+            (l.source.id === hoveredNode.id && l.target.id === node.id) ||
             (l.target.id === hoveredNode.id && l.source.id === node.id)
           );
           const shouldHighlight = hoveredNode ? (isHoveredNode || isNeighbor) : isNodeHighlighted;
@@ -285,7 +285,7 @@ export default function KnowledgeGraph({ notes, width, height, selectedTag }: Kn
           }
           try {
             const pulse = (Math.sin(Date.now() / 200) + 1) / 2;
-            const pulseIntensity = pulse * 0.1; 
+            const pulseIntensity = pulse * 0.1;
             let glowOpacity = 0.05;
             if (shouldHighlight) {
               const baseOpacity = isHoveredNode ? 0.4 : 0.1;
@@ -299,7 +299,7 @@ export default function KnowledgeGraph({ notes, width, height, selectedTag }: Kn
             ctx.beginPath();
             ctx.arc(node.x, node.y, nodeR * (isHoveredNode ? 6 : 4), 0, 2 * Math.PI, false);
             ctx.fill();
-          } catch (e) {}
+          } catch (e) { }
           ctx.beginPath();
           ctx.arc(node.x, node.y, nodeR * (isHoveredNode ? 1.2 : 1), 0, 2 * Math.PI, false);
           ctx.fillStyle = shouldHighlight ? (node.color || '#FF4F00') : 'rgba(128, 128, 128, 0.1)';
@@ -313,7 +313,7 @@ export default function KnowledgeGraph({ notes, width, height, selectedTag }: Kn
           }
         }}
       />
-      
+
       <div className="absolute bottom-10 right-10 pointer-events-none text-right hidden md:block">
         <div className="space-y-1">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40 text-[var(--foreground)]">Matriz de Dados</p>

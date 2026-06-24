@@ -223,9 +223,9 @@ const ToolbarButton = ({
       onClick();
     }}
     title={title}
-    className={`w-9 h-9 md:w-7 md:h-7 flex items-center justify-center rounded-full transition-all relative shrink-0 ${
+    className={`w-9 h-9 md:w-7 md:h-7 flex items-center justify-center rounded-none transition-all relative shrink-0 ${
       isActive 
-        ? 'bg-[var(--accent)] text-white shadow-md' 
+        ? 'bg-[var(--accent)] text-white shadow-sm' 
         : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-70 hover:opacity-100 hover:scale-105 active:scale-95'
     } ${className}`}
   >
@@ -247,13 +247,15 @@ const CustomSelect = ({
   value, 
   onChange, 
   options, 
-  label 
+  label,
+  hideLabel = false
 }: { 
   icon: any, 
   value?: string, 
   onChange: (val: string) => void, 
   options: { label: string, value: string, isActive?: boolean }[],
-  label: string
+  label: string,
+  hideLabel?: boolean
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -268,13 +270,17 @@ const CustomSelect = ({
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
-        className={`flex items-center gap-1 px-2 py-1 rounded-full bg-[var(--muted)]/50 text-[var(--foreground)] border border-[var(--border)]/10 hover:border-[var(--accent)]/50 transition-all group ${isOpen ? 'ring-1 ring-[var(--accent)] border-[var(--accent)]/50' : ''}`}
+        className={`flex items-center justify-center gap-1 ${hideLabel ? 'p-1.5' : 'px-2 py-1'} rounded-none bg-[var(--muted)]/50 text-[var(--foreground)] border border-[var(--border)]/10 hover:border-[var(--accent)]/50 transition-all group ${isOpen ? 'ring-1 ring-[var(--accent)] border-[var(--accent)]/50' : ''}`}
       >
         <Icon className="w-3.5 h-3.5 md:w-3 md:h-3 opacity-50 group-hover:opacity-100 transition-opacity" />
-        <span className="text-[9px] md:text-[8px] font-bold uppercase tracking-wider truncate max-w-[40px] md:max-w-[45px]">
-          {selectedLabel}
-        </span>
-        <ChevronDown className={`w-2.5 h-2.5 ml-auto opacity-20 group-hover:opacity-100 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        {!hideLabel && (
+          <>
+            <span className="text-[9px] md:text-[8px] font-bold uppercase tracking-wider truncate max-w-[40px] md:max-w-[45px]">
+              {selectedLabel}
+            </span>
+            <ChevronDown className={`w-2.5 h-2.5 ml-auto opacity-20 group-hover:opacity-100 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+          </>
+        )}
       </button>
 
       <AnimatePresence>
@@ -291,7 +297,7 @@ const CustomSelect = ({
               initial={{ opacity: 0, y: 10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 5, scale: 0.95 }}
-              className="absolute top-full left-0 mt-2 z-[70] bg-[var(--background)]/95 backdrop-blur-xl border border-[var(--border)] shadow-[0_10px_40px_rgba(0,0,0,0.2)] rounded-2xl min-w-[180px] py-1.5 overflow-hidden"
+              className="absolute top-full left-0 mt-2 z-[70] bg-[var(--background)]/95 backdrop-blur-xl border border-[var(--border)] shadow-[6px_6px_0px_rgba(0,0,0,0.15)] rounded-none min-w-[180px] py-1.5 overflow-hidden"
             >
               <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
                 {options.map(opt => (
@@ -810,9 +816,15 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
 
   return (
     <div className="flex flex-col w-full relative">
-      {/* Modern Floating Command Dock - Evaluation: Minimalist & Pro */}
-      <div className="sticky top-4 z-50 flex justify-center w-full pointer-events-none">
-        <div className="pointer-events-auto bg-[var(--background)]/80 backdrop-blur-xl border border-[var(--border)] shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.3)] rounded-full px-2.5 py-1 md:px-3 md:py-1.5 flex items-center gap-1 md:gap-0.5 max-w-[95vw] md:max-w-full overflow-visible no-scrollbar transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
+      {/* Toolbar Container */}
+      <div className={isFocusMode 
+        ? "sticky top-4 z-50 flex justify-center w-full pointer-events-none mb-4" 
+        : "w-full border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur-sm sticky top-0 z-30 px-6 py-2.5 flex items-center justify-between gap-4"
+      }>
+        <div className={isFocusMode 
+          ? "pointer-events-auto bg-[var(--background)]/90 backdrop-blur-xl border border-[var(--border)] shadow-[6px_6px_0px_rgba(0,0,0,0.15)] rounded-none px-2.5 py-1 md:px-3 md:py-1.5 flex items-center gap-1 md:gap-0.5 max-w-[95vw] md:max-w-full overflow-visible no-scrollbar transition-all hover:shadow-[8px_8px_0px_rgba(0,0,0,0.2)]"
+          : "pointer-events-auto flex flex-wrap items-center gap-1 md:gap-1.5 w-full overflow-visible"
+        }>
         <div className="flex items-center mr-0.5">
           <ToolbarButton onClick={() => editor.chain().focus().undo().run()} title="Desfazer">
             <Undo className="w-4 h-4 md:w-3.5 md:h-3.5" />
@@ -822,7 +834,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
           </ToolbarButton>
         </div>
 
-        <div className="flex items-center mr-0.5 bg-[var(--muted)]/10 rounded-full px-0.5 py-0.5">
+        <div className="flex items-center mr-0.5 bg-[var(--muted)]/10 rounded-none px-0.5 py-0.5">
           <ToolbarButton 
             onClick={() => editor.chain().focus().toggleBold().run()} 
             isActive={editor.isActive('bold')} 
@@ -865,22 +877,31 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
                 { label: 'Monospace', value: 'monospace' },
               ]}
             />
-            <CustomSelect 
-              label="Tamanho"
-              icon={Type}
-              value={editor.getAttributes('textStyle').fontSize || '16px'}
-              onChange={(val) => editor.chain().focus().setFontSize(val).run()}
-              options={[
-                { label: '12px', value: '12px' },
-                { label: '14px', value: '14px' },
-                { label: '16px', value: '16px' },
-                { label: '18px', value: '18px' },
-                { label: '20px', value: '20px' },
-                { label: '24px', value: '24px' },
-                { label: '30px', value: '30px' },
-                { label: '36px', value: '36px' },
-              ]}
-            />
+          </div>
+        )}
+
+        <div className="hidden md:flex items-center gap-1 mr-1 animate-in fade-in slide-in-from-left-2 duration-300">
+          <CustomSelect 
+            label="Tamanho"
+            icon={Type}
+            hideLabel={!isFocusMode}
+            value={editor.getAttributes('textStyle').fontSize || '16px'}
+            onChange={(val) => editor.chain().focus().setFontSize(val).run()}
+            options={[
+              { label: '12px', value: '12px' },
+              { label: '14px', value: '14px' },
+              { label: '16px', value: '16px' },
+              { label: '18px', value: '18px' },
+              { label: '20px', value: '20px' },
+              { label: '24px', value: '24px' },
+              { label: '30px', value: '30px' },
+              { label: '36px', value: '36px' },
+            ]}
+          />
+        </div>
+
+        {isFocusMode && (
+          <div className="hidden md:flex items-center gap-1 mr-1 animate-in fade-in slide-in-from-left-2 duration-300">
             <CustomSelect 
               label="Cor"
               icon={Palette}
@@ -960,27 +981,30 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
           )}
         </div>
 
-        {isFocusMode && (
-          <div className="hidden md:flex items-center mr-1 animate-in fade-in slide-in-from-left-2 duration-300">
-            <CustomSelect 
-              label="Alinhar"
-              icon={AlignLeft}
-              value={
-                editor.isActive({ textAlign: 'left' }) ? 'left' :
-                editor.isActive({ textAlign: 'center' }) ? 'center' :
-                editor.isActive({ textAlign: 'right' }) ? 'right' :
-                editor.isActive({ textAlign: 'justify' }) ? 'justify' : 'left'
-              }
-              onChange={(val) => editor.chain().focus().setTextAlign(val).run()}
-              options={[
-                { label: 'Esquerda', value: 'left' },
-                { label: 'Centro', value: 'center' },
-                { label: 'Direita', value: 'right' },
-                { label: 'Justificado', value: 'justify' },
-              ]}
-            />
-          </div>
-        )}
+        <div className="hidden md:flex items-center mr-1 animate-in fade-in slide-in-from-left-2 duration-300">
+          <CustomSelect 
+            label="Alinhar"
+            icon={
+              editor.isActive({ textAlign: 'center' }) ? AlignCenter :
+              editor.isActive({ textAlign: 'right' }) ? AlignRight :
+              editor.isActive({ textAlign: 'justify' }) ? AlignJustify : AlignLeft
+            }
+            hideLabel={!isFocusMode}
+            value={
+              editor.isActive({ textAlign: 'left' }) ? 'left' :
+              editor.isActive({ textAlign: 'center' }) ? 'center' :
+              editor.isActive({ textAlign: 'right' }) ? 'right' :
+              editor.isActive({ textAlign: 'justify' }) ? 'justify' : 'left'
+            }
+            onChange={(val) => editor.chain().focus().setTextAlign(val).run()}
+            options={[
+              { label: 'Esquerda', value: 'left' },
+              { label: 'Centro', value: 'center' },
+              { label: 'Direita', value: 'right' },
+              { label: 'Justificado', value: 'justify' },
+            ]}
+          />
+        </div>
 
         <div className="flex items-center gap-0.5">
           <ToolbarButton 
@@ -993,7 +1017,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
           </ToolbarButton>
           <button
             onClick={toggleTranscription}
-            className={`w-9 h-9 md:w-7 md:h-7 flex items-center justify-center rounded-full transition-all hidden md:flex ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60'}`}
+            className={`w-9 h-9 md:w-7 md:h-7 flex items-center justify-center rounded-none transition-all hidden md:flex ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60'}`}
             title="Voz para Texto"
           >
             <Mic className="w-4 h-4 md:w-3.5 md:h-3.5" />
@@ -1004,7 +1028,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
               if (isRecordingAudio) stopAudioRecording();
               else startAudioRecording();
             }}
-            className={`w-9 h-9 md:w-7 md:h-7 flex items-center justify-center rounded-full transition-all hidden md:flex ${isRecordingAudio ? 'bg-[#FF4F00] text-white animate-pulse' : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60'}`}
+            className={`w-9 h-9 md:w-7 md:h-7 flex items-center justify-center rounded-none transition-all hidden md:flex ${isRecordingAudio ? 'bg-[#FF4F00] text-white animate-pulse' : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60'}`}
             title={isRecordingAudio ? "Parar Gravação" : "Gravar Áudio (Temporário)"}
           >
             <AudioLines className="w-4 h-4 md:w-3.5 md:h-3.5" />
@@ -1024,9 +1048,9 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
                 e.preventDefault();
                 setIsMobileMenuOpen(!isMobileMenuOpen);
               }}
-              className={`w-9 h-9 flex items-center justify-center rounded-full transition-all relative shrink-0 ${
+              className={`w-9 h-9 flex items-center justify-center rounded-none transition-all relative shrink-0 ${
                 isMobileMenuOpen 
-                  ? 'bg-[var(--accent)] text-white shadow-md' 
+                  ? 'bg-[var(--accent)] text-white shadow-sm' 
                   : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-70 hover:opacity-100'
               }`}
               title="Mais Opções"
@@ -1045,7 +1069,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 5, scale: 0.95 }}
-                    className="absolute right-0 bottom-full mb-2 z-[70] bg-[var(--background)]/95 backdrop-blur-xl border border-[var(--border)] shadow-[0_10px_40px_rgba(0,0,0,0.2)] rounded-2xl min-w-[200px] py-1.5 overflow-hidden flex flex-col"
+                    className="absolute right-0 bottom-full mb-2 z-[70] bg-[var(--background)]/95 backdrop-blur-xl border border-[var(--border)] shadow-[6px_6px_0px_rgba(0,0,0,0.15)] rounded-none min-w-[200px] py-1.5 overflow-hidden flex flex-col"
                   >
                     {isFocusMode && (
                       <button

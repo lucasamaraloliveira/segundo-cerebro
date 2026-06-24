@@ -2,14 +2,14 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Search, 
-  Plus, 
-  Tag, 
-  Trash2, 
-  LayoutDashboard, 
-  Moon, 
-  Sun, 
+import {
+  Search,
+  Plus,
+  Tag,
+  Trash2,
+  LayoutDashboard,
+  Moon,
+  Sun,
   Command,
   FileText,
   ArrowRight
@@ -36,16 +36,16 @@ export default function CommandPalette({ isOpen, onClose, notes, onAction }: Com
 
   const filteredItems = useMemo(() => {
     const q = query.toLowerCase();
-    
-    const matchedCommands = commands.filter(c => 
+
+    const matchedCommands = commands.filter(c =>
       c.label.toLowerCase().includes(q) || c.description.toLowerCase().includes(q)
     ).map(c => ({ ...c, type: 'command' }));
 
-    const matchedNotes = notes.filter(n => 
+    const matchedNotes = notes.filter(n =>
       n.title.toLowerCase().includes(q) || (n.tags && n.tags.some(t => t.toLowerCase().includes(q)))
-    ).slice(0, 5).map(n => ({ 
-      id: n.id, 
-      label: n.title || 'Sem título', 
+    ).slice(0, 5).map(n => ({
+      id: n.id,
+      label: n.title || 'Sem título',
       description: n.tags?.join(', ') || 'Sem tags',
       icon: FileText,
       type: 'note'
@@ -97,14 +97,14 @@ export default function CommandPalette({ isOpen, onClose, notes, onAction }: Com
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] px-4">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
             className="absolute inset-0 bg-black/40 backdrop-blur-md"
           />
-          
+
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: -20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -145,7 +145,7 @@ export default function CommandPalette({ isOpen, onClose, notes, onAction }: Com
                           <p className={`text-[10px] opacity-60 ${index === selectedIndex ? 'text-white/70' : ''}`}>{item.description}</p>
                         </div>
                       </div>
-                      
+
                       {index === selectedIndex && (
                         <motion.div layoutId="arrow" className="flex items-center gap-2">
                           <span className="text-[9px] font-bold opacity-50 uppercase tracking-tighter">Executar</span>

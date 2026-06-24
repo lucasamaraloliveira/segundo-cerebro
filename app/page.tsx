@@ -82,14 +82,14 @@ const stripHtml = (html: string) => {
 };
 
 
-const NoteCard = React.memo(({ 
-  note, 
-  isActive, 
+const NoteCard = React.memo(({
+  note,
+  isActive,
   onClick,
   onToggleComplete
-}: { 
-  note: Note, 
-  isActive: boolean, 
+}: {
+  note: Note,
+  isActive: boolean,
   onClick: () => void,
   onToggleComplete: (e: React.MouseEvent) => void
 }) => {
@@ -111,7 +111,7 @@ const NoteCard = React.memo(({
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button 
+          <button
             onClick={onToggleComplete}
             className={`w-5 h-5 border-2 rounded-full flex items-center justify-center transition-all ${note.isCompleted ? 'bg-[#FF4F00] border-[#FF4F00] text-white' : 'border-[var(--border)] hover:border-[#FF4F00] text-transparent'}`}
           >
@@ -132,14 +132,14 @@ const NoteCard = React.memo(({
 
 NoteCard.displayName = 'NoteCard';
 
-const TagButton = React.memo(({ 
-  tag, 
-  isActive, 
-  onClick 
-}: { 
-  tag: string, 
-  isActive: boolean, 
-  onClick: () => void 
+const TagButton = React.memo(({
+  tag,
+  isActive,
+  onClick
+}: {
+  tag: string,
+  isActive: boolean,
+  onClick: () => void
 }) => (
   <button
     onClick={onClick}
@@ -202,125 +202,112 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
       exit={{ opacity: 0, y: -10 }}
       className="flex-1 flex flex-col h-full overflow-hidden"
     >
-      {!isFullscreen && (
-        <div className="px-4 md:px-12 py-4 md:py-6 border-b border-[var(--border)] flex items-center justify-between bg-[var(--background)]/80 backdrop-blur-sm sticky top-0 z-20">
-        <div className="flex items-center gap-3 md:gap-6">
-          <div className="w-1.5 h-1.5 bg-green-500 rounded-none animate-pulse flex-shrink-0" title="Sincronizado" />
-          
-          <button
-            onClick={() => updateNote(activeNote.id, { isBookmarked: !activeNote.isBookmarked })}
-            className={`p-1.5 transition-all ${activeNote.isBookmarked ? 'bg-[var(--accent)] text-[var(--accent-foreground)] rounded-md' : 'text-[var(--foreground)]/40 hover:text-[var(--foreground)]'}`}
-            title="Favoritar"
-          >
-            <Bookmark className={`w-3.5 h-3.5 ${activeNote.isBookmarked ? 'fill-white' : ''}`} />
-          </button>
-          <button
-            onClick={() => updateNote(activeNote.id, { isCompleted: !activeNote.isCompleted })}
-            className={`p-1.5 transition-all ${activeNote.isCompleted ? 'bg-green-500 text-white rounded-md' : 'text-[var(--foreground)]/40 hover:text-[var(--foreground)]'}`}
-            title={activeNote.isCompleted ? "Marcar como Ativa" : "Concluir Nota"}
-          >
-            <CheckCircle className="w-3.5 h-3.5" />
-          </button>
-          <div
-            onClick={() => setIsTempModalOpen(!isTempModalOpen)}
-            className={`p-1.5 transition-all relative cursor-pointer ${activeNote.isTemporary ? 'bg-[#FF4F00] text-white rounded-md' : 'text-[var(--foreground)]/40 hover:text-[var(--foreground)]'}`}
-            title={activeNote.isTemporary ? "Ajustar Tempo / Remover" : "Tornar Nota Temporária (Auto-Destruição)"}
-          >
-            <Clock className="w-3.5 h-3.5" />
+      <div className="px-4 md:px-12 py-4 md:py-6 border-b border-[var(--border)] flex items-center justify-between bg-[var(--background)]/80 backdrop-blur-sm sticky top-0 z-20">
+          <div className="flex items-center gap-3 md:gap-6">
+            <div className="w-1.5 h-1.5 bg-green-500 rounded-none animate-pulse flex-shrink-0" title="Sincronizado" />
 
-            {isTempModalOpen && (
-              <div 
-                onClick={(e) => e.stopPropagation()} 
-                className="absolute top-full left-0 mt-2 z-[150] bg-[var(--background)] border border-black/20 dark:border-white/20 p-2 shadow-[8px_8px_0px_rgba(0,0,0,0.1)] flex flex-col gap-1.5 w-36 text-left"
-              >
-                <p className="text-[7px] font-bold uppercase tracking-[0.1em] text-[var(--foreground)]/50 mb-1 text-center">Auto-Destruição</p>
-                
-                {(['5m', '1h', '24h'] as const).map((dur) => {
-                  let durationMs = 3600000;
-                  if (dur === '5m') durationMs = 5 * 60 * 1000;
-                  if (dur === '24h') durationMs = 24 * 60 * 60 * 1000;
+            <button
+              onClick={() => updateNote(activeNote.id, { isBookmarked: !activeNote.isBookmarked })}
+              className={`p-1.5 transition-all ${activeNote.isBookmarked ? 'bg-[var(--accent)] text-[var(--accent-foreground)] rounded-md' : 'text-[var(--foreground)]/40 hover:text-[var(--foreground)]'}`}
+              title="Favoritar"
+            >
+              <Bookmark className={`w-3.5 h-3.5 ${activeNote.isBookmarked ? 'fill-white' : ''}`} />
+            </button>
+            <button
+              onClick={() => updateNote(activeNote.id, { isCompleted: !activeNote.isCompleted })}
+              className={`p-1.5 transition-all ${activeNote.isCompleted ? 'bg-green-500 text-white rounded-md' : 'text-[var(--foreground)]/40 hover:text-[var(--foreground)]'}`}
+              title={activeNote.isCompleted ? "Marcar como Ativa" : "Concluir Nota"}
+            >
+              <CheckCircle className="w-3.5 h-3.5" />
+            </button>
+            <div
+              onClick={() => setIsTempModalOpen(!isTempModalOpen)}
+              className={`p-1.5 transition-all relative cursor-pointer ${activeNote.isTemporary ? 'bg-[#FF4F00] text-white rounded-md' : 'text-[var(--foreground)]/40 hover:text-[var(--foreground)]'}`}
+              title={activeNote.isTemporary ? "Ajustar Tempo / Remover" : "Tornar Nota Temporária (Auto-Destruição)"}
+            >
+              <Clock className="w-3.5 h-3.5" />
 
-                  return (
+              {isTempModalOpen && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className="absolute top-full left-0 mt-2 z-[150] bg-[var(--background)] border border-black/20 dark:border-white/20 p-2 shadow-[8px_8px_0px_rgba(0,0,0,0.1)] flex flex-col gap-1.5 w-36 text-left"
+                >
+                  <p className="text-[7px] font-bold uppercase tracking-[0.1em] text-[var(--foreground)]/50 mb-1 text-center">Auto-Destruição</p>
+
+                  {(['5m', '1h', '24h'] as const).map((dur) => {
+                    let durationMs = 3600000;
+                    if (dur === '5m') durationMs = 5 * 60 * 1000;
+                    if (dur === '24h') durationMs = 24 * 60 * 60 * 1000;
+
+                    return (
+                      <button
+                        key={dur}
+                        onClick={() => {
+                          updateNote(activeNote.id, {
+                            isTemporary: true,
+                            expiresAt: Date.now() + durationMs
+                          });
+                          setIsTempModalOpen(false);
+                        }}
+                        className="text-[8px] font-bold uppercase py-1.5 px-2 border border-black/10 dark:border-white/10 bg-[var(--muted)] hover:bg-[#FF4F00] hover:text-white transition-colors text-[var(--foreground)] text-center rounded shadow-[2px_2px_0px_rgba(0,0,0,0.05)]"
+                      >
+                        {dur === '5m' ? '5 minutos' : dur === '1h' ? '1 hora' : '24 horas'}
+                      </button>
+                    );
+                  })}
+
+                  {activeNote.isTemporary && (
                     <button
-                      key={dur}
                       onClick={() => {
-                        updateNote(activeNote.id, { 
-                          isTemporary: true, 
-                          expiresAt: Date.now() + durationMs 
+                        updateNote(activeNote.id, {
+                          isTemporary: false,
+                          expiresAt: null
                         });
                         setIsTempModalOpen(false);
                       }}
-                      className="text-[8px] font-bold uppercase py-1.5 px-2 border border-black/10 dark:border-white/10 bg-[var(--muted)] hover:bg-[#FF4F00] hover:text-white transition-colors text-[var(--foreground)] text-center rounded shadow-[2px_2px_0px_rgba(0,0,0,0.05)]"
+                      className="text-[8px] font-bold uppercase py-1.5 px-2 mt-1 border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors text-center rounded"
                     >
-                      {dur === '5m' ? '5 minutos' : dur === '1h' ? '1 hora' : '24 horas'}
+                      Desativar
                     </button>
-                  );
-                })}
-
-                {activeNote.isTemporary && (
-                  <button
-                    onClick={() => {
-                      updateNote(activeNote.id, { 
-                        isTemporary: false, 
-                        expiresAt: null 
-                      });
-                      setIsTempModalOpen(false);
-                    }}
-                    className="text-[8px] font-bold uppercase py-1.5 px-2 mt-1 border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors text-center rounded"
-                  >
-                    Desativar
-                  </button>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-3 md:gap-6 h-8 overflow-x-auto no-scrollbar flex-nowrap pr-4">
+            <button
+              onClick={() => setIsAIAssistantOpen(true)}
+              className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter hover:text-[#FF4F00] transition-all group text-[var(--foreground)]"
+            >
+              <Sparkles className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100 group-hover:text-[#FF4F00]" />
+              <span className="whitespace-nowrap">Assistente IA</span>
+            </button>
+            <div className="flex-shrink-0 w-[1px] h-3 bg-[var(--border)] hidden md:block" />
+            <button
+              onClick={() => exportAsPDF(activeNote)}
+              className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter hover:text-[var(--foreground)] transition-all group text-[var(--foreground)]"
+            >
+              <Printer className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100" />
+              <span className="whitespace-nowrap">Imprimir</span>
+            </button>
+            <button
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter hover:text-[var(--foreground)] transition-all group text-[var(--foreground)]"
+            >
+              <Maximize2 className={`w-3.5 h-3.5 ${isFullscreen ? 'text-blue-600' : 'opacity-40 group-hover:opacity-100'}`} />
+              <span className="whitespace-nowrap">{isFullscreen ? 'Sair Foco' : 'Modo Foco'}</span>
+            </button>
+            <button
+              onClick={() => deleteNote(activeNote.id)}
+              className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter text-red-400 hover:text-red-600 transition-all group"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span className="whitespace-nowrap">Excluir</span>
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-3 md:gap-6 h-8 overflow-x-auto no-scrollbar flex-nowrap pr-4">
-          <button
-            onClick={() => setIsAIAssistantOpen(true)}
-            className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter hover:text-[#FF4F00] transition-all group text-[var(--foreground)]"
-          >
-            <Sparkles className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100 group-hover:text-[#FF4F00]" />
-            <span className="whitespace-nowrap">Assistente IA</span>
-          </button>
-          <div className="flex-shrink-0 w-[1px] h-3 bg-[var(--border)] hidden md:block" />
-          <button
-            onClick={() => exportAsPDF(activeNote)}
-            className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter hover:text-[var(--foreground)] transition-all group text-[var(--foreground)]"
-          >
-            <Printer className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100" />
-            <span className="whitespace-nowrap">Imprimir</span>
-          </button>
-          <button
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter hover:text-[var(--foreground)] transition-all group text-[var(--foreground)]"
-          >
-            <Maximize2 className={`w-3.5 h-3.5 ${isFullscreen ? 'text-blue-600' : 'opacity-40 group-hover:opacity-100'}`} />
-            <span className="whitespace-nowrap">{isFullscreen ? 'Sair Foco' : 'Modo Foco'}</span>
-          </button>
-          <button
-            onClick={() => deleteNote(activeNote.id)}
-            className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter text-red-400 hover:text-red-600 transition-all group"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span className="whitespace-nowrap">Excluir</span>
-          </button>
-        </div>
-      </div>
-      )}
 
-      {/* Floating Exit Focus Button (Top Right) - Only visible in Fullscreen */}
-      {isFullscreen && (
-        <div className="fixed top-6 right-8 z-[100] animate-in fade-in zoom-in duration-300">
-          <button
-            onClick={() => setIsFullscreen(false)}
-            className="flex items-center gap-2 px-4 py-2 bg-[var(--background)]/80 backdrop-blur-md border border-[var(--border)] shadow-xl hover:bg-[var(--accent)] hover:text-white transition-all rounded-full text-[10px] font-bold uppercase tracking-widest group"
-          >
-            <Maximize2 className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
-            <span>Sair Foco</span>
-          </button>
-        </div>
-      )}
+
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-12 lg:p-20 bg-[var(--muted)]/30 custom-scrollbar">
         <div className="max-w-[850px] mx-auto w-full bg-[var(--background)] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] min-h-[1100px] border border-[var(--border)] overflow-visible relative">
           {activeNote.isTemporary && (
@@ -330,103 +317,103 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
             </div>
           )}
           <div className="px-8 md:px-16 lg:px-24 py-6 md:py-8">
-          <div className="mb-2 flex justify-between items-end border-b border-[var(--border)] pb-2">
-            <div className="space-y-1">
-              <div className="flex flex-wrap gap-2">
-                {activeNote.tags?.slice(0, showAllTags ? undefined : 5).map((tag: string) => (
-                   <span key={tag} className="px-2 py-1 bg-[var(--muted)] text-[var(--foreground)] text-[10px] font-bold uppercase tracking-widest rounded flex items-center gap-1 group">
-                    #{tag}
+            <div className="mb-2 flex justify-between items-end border-b border-[var(--border)] pb-2">
+              <div className="space-y-1">
+                <div className="flex flex-wrap gap-2">
+                  {activeNote.tags?.slice(0, showAllTags ? undefined : 5).map((tag: string) => (
+                    <span key={tag} className="px-2 py-1 bg-[var(--muted)] text-[var(--foreground)] text-[10px] font-bold uppercase tracking-widest rounded flex items-center gap-1 group">
+                      #{tag}
+                      <button
+                        onClick={() => {
+                          setTagToDelete({ noteId: activeNote.id, tag });
+                          setIsTagDeleteModalOpen(true);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  {activeNote.tags?.length > 5 && (
                     <button
-                      onClick={() => {
-                        setTagToDelete({ noteId: activeNote.id, tag });
-                        setIsTagDeleteModalOpen(true);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500"
+                      onClick={() => setShowAllTags(!showAllTags)}
+                      className="text-[9px] font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity px-2 py-1 border border-[var(--border)] rounded"
                     >
-                      ×
+                      {showAllTags ? 'Ver menos' : `+${activeNote.tags.length - 5} Ver mais`}
                     </button>
-                  </span>
-                ))}
-                {activeNote.tags?.length > 5 && (
+                  )}
                   <button
-                    onClick={() => setShowAllTags(!showAllTags)}
-                    className="text-[9px] font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity px-2 py-1 border border-[var(--border)] rounded"
+                    onClick={() => {
+                      setNewTagInput('');
+                      setIsTagModalOpen(true);
+                    }}
+                    className="text-[10px] font-bold uppercase tracking-widest text-[var(--foreground)] opacity-30 hover:opacity-100 transition-colors"
                   >
-                    {showAllTags ? 'Ver menos' : `+${activeNote.tags.length - 5} Ver mais`}
+                    + Adicionar Tag
                   </button>
-                )}
-                <button
-                  onClick={() => {
-                    setNewTagInput('');
-                    setIsTagModalOpen(true);
-                  }}
-                  className="text-[10px] font-bold uppercase tracking-widest text-[var(--foreground)] opacity-30 hover:opacity-100 transition-colors"
-                >
-                  + Adicionar Tag
-                </button>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Atualizado em</p>
+                <p className="text-sm font-serif italic">
+                  {activeNote.updatedAt ? format(activeNote.updatedAt.toDate(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : 'Agora'}
+                </p>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Atualizado em</p>
-              <p className="text-sm font-serif italic">
-                {activeNote.updatedAt ? format(activeNote.updatedAt.toDate(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : 'Agora'}
-              </p>
+            <textarea
+              ref={titleRef}
+              rows={1}
+              value={localTitle}
+              placeholder="Título da nota"
+              onChange={(e) => setLocalTitle(e.target.value.replace(/\n/g, ''))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                }
+              }}
+              className="w-full text-3xl md:text-3xl lg:text-4xl xl:text-6xl font-serif font-bold tracking-tighter leading-[1.1] bg-transparent border-none focus:outline-none mb-0 p-0 placeholder:text-[var(--foreground)]/40 text-[var(--foreground)] resize-none overflow-hidden"
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-4 mb-0 pb-3 border-b border-[var(--border)] mt-4 md:mt-6">
+              <div className="space-y-1">
+                <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Lembrete</p>
+                <input
+                  type="datetime-local"
+                  className="w-full bg-[var(--muted)] text-[var(--foreground)] px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold uppercase tracking-normal sm:tracking-wider rounded border-none focus:outline-none"
+                  value={activeNote.reminder ? format(activeNote.reminder.toDate(), "yyyy-MM-dd'T'HH:mm") : ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val) {
+                      updateNote(activeNote.id, { reminder: null });
+                    } else {
+                      const d = new Date(val);
+                      if (!isNaN(d.getTime())) {
+                        updateNote(activeNote.id, { reminder: Timestamp.fromDate(d) });
+                      }
+                    }
+                  }}
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Vencimento</p>
+                <input
+                  type="datetime-local"
+                  className="w-full bg-[var(--muted)] text-[var(--foreground)] px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold uppercase tracking-normal sm:tracking-wider rounded border-none focus:outline-none"
+                  value={activeNote.expiryDate ? format(activeNote.expiryDate.toDate(), "yyyy-MM-dd'T'HH:mm") : ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val) {
+                      updateNote(activeNote.id, { expiryDate: null });
+                    } else {
+                      const d = new Date(val);
+                      if (!isNaN(d.getTime())) {
+                        updateNote(activeNote.id, { expiryDate: Timestamp.fromDate(d) });
+                      }
+                    }
+                  }}
+                />
+              </div>
             </div>
           </div>
-          <textarea
-            ref={titleRef}
-            rows={1}
-            value={localTitle}
-            placeholder="Título da nota"
-            onChange={(e) => setLocalTitle(e.target.value.replace(/\n/g, ''))}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-              }
-            }}
-            className="w-full text-3xl md:text-3xl lg:text-4xl xl:text-6xl font-serif font-bold tracking-tighter leading-[1.1] bg-transparent border-none focus:outline-none mb-0 p-0 placeholder:text-[var(--foreground)]/40 text-[var(--foreground)] resize-none overflow-hidden"
-          />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-4 mb-0 pb-3 border-b border-[var(--border)] mt-4 md:mt-6">
-            <div className="space-y-1">
-              <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Lembrete</p>
-              <input
-                type="datetime-local"
-                className="w-full bg-[var(--muted)] text-[var(--foreground)] px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold uppercase tracking-normal sm:tracking-wider rounded border-none focus:outline-none"
-                value={activeNote.reminder ? format(activeNote.reminder.toDate(), "yyyy-MM-dd'T'HH:mm") : ''}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (!val) {
-                    updateNote(activeNote.id, { reminder: null });
-                  } else {
-                    const d = new Date(val);
-                    if (!isNaN(d.getTime())) {
-                      updateNote(activeNote.id, { reminder: Timestamp.fromDate(d) });
-                    }
-                  }
-                }}
-              />
-            </div>
-            <div className="space-y-1">
-              <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Vencimento</p>
-              <input
-                type="datetime-local"
-                className="w-full bg-[var(--muted)] text-[var(--foreground)] px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold uppercase tracking-normal sm:tracking-wider rounded border-none focus:outline-none"
-                value={activeNote.expiryDate ? format(activeNote.expiryDate.toDate(), "yyyy-MM-dd'T'HH:mm") : ''}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (!val) {
-                    updateNote(activeNote.id, { expiryDate: null });
-                  } else {
-                    const d = new Date(val);
-                    if (!isNaN(d.getTime())) {
-                      updateNote(activeNote.id, { expiryDate: Timestamp.fromDate(d) });
-                    }
-                  }
-                }}
-              />
-            </div>
-          </div>
-        </div>
           <RichTextEditor
             content={localContent}
             onChange={(html: string) => setLocalContent(html)}
@@ -494,8 +481,8 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
               </div>
             </div>
           )}
-          </div>
         </div>
+      </div>
     </motion.div>
   );
 });
@@ -550,14 +537,14 @@ export default function Home() {
     if (typeof window === "undefined") return;
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     const type = typeOverride || alarmType;
-    
+
     const osc = audioContext.createOscillator();
     const gain = audioContext.createGain();
-    
+
     osc.connect(gain);
     gain.connect(audioContext.destination);
 
-    switch(type) {
+    switch (type) {
       case 'crystal':
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(1760, audioContext.currentTime);
@@ -613,14 +600,14 @@ export default function Home() {
                 body: "Um de seus pensamentos requer sua atenção agora.",
               });
             }
-            
+
             // Visual feedback (Styled Modal)
             setCurrentReminderNote(note);
             setIsReminderAlertOpen(true);
             playNeuralSound();
-            
+
             setNotifiedReminders(prev => new Set(prev).add(note.id));
-            
+
             // AUTOMATICALLY REMOVE REMOVED (As requested)
             updateNote(note.id, { reminder: null });
           }
@@ -787,21 +774,21 @@ export default function Home() {
     return notes.filter(note => {
       const titleLower = note.title.toLowerCase();
       const contentLower = note.content.toLowerCase();
-      
-      const matchesKeyword = 
-        titleLower.includes(queryLower) || 
+
+      const matchesKeyword =
+        titleLower.includes(queryLower) ||
         contentLower.includes(queryLower);
-      
-      const matchesSemantic = isSemanticSearch && semanticKeywords.some(kw => 
+
+      const matchesSemantic = isSemanticSearch && semanticKeywords.some(kw =>
         titleLower.includes(kw) || contentLower.includes(kw)
       );
 
       const matchesSearch = matchesKeyword || matchesSemantic;
       const matchesTag = activeTag ? note.tags?.includes(activeTag) : true;
-      const matchesView = 
-        view === 'favorites' ? note.isBookmarked : 
-        view === 'reminders' ? !!note.reminder : 
-        view === 'completed' ? note.isCompleted : true;
+      const matchesView =
+        view === 'favorites' ? note.isBookmarked :
+          view === 'reminders' ? !!note.reminder :
+            view === 'completed' ? note.isCompleted : true;
       return matchesSearch && matchesTag && matchesView;
     });
   }, [notes, searchQuery, activeTag, view, isSemanticSearch, semanticKeywords]);
@@ -814,16 +801,16 @@ export default function Home() {
     return {
       bytes: totalBytes,
       percentage: Math.max(0.1, (totalBytes / limitBytes) * 100),
-      formatted: totalBytes < 1024 * 1024 
-        ? (totalBytes / 1024).toFixed(1) + ' KB' 
+      formatted: totalBytes < 1024 * 1024
+        ? (totalBytes / 1024).toFixed(1) + ' KB'
         : (totalBytes / (1024 * 1024)).toFixed(1) + ' MB'
     };
   }, [notes]);
 
   const backlinks = useMemo(() => {
     if (!activeNote) return [];
-    return notes.filter(n => 
-      n.id !== activeNote.id && 
+    return notes.filter(n =>
+      n.id !== activeNote.id &&
       n.content?.includes(activeNote.id)
     );
   }, [activeNote, notes]);
@@ -923,7 +910,7 @@ export default function Home() {
     try {
       const newTags = (note.tags || []).filter(t => t !== tag);
       await updateNote(noteId, { tags: newTags });
-      
+
       setLastDeletedTag({ noteId, tag });
       setIsTagDeleteModalOpen(false);
       setTagToDelete(null);
@@ -975,7 +962,7 @@ export default function Home() {
           await updateNote(noteId, { tags: newTags });
         }
       }
-      
+
       setLastDeletedTag({ noteId: '', tag, affectedNoteIds });
       setIsGlobalTagDeleteModalOpen(false);
       setGlobalTagToDelete(null);
@@ -1003,18 +990,18 @@ export default function Home() {
     if (!activeNote) return;
     const currentTags = activeNote.tags || [];
     const finalTags = [...currentTags];
-    
+
     suggestedTags.forEach(suggested => {
       // Look for match in existing system tags (case insensitive)
       const existing = allExistingTags.find(t => t.toLowerCase() === suggested.toLowerCase());
       const tagToAdd = existing || suggested;
-      
+
       // Check if this tag is already in this note's tag list
       if (!finalTags.some(t => t.toLowerCase() === tagToAdd.toLowerCase())) {
         finalTags.push(tagToAdd);
       }
     });
-    
+
     await updateNote(activeNote.id, { tags: finalTags });
   };
 
@@ -1060,15 +1047,15 @@ export default function Home() {
     // 1. Cria um container nativo que será a ÚNICA coisa visível durante a impressão
     const printContainer = document.createElement('div');
     printContainer.id = 'printable-note-container';
-    
+
     // Força fundo branco sem padding excessivo (as margens são controladas pelo @page)
     printContainer.style.backgroundColor = 'white';
     printContainer.style.width = '100%';
     printContainer.style.margin = '0';
     printContainer.style.padding = '0';
 
-    const dateStr = note.updatedAt 
-      ? format(note.updatedAt.toDate(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) 
+    const dateStr = note.updatedAt
+      ? format(note.updatedAt.toDate(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
       : 'Agora';
 
     // 2. Injeta o HTML. Usamos classes prose nativas para paridade 1:1 com o editor.
@@ -1132,7 +1119,7 @@ export default function Home() {
     // 5. Aguarda um instante para o navegador reprocessar o layout e invoca a impressão nativa
     setTimeout(() => {
       window.print();
-      
+
       // 6. Limpeza (Cleanup) - Volta o app ao normal imediatamente após a janela de impressão fechar
       document.title = originalTitle; // Devolve o título original do site
       document.body.classList.remove('is-printing-note');
@@ -1199,193 +1186,191 @@ export default function Home() {
     <div className={`flex h-screen overflow-hidden bg-[var(--background)] ${isFullscreen ? 'p-0' : ''} touch-pan-y md:touch-auto`}>
       {/* SIDEBAR - Permanente, oculta apenas no Modo Foco */}
       <motion.aside
-            initial={false}
-            animate={{ 
-              width: isFullscreen ? 0 : 320,
-              opacity: isFullscreen ? 0 : 1,
-              x: isFullscreen ? -320 : 0
-            }}
-            className="hidden lg:flex flex-col bg-[var(--sidebar-bg)] border-r border-[var(--border)] relative z-30 overflow-hidden"
-          >
-            <div className="p-10 flex-1 flex flex-col h-full">
-            <div className="mb-10 flex items-center justify-between">
-              <h2 className="font-serif italic text-3xl tracking-tight flex items-center gap-2">
-                Cérebro²
-              </h2>
-              <button
-                onClick={toggleTheme}
-                className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-none transition-colors text-[var(--foreground)] opacity-60 hover:opacity-100"
-                title="Trocar Tema"
-              >
-                {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-              </button>
-            </div>
+        initial={false}
+        animate={{
+          width: isFullscreen ? 0 : 320,
+          opacity: isFullscreen ? 0 : 1,
+          x: isFullscreen ? -320 : 0
+        }}
+        className="hidden lg:flex flex-col bg-[var(--sidebar-bg)] border-r border-[var(--border)] relative z-30 overflow-hidden"
+      >
+        <div className="p-10 flex-1 flex flex-col h-full">
+          <div className="mb-10 flex items-center justify-between">
+            <h2 className="font-serif italic text-3xl tracking-tight flex items-center gap-2">
+              Cérebro²
+            </h2>
+            <button
+              onClick={toggleTheme}
+              className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-none transition-colors text-[var(--foreground)] opacity-60 hover:opacity-100"
+              title="Trocar Tema"
+            >
+              {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+            </button>
+          </div>
 
-            <div className="mb-10">
-              <button
-                onClick={createNewNote}
-                className="w-full bg-[var(--accent)] text-[var(--accent-foreground)] py-4 px-4 text-xs font-bold uppercase tracking-widest hover:opacity-90 transition-all shadow-[4px_4px_0px_rgba(0,0,0,0.1)] border border-black/5"
-              >
-                Nova Nota
-              </button>
-            </div>
+          <div className="mb-10">
+            <button
+              onClick={createNewNote}
+              className="w-full bg-[var(--accent)] text-[var(--accent-foreground)] py-4 px-4 text-xs font-bold uppercase tracking-widest hover:opacity-90 transition-all shadow-[4px_4px_0px_rgba(0,0,0,0.1)] border border-black/5"
+            >
+              Nova Nota
+            </button>
+          </div>
 
-            <nav className="flex-1 overflow-y-auto pb-6 space-y-8 custom-scrollbar">
-              <div className="space-y-4">
-                <p className="text-[10px] uppercase tracking-widest text-[var(--foreground)]/40 font-bold">Principal</p>
-                <div className="space-y-1">
-                  <button
-                    onClick={() => {
-                      setView('all');
-                      setActiveTag(null);
-                    }}
-                    className={`w-full flex items-center justify-between px-2 py-2 rounded-none transition-all text-sm font-medium ${view === 'all' && !activeTag ? 'bg-[var(--muted)] text-[var(--foreground)]' : 'text-[var(--foreground)] opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <FileText className={`w-4 h-4 ${view === 'all' && !activeTag ? 'opacity-100' : 'opacity-40'}`} />
-                      Todas as Notas
-                    </div>
-                    <span className="text-[10px] opacity-60 font-mono">{notes.length}</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setView('favorites');
-                      setActiveTag(null);
-                    }}
-                    className={`w-full flex items-center justify-between px-2 py-2 rounded-none transition-all text-sm font-medium ${view === 'favorites' ? 'bg-[var(--muted)] text-[var(--foreground)]' : 'text-[var(--foreground)] opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Star className={`w-4 h-4 ${view === 'favorites' ? 'text-yellow-500 fill-yellow-500' : 'opacity-40'}`} />
-                      Favoritos
-                    </div>
-                    <span className="text-[10px] opacity-60 font-mono">{notes.filter(n => n.isBookmarked).length}</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setView('reminders');
-                      setActiveTag(null);
-                    }}
-                    className={`w-full flex items-center justify-between px-2 py-2 rounded-none transition-all text-sm font-medium ${view === 'reminders' ? 'bg-[var(--muted)] text-[var(--foreground)]' : 'text-[var(--foreground)] opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Bell className={`w-4 h-4 ${view === 'reminders' ? 'text-[var(--accent)]' : 'opacity-40'}`} />
-                      Lembretes
-                    </div>
-                    <span className="text-[10px] opacity-60 font-mono">{notes.filter(n => n.reminder).length}</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setView('completed');
-                      setActiveTag(null);
-                    }}
-                    className={`w-full flex items-center justify-between px-2 py-2 rounded-none transition-all text-sm font-medium ${view === 'completed' ? 'bg-[var(--muted)] text-[var(--foreground)]' : 'text-[var(--foreground)] opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <CheckCircle className={`w-4 h-4 ${view === 'completed' ? 'text-green-500' : 'opacity-40'}`} />
-                      Notas Concluídas
-                    </div>
-                    <span className="text-[10px] opacity-60 font-mono">{notes.filter(n => n.isCompleted).length}</span>
-                  </button>
-                </div>
-                <Link
-                  href="/dashboard"
-                  className="block w-full text-left text-sm font-medium transition-all hover:italic hover:pl-2 text-accent flex items-center gap-2 pt-2"
+          <nav className="flex-1 overflow-y-auto pb-6 space-y-8 custom-scrollbar">
+            <div className="space-y-4">
+              <p className="text-[10px] uppercase tracking-widest text-[var(--foreground)]/40 font-bold">Principal</p>
+              <div className="space-y-1">
+                <button
+                  onClick={() => {
+                    setView('all');
+                    setActiveTag(null);
+                  }}
+                  className={`w-full flex items-center justify-between px-2 py-2 rounded-none transition-all text-sm font-medium ${view === 'all' && !activeTag ? 'bg-[var(--muted)] text-[var(--foreground)]' : 'text-[var(--foreground)] opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}
                 >
-                  <Brain className="w-4 h-4 opacity-40" />
-                  Dashboard Neural
-                </Link>
+                  <div className="flex items-center gap-3">
+                    <FileText className={`w-4 h-4 ${view === 'all' && !activeTag ? 'opacity-100' : 'opacity-40'}`} />
+                    Todas as Notas
+                  </div>
+                  <span className="text-[10px] opacity-60 font-mono">{notes.length}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setView('favorites');
+                    setActiveTag(null);
+                  }}
+                  className={`w-full flex items-center justify-between px-2 py-2 rounded-none transition-all text-sm font-medium ${view === 'favorites' ? 'bg-[var(--muted)] text-[var(--foreground)]' : 'text-[var(--foreground)] opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Star className={`w-4 h-4 ${view === 'favorites' ? 'text-yellow-500 fill-yellow-500' : 'opacity-40'}`} />
+                    Favoritos
+                  </div>
+                  <span className="text-[10px] opacity-60 font-mono">{notes.filter(n => n.isBookmarked).length}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setView('reminders');
+                    setActiveTag(null);
+                  }}
+                  className={`w-full flex items-center justify-between px-2 py-2 rounded-none transition-all text-sm font-medium ${view === 'reminders' ? 'bg-[var(--muted)] text-[var(--foreground)]' : 'text-[var(--foreground)] opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Bell className={`w-4 h-4 ${view === 'reminders' ? 'text-[var(--accent)]' : 'opacity-40'}`} />
+                    Lembretes
+                  </div>
+                  <span className="text-[10px] opacity-60 font-mono">{notes.filter(n => n.reminder).length}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setView('completed');
+                    setActiveTag(null);
+                  }}
+                  className={`w-full flex items-center justify-between px-2 py-2 rounded-none transition-all text-sm font-medium ${view === 'completed' ? 'bg-[var(--muted)] text-[var(--foreground)]' : 'text-[var(--foreground)] opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <CheckCircle className={`w-4 h-4 ${view === 'completed' ? 'text-green-500' : 'opacity-40'}`} />
+                    Notas Concluídas
+                  </div>
+                  <span className="text-[10px] opacity-60 font-mono">{notes.filter(n => n.isCompleted).length}</span>
+                </button>
               </div>
+              <Link
+                href="/dashboard"
+                className="block w-full text-left text-sm font-medium transition-all hover:italic hover:pl-2 text-accent flex items-center gap-2 pt-2"
+              >
+                <Brain className="w-4 h-4 opacity-40" />
+                Dashboard Neural
+              </Link>
+            </div>
 
-              <div className="">
-                <p className="text-[10px] uppercase tracking-widest text-[var(--foreground)]/40 font-bold mb-4">Etiquetas</p>
-                <div className="flex flex-wrap gap-2">
-                  {allTags.length === 0 ? (
-                    <p className="text-xs text-muted-foreground italic">Nenhuma tag ainda</p>
-                  ) : (
-                    <>
-                      {allTags.slice(0, showAllSidebarTags ? undefined : 5).map(tag => (
-                        <TagButton
-                          key={tag}
-                          tag={tag}
-                          isActive={activeTag === tag}
-                          onClick={() => setActiveTag(tag === activeTag ? null : tag)}
-                        />
-                      ))}
-                      {allTags.length > 5 && (
-                        <button
-                          onClick={() => setShowAllSidebarTags(!showAllSidebarTags)}
-                          className="w-full text-[9px] font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity py-2 border border-[var(--border)] border-dashed hover:border-[var(--accent)]/30 hover:bg-[var(--accent)]/5 mt-2"
-                        >
-                          {showAllSidebarTags ? 'Ver menos' : `+${allTags.length - 5} Ver todas`}
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
+            <div className="">
+              <p className="text-[10px] uppercase tracking-widest text-[var(--foreground)]/40 font-bold mb-4">Etiquetas</p>
+              <div className="flex flex-wrap gap-2">
+                {allTags.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic">Nenhuma tag ainda</p>
+                ) : (
+                  <>
+                    {allTags.slice(0, showAllSidebarTags ? undefined : 5).map(tag => (
+                      <TagButton
+                        key={tag}
+                        tag={tag}
+                        isActive={activeTag === tag}
+                        onClick={() => setActiveTag(tag === activeTag ? null : tag)}
+                      />
+                    ))}
+                    {allTags.length > 5 && (
+                      <button
+                        onClick={() => setShowAllSidebarTags(!showAllSidebarTags)}
+                        className="w-full text-[9px] font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity py-2 border border-[var(--border)] border-dashed hover:border-[var(--accent)]/30 hover:bg-[var(--accent)]/5 mt-2"
+                      >
+                        {showAllSidebarTags ? 'Ver menos' : `+${allTags.length - 5} Ver todas`}
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
-            </nav>
+            </div>
+          </nav>
 
-            <div className="pt-8 border-t border-[var(--border)]">
-              {/* Firebase Usage Monitor */}
-              <div className="mb-6 space-y-2">
-                <div className="flex items-center justify-between gap-2 flex-nowrap">
-                  <span className="text-[9px] font-bold uppercase tracking-widest opacity-40 whitespace-nowrap">Capacidade Neural</span>
-                  <span className="text-[9px] font-mono opacity-40 whitespace-nowrap">{storageUsage.formatted} / 1GB</span>
-                </div>
-                <div className="h-1 w-full bg-[var(--muted)] rounded-none overflow-hidden border border-black/5">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: `${storageUsage.percentage}%` }}
-                    className={`h-full transition-colors ${
-                      storageUsage.percentage > 90 ? 'bg-red-500' : 
-                      storageUsage.percentage > 70 ? 'bg-orange-500' : 
-                      'bg-[var(--accent)]'
+          <div className="pt-8 border-t border-[var(--border)]">
+            {/* Firebase Usage Monitor */}
+            <div className="mb-6 space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-nowrap">
+                <span className="text-[9px] font-bold uppercase tracking-widest opacity-40 whitespace-nowrap">Capacidade Neural</span>
+                <span className="text-[9px] font-mono opacity-40 whitespace-nowrap">{storageUsage.formatted} / 1GB</span>
+              </div>
+              <div className="h-1 w-full bg-[var(--muted)] rounded-none overflow-hidden border border-black/5">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${storageUsage.percentage}%` }}
+                  className={`h-full transition-colors ${storageUsage.percentage > 90 ? 'bg-red-500' :
+                      storageUsage.percentage > 70 ? 'bg-orange-500' :
+                        'bg-[var(--accent)]'
                     }`}
-                  />
-                </div>
-                <p className="text-[8px] italic opacity-30 leading-tight">Limite do Plano Gratuito (Firestore)</p>
-              </div>
-
-              <div className="flex items-center gap-2 text-green-600 mb-6">
-                <div className="w-2 h-2 rounded-none bg-current animate-pulse"></div>
-                <span className="text-[11px] font-bold uppercase tracking-wider">Sincronizado</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Image
-                  src={user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`}
-                  width={32}
-                  height={32}
-                  className="rounded-none border border-border"
-                  alt="Avatar"
-                  referrerPolicy="no-referrer"
                 />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[11px] font-bold truncate uppercase tracking-widest">{user.displayName || 'Usuário'}</p>
-                </div>
-                <button
-                  onClick={() => setIsSettingsOpen(true)}
-                  className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)] rounded-none transition-colors"
-                  title="Configurações"
-                >
-                  <Settings className="w-3 h-3" />
-                </button>
-                <button
-                  onClick={logOut}
-                  className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)] rounded-none transition-colors"
-                  title="Sair"
-                >
-                  <LogOut className="w-3 h-3" />
-                </button>
               </div>
+              <p className="text-[8px] italic opacity-30 leading-tight">Limite do Plano Gratuito (Firestore)</p>
+            </div>
+
+            <div className="flex items-center gap-2 text-green-600 mb-6">
+              <div className="w-2 h-2 rounded-none bg-current animate-pulse"></div>
+              <span className="text-[11px] font-bold uppercase tracking-wider">Sincronizado</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Image
+                src={user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`}
+                width={32}
+                height={32}
+                className="rounded-none border border-border"
+                alt="Avatar"
+                referrerPolicy="no-referrer"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-bold truncate uppercase tracking-widest">{user.displayName || 'Usuário'}</p>
+              </div>
+              <button
+                onClick={() => setIsSettingsOpen(true)}
+                className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)] rounded-none transition-colors"
+                title="Configurações"
+              >
+                <Settings className="w-3 h-3" />
+              </button>
+              <button
+                onClick={logOut}
+                className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)] rounded-none transition-colors"
+                title="Sair"
+              >
+                <LogOut className="w-3 h-3" />
+              </button>
             </div>
           </div>
-        </motion.aside>
+        </div>
+      </motion.aside>
 
 
 
       {/* NOTE LIST - Hidden on mobile if editor is open */}
       <section className={`w-full md:w-80 border-r border-[var(--border)] bg-[var(--background)] flex flex-col relative z-10 
-        ${isFullscreen ? 'hidden' : ''} 
         ${mobileView === 'editor' ? 'hidden md:flex' : 'flex'}`}
       >
 
@@ -1394,27 +1379,27 @@ export default function Home() {
         <div className="md:hidden flex items-center justify-between p-5 pb-0 bg-[var(--background)]">
           <h2 className="font-serif italic text-2xl tracking-tight text-[var(--foreground)]">Cérebro²</h2>
           <div className="flex items-center gap-1">
-            <button 
+            <button
               onClick={() => window.dispatchEvent(new CustomEvent('open-specialist-chat'))}
               className="p-2 bg-[#FF4F00]/10 text-[#FF4F00] border border-[#FF4F00]/20 shadow-[2px_2px_0px_rgba(0,0,0,0.05)] transition-all active:scale-95"
               title="Especialista Neural"
             >
               <Brain className="w-5 h-5" />
             </button>
-            <button 
+            <button
               onClick={toggleTheme}
               className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 transition-colors"
             >
               {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
             </button>
-            <button 
+            <button
               onClick={() => setIsSettingsOpen(true)}
               className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 transition-colors"
               title="Configurações"
             >
               <Settings className="w-5 h-5" />
             </button>
-            <button 
+            <button
               onClick={logOut}
               className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 transition-colors"
               title="Sair"
@@ -1427,8 +1412,8 @@ export default function Home() {
         <div className="p-4 md:p-8 pt-2 md:pt-8">
           <div className="relative mb-2 md:mb-6">
             <SearchIcon className={`absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${isSemanticSearch ? 'text-[var(--accent)] opacity-100' : 'opacity-30'}`} />
-            <input 
-              type="text" 
+            <input
+              type="text"
               placeholder={isSemanticSearch ? "Busca Semântica ativa..." : "Buscar..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -1447,8 +1432,8 @@ export default function Home() {
               <span>{filteredNotes.length} Notas</span>
               {isSemanticSearch && semanticKeywords.length > 0 && (
                 <div className="flex items-center gap-1 text-[var(--accent)] text-[7px] animate-pulse">
-                   <div className="w-1 h-1 bg-[var(--accent)]" />
-                   CONCEITOS: {semanticKeywords.join(' · ')}
+                  <div className="w-1 h-1 bg-[var(--accent)]" />
+                  CONCEITOS: {semanticKeywords.join(' · ')}
                 </div>
               )}
             </div>
@@ -1483,45 +1468,45 @@ export default function Home() {
       {/* EDITOR - Full screen or mobile controlled */}
       <main className={`flex-1 bg-[var(--background)] flex flex-col overflow-hidden relative ${mobileView === 'list' ? 'hidden md:flex' : 'flex'}`}>
         {/* Mobile Header */}
-         <div className="md:hidden flex items-center justify-between p-4 border-b border-[var(--border)] bg-[var(--background)]">
-            <button 
-              onClick={() => {
-                setMobileView('list');
-                setIsFullscreen(false);
-              }} 
-              className="flex items-center gap-1 text-sm font-bold uppercase text-[var(--foreground)]"
+        <div className="md:hidden flex items-center justify-between p-4 border-b border-[var(--border)] bg-[var(--background)]">
+          <button
+            onClick={() => {
+              setMobileView('list');
+              setIsFullscreen(false);
+            }}
+            className="flex items-center gap-1 text-sm font-bold uppercase text-[var(--foreground)]"
+          >
+            <ArrowLeft className="w-4 h-4" /> Voltar
+          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('open-specialist-chat'))}
+              className="p-2 bg-[#FF4F00] text-white shadow-[4px_4px_0px_rgba(0,0,0,0.1)] active:scale-95 transition-all border border-black/5"
+              title="Especialista Neural"
             >
-              <ArrowLeft className="w-4 h-4" /> Voltar
+              <Brain className="w-5 h-5" />
             </button>
-            <div className="flex items-center gap-1">
-              <button 
-                onClick={() => window.dispatchEvent(new CustomEvent('open-specialist-chat'))}
-                className="p-2 bg-[#FF4F00] text-white shadow-[4px_4px_0px_rgba(0,0,0,0.1)] active:scale-95 transition-all border border-black/5"
-                title="Especialista Neural"
-              >
-                <Brain className="w-5 h-5" />
-              </button>
-              <button 
-                onClick={toggleTheme}
-                className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 transition-colors"
-              >
-                {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-              </button>
-              <button 
-                onClick={() => setIsSettingsOpen(true)}
-                className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 transition-colors"
-                title="Configurações"
-              >
-                <Settings className="w-5 h-5" />
-              </button>
-              <button 
-                onClick={logOut}
-                className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 transition-colors"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
-            </div>
-         </div>
+            <button
+              onClick={toggleTheme}
+              className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 transition-colors"
+            >
+              {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+            </button>
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 transition-colors"
+              title="Configurações"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+            <button
+              onClick={logOut}
+              className="p-2 hover:bg-[var(--muted)] text-[var(--foreground)]/60 transition-colors"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
         <AnimatePresence mode="wait">
           {activeNote ? (
             <ActiveNoteEditor
@@ -1570,7 +1555,7 @@ export default function Home() {
         <>
           <div className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-[var(--background)]/80 backdrop-blur-xl border-t border-[var(--border)] flex items-center z-40 px-4 pb-2">
             <div className="flex-1 flex justify-around pr-8">
-              <button 
+              <button
                 onClick={() => { setView('all'); setMobileView('list'); setActiveTag(null); }}
                 className={`flex flex-col items-center gap-1 transition-all ${view === 'all' && !activeTag ? 'text-[var(--foreground)] scale-105' : 'text-[var(--foreground)]/30'}`}
                 title="Notas"
@@ -1578,8 +1563,8 @@ export default function Home() {
                 <FileText className={`w-5.5 h-5.5 ${view === 'all' && !activeTag ? 'opacity-100' : 'opacity-40'}`} />
                 <span className="text-[9px] font-bold uppercase tracking-widest">Notas</span>
               </button>
-              
-              <button 
+
+              <button
                 onClick={() => { setView('favorites'); setMobileView('list'); setActiveTag(null); }}
                 className={`flex flex-col items-center gap-1 transition-all ${view === 'favorites' ? 'text-[var(--foreground)] scale-105' : 'text-[var(--foreground)]/30'}`}
                 title="Favoritos"
@@ -1592,7 +1577,7 @@ export default function Home() {
             <div className="w-16"></div> {/* Center space for FAB */}
 
             <div className="flex-1 flex justify-around pl-4">
-              <Link 
+              <Link
                 href="/dashboard"
                 className="flex flex-col items-center gap-1 text-[var(--foreground)]/30 hover:text-[var(--foreground)] transition-all"
                 title="Dashboard Neural"
@@ -1601,7 +1586,7 @@ export default function Home() {
                 <span className="text-[9px] font-bold uppercase tracking-widest">Dash</span>
               </Link>
 
-              <button 
+              <button
                 onClick={() => setIsMobileTagsModalOpen(true)}
                 className={`flex flex-col items-center gap-1 transition-all ${activeTag ? 'text-[var(--foreground)] scale-105' : 'text-[var(--foreground)]/30'}`}
                 title="Tags"
@@ -1613,7 +1598,7 @@ export default function Home() {
           </div>
 
           {/* FLOATING ACTION BUTTON (FAB) */}
-          <motion.button 
+          <motion.button
             whileHover={{ scale: 1.1, rotate: 90 }}
             whileTap={{ scale: 0.9 }}
             initial={{ scale: 0, y: 100 }}
@@ -1630,14 +1615,14 @@ export default function Home() {
       <AnimatePresence>
         {isMobileTagsModalOpen && (
           <div className="fixed inset-0 z-[60] flex items-end md:hidden">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsMobileTagsModalOpen(false)}
               className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             />
-            <motion.div 
+            <motion.div
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
@@ -1645,14 +1630,14 @@ export default function Home() {
               className="relative bg-[var(--background)] rounded-t-[2.5rem] shadow-2xl p-8 pt-10 w-full border-t border-[var(--border)] max-h-[80vh] overflow-y-auto"
             >
               <div className="w-12 h-1.5 bg-[var(--border)] rounded-none mx-auto mb-8 opacity-50" />
-              
+
               <div className="mb-8">
                 <h3 className="text-3xl font-serif mb-2 tracking-tight">Filtrar por Tags</h3>
                 <p className="text-[10px] text-[var(--foreground)]/40 uppercase font-bold tracking-[0.2em]">Selecione uma etiqueta para filtrar</p>
               </div>
 
               <div className="flex flex-wrap gap-3 mb-10">
-                <button 
+                <button
                   onClick={() => {
                     setActiveTag(null);
                     setIsMobileTagsModalOpen(false);
@@ -1662,17 +1647,16 @@ export default function Home() {
                   Todas as Notas
                 </button>
                 {allTags.map(tag => (
-                  <button 
+                  <button
                     key={tag}
                     onClick={() => {
                       setActiveTag(tag === activeTag ? null : tag);
                       setIsMobileTagsModalOpen(false);
                     }}
-                    className={`px-5 py-4 rounded-none text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 border-2 ${
-                      activeTag === tag 
-                        ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--foreground)] shadow-inner' 
+                    className={`px-5 py-4 rounded-none text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 border-2 ${activeTag === tag
+                        ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--foreground)] shadow-inner'
                         : 'border-transparent bg-[var(--muted)] text-[var(--foreground)]/60'
-                    }`}
+                      }`}
                   >
                     {activeTag === tag && <div className="w-2 h-2 bg-[var(--accent)] animate-pulse" />}
                     #{tag}
@@ -1680,7 +1664,7 @@ export default function Home() {
                 ))}
               </div>
 
-              <button 
+              <button
                 onClick={() => setIsMobileTagsModalOpen(false)}
                 className="w-full py-5 bg-[var(--muted)] text-[var(--foreground)] rounded-none font-bold uppercase text-[10px] tracking-[0.3em] hover:opacity-90 transition-all"
               >
@@ -1782,7 +1766,7 @@ export default function Home() {
                         finalTags.push(newTag);
                       }
                     }
-                    
+
                     if (activeNote) {
                       updateNote(activeNote.id, { tags: finalTags });
                     }
@@ -1797,14 +1781,14 @@ export default function Home() {
           </div>
         )}
       </AnimatePresence>
-      <CommandPalette 
-        isOpen={isCommandPaletteOpen} 
-        onClose={() => setIsCommandPaletteOpen(false)} 
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
         notes={notes}
         onAction={handleCommandAction}
       />
 
-      <AIAssistantModal 
+      <AIAssistantModal
         isOpen={isAIAssistantOpen}
         onClose={() => setIsAIAssistantOpen(false)}
         content={activeNote?.content || ""}
@@ -1817,12 +1801,12 @@ export default function Home() {
       <AnimatePresence>
         {isDeleteModalOpen && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setIsDeleteModalOpen(false)}
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
               className="relative w-full max-w-sm bg-[var(--background)] border border-red-500/30 p-8 shadow-[20px_20px_0px_rgba(239,68,68,0.1)]"
             >
@@ -1834,13 +1818,13 @@ export default function Home() {
                 Você está prestes a apagar permanentemente esta nota. Esta ação não pode ser desfeita após o período de restauração.
               </p>
               <div className="flex gap-4">
-                <button 
+                <button
                   onClick={() => setIsDeleteModalOpen(false)}
                   className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest border border-[var(--border)] hover:bg-[var(--muted)] transition-all"
                 >
                   Cancelar
                 </button>
-                <button 
+                <button
                   onClick={executeDelete}
                   className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest bg-red-500 text-white hover:bg-red-600 shadow-[4px_4px_0px_rgba(0,0,0,0.2)] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all"
                 >
@@ -1856,7 +1840,7 @@ export default function Home() {
       {/* UNDO TOAST */}
       <AnimatePresence>
         {showUndoToast && (
-          <motion.div 
+          <motion.div
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
@@ -1866,7 +1850,7 @@ export default function Home() {
               <Trash2 className="w-4 h-4 text-red-400" />
               <span className="text-xs font-bold uppercase tracking-widest">Nota excluída</span>
             </div>
-            <button 
+            <button
               onClick={undoDelete}
               className="flex items-center gap-2 text-accent text-xs font-bold uppercase tracking-widest hover:underline"
             >
@@ -1880,11 +1864,11 @@ export default function Home() {
       <AnimatePresence>
         {isReminderAlertOpen && currentReminderNote && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 bg-black/60 backdrop-blur-md"
             />
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.8, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.8, opacity: 0, y: 20 }}
@@ -1907,7 +1891,7 @@ export default function Home() {
                 </div>
 
                 <div className="w-full pt-4 flex flex-col gap-3">
-                  <button 
+                  <button
                     onClick={() => {
                       if (currentReminderNote) {
                         const noteId = currentReminderNote.id;
@@ -1920,7 +1904,7 @@ export default function Home() {
                   >
                     <ArrowRight className="w-4 h-4" /> Expandir Pensamento
                   </button>
-                  <button 
+                  <button
                     onClick={() => setIsReminderAlertOpen(false)}
                     className="w-full py-3 text-[10px] font-bold uppercase tracking-[0.2em] opacity-40 hover:opacity-100 transition-all"
                   >
@@ -1937,12 +1921,12 @@ export default function Home() {
       <AnimatePresence>
         {isSettingsOpen && (
           <div className="fixed inset-0 z-[250] flex items-center justify-center p-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setIsSettingsOpen(false)}
               className="absolute inset-0 bg-black/60 backdrop-blur-md"
             />
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
@@ -1965,7 +1949,7 @@ export default function Home() {
                       <Bell className="w-5 h-5 text-[var(--accent)]" />
                       <h3 className="text-sm font-bold uppercase tracking-widest">Alarme Neural</h3>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       {[
                         { id: 'neural', name: 'Neural', desc: 'Sutil e decrescente' },
@@ -1980,11 +1964,10 @@ export default function Home() {
                             localStorage.setItem('alarmType', type.id);
                             playNeuralSound(type.id);
                           }}
-                          className={`text-left p-4 border-2 transition-all group ${
-                            alarmType === type.id 
-                              ? 'border-[var(--accent)] bg-[var(--accent)]/5' 
+                          className={`text-left p-4 border-2 transition-all group ${alarmType === type.id
+                              ? 'border-[var(--accent)] bg-[var(--accent)]/5'
                               : 'border-[var(--border)] hover:border-[var(--accent)]/30'
-                          }`}
+                            }`}
                         >
                           <div className="flex items-center justify-between mb-2">
                             <span className={`text-[10px] font-bold uppercase tracking-widest ${alarmType === type.id ? 'text-[var(--accent)]' : 'opacity-40'}`}>
@@ -2009,7 +1992,7 @@ export default function Home() {
                         <div key={tag} className="group relative">
                           <span className="px-3 py-2 bg-[var(--muted)] text-[var(--foreground)] text-[10px] font-bold uppercase tracking-widest border border-[var(--border)] flex items-center gap-2">
                             #{tag}
-                            <button 
+                            <button
                               onClick={() => {
                                 setGlobalTagToDelete(tag);
                                 setIsGlobalTagDeleteModalOpen(true);
@@ -2047,12 +2030,12 @@ export default function Home() {
       <AnimatePresence>
         {isTagDeleteModalOpen && tagToDelete && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setIsTagDeleteModalOpen(false)}
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
               className="relative w-full max-w-sm bg-[var(--background)] border border-red-500/30 p-8 shadow-[20px_20px_0px_rgba(239,68,68,0.1)]"
             >
@@ -2064,13 +2047,13 @@ export default function Home() {
                 Deseja remover a etiqueta <span className="font-bold text-[var(--foreground)]">#{tagToDelete.tag}</span> deste pensamento?
               </p>
               <div className="flex gap-4">
-                <button 
+                <button
                   onClick={() => setIsTagDeleteModalOpen(false)}
                   className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest border border-[var(--border)] hover:bg-[var(--muted)] transition-all"
                 >
                   Cancelar
                 </button>
-                <button 
+                <button
                   onClick={executeTagDelete}
                   className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest bg-red-500 text-white hover:bg-red-600 shadow-[4px_4px_0px_rgba(0,0,0,0.2)] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all"
                 >
@@ -2086,12 +2069,12 @@ export default function Home() {
       <AnimatePresence>
         {isGlobalTagDeleteModalOpen && globalTagToDelete && (
           <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setIsGlobalTagDeleteModalOpen(false)}
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
               className="relative w-full max-w-sm bg-[var(--background)] border border-red-500/30 p-8 shadow-[20px_20px_0px_rgba(239,68,68,0.1)]"
             >
@@ -2103,13 +2086,13 @@ export default function Home() {
                 Você está prestes a remover a tag <span className="font-bold text-[var(--foreground)]">#{globalTagToDelete}</span> de <span className="font-bold text-[var(--foreground)] font-serif italic">{notes.filter(n => n.tags?.includes(globalTagToDelete)).length} notas</span>. Deseja continuar?
               </p>
               <div className="flex gap-4">
-                <button 
+                <button
                   onClick={() => setIsGlobalTagDeleteModalOpen(false)}
                   className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest border border-[var(--border)] hover:bg-[var(--muted)] transition-all"
                 >
                   Cancelar
                 </button>
-                <button 
+                <button
                   onClick={executeGlobalTagDelete}
                   className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest bg-red-500 text-white hover:bg-red-600 shadow-[4px_4px_0px_rgba(0,0,0,0.2)] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all"
                 >
@@ -2124,7 +2107,7 @@ export default function Home() {
       {/* TAG UNDO TOAST */}
       <AnimatePresence>
         {showTagUndoToast && (
-          <motion.div 
+          <motion.div
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
@@ -2136,7 +2119,7 @@ export default function Home() {
                 {lastDeletedTag?.affectedNoteIds ? `Tag removida de ${lastDeletedTag.affectedNoteIds.length} notas` : `Tag removida: #${lastDeletedTag?.tag}`}
               </span>
             </div>
-            <button 
+            <button
               onClick={undoTagDelete}
               className="flex items-center gap-2 text-accent text-xs font-bold uppercase tracking-widest hover:underline"
             >

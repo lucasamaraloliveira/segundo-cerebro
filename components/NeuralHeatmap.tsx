@@ -2,12 +2,12 @@
 
 import React, { useMemo } from 'react';
 import { Note } from '@/lib/types';
-import { 
-  format, 
-  subDays, 
-  isSameDay, 
-  eachDayOfInterval, 
-  startOfToday, 
+import {
+  format,
+  subDays,
+  isSameDay,
+  eachDayOfInterval,
+  startOfToday,
   differenceInDays,
   startOfMonth,
   endOfMonth
@@ -97,7 +97,7 @@ export default function NeuralHeatmap({ notes }: NeuralHeatmapProps) {
         <div className="bg-[var(--muted)]/20 border border-[var(--border)] p-8 shadow-[10px_10px_0px_rgba(0,0,0,0.05)]">
           <div className="flex flex-wrap gap-2 justify-center">
             {activityData.map((data, i) => (
-              <div 
+              <div
                 key={i}
                 className={`w-4 h-4 rounded-sm transition-all hover:scale-125 hover:z-10 cursor-help ${intensityColors[data.intensity]}`}
                 title={`${format(data.day, 'dd/MM')}: ${data.count} notas atualizadas`}
@@ -127,9 +127,9 @@ export default function NeuralHeatmap({ notes }: NeuralHeatmapProps) {
           <div className="space-y-4">
             {tagInsights.topFocus.map(tag => (
               <div key={tag.name} className="relative p-4 bg-[var(--muted)]/30 border border-[var(--border)] overflow-hidden group">
-                <div 
-                  className="absolute left-0 top-0 bottom-0 bg-[var(--accent)]/10 transition-all duration-1000" 
-                  style={{ width: `${Math.min(100, (tag.count / notes.length) * 300)}%` }} 
+                <div
+                  className="absolute left-0 top-0 bottom-0 bg-[var(--accent)]/10 transition-all duration-1000"
+                  style={{ width: `${Math.min(100, (tag.count / notes.length) * 300)}%` }}
                 />
                 <div className="relative flex justify-between items-center">
                   <span className="font-serif italic text-lg text-[var(--accent)]">#{tag.name}</span>
