@@ -323,6 +323,23 @@ const CustomSelect = ({
   );
 };
 
+const cleanHtmlTags = (text: string) => {
+  if (!text) return '';
+  return text
+    // Replace <bold> or <strong> or <b> tags with markdown **
+    .replace(/<(?:bold|strong|b)(?:\s+[^>]*?)?>(.*?)<\/(?:bold|strong|b)>/gi, '**$1**')
+    // Replace <em> or <i> tags with markdown *
+    .replace(/<(?:em|i)(?:\s+[^>]*?)?>(.*?)<\/(?:em|i)>/gi, '*$1*')
+    // Replace h1, h2, h3 tags with markdown #, ##, ###
+    .replace(/<h1(?:\s+[^>]*?)?>(.*?)<\/h1>/gi, '# $1')
+    .replace(/<h2(?:\s+[^>]*?)?>(.*?)<\/h2>/gi, '## $1')
+    .replace(/<h3(?:\s+[^>]*?)?>(.*?)<\/h3>/gi, '### $1')
+    // Replace p tags
+    .replace(/<p(?:\s+[^>]*?)?>(.*?)<\/p>/gi, '\n\n$1\n\n')
+    // Replace br tags
+    .replace(/<br\s*\/?>/gi, '\n');
+};
+
 const markdownToHtml = (markdown: string) => {
   if (!markdown) return '';
   
@@ -482,7 +499,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
       if (data.text) {
         // Apply formatted text to the editor
         if (editor) {
-          editor.chain().focus().insertContent(markdownToHtml(data.text)).run();
+          editor.chain().focus().insertContent(markdownToHtml(cleanHtmlTags(data.text))).run();
         }
         // Success: clear audio and close modal
         handleDeleteAudio(true); // Bypass confirmation to clean up after successful use
@@ -822,15 +839,15 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
         : "w-full border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur-sm sticky top-0 z-30 px-6 py-2.5 flex items-center justify-between gap-4"
       }>
         <div className={isFocusMode 
-          ? "pointer-events-auto bg-[var(--background)]/90 backdrop-blur-xl border border-[var(--border)] shadow-[6px_6px_0px_rgba(0,0,0,0.15)] rounded-none px-2.5 py-1 md:px-3 md:py-1.5 flex items-center gap-1 md:gap-0.5 max-w-[95vw] md:max-w-full overflow-visible no-scrollbar transition-all hover:shadow-[8px_8px_0px_rgba(0,0,0,0.2)]"
-          : "pointer-events-auto flex flex-wrap items-center gap-1 md:gap-1.5 w-full overflow-visible"
+          ? "pointer-events-auto bg-[var(--background)]/90 backdrop-blur-xl border border-[var(--border)] shadow-[6px_6px_0px_rgba(0,0,0,0.15)] rounded-none px-2.5 py-1 xl:px-3 xl:py-1.5 flex items-center gap-1 xl:gap-0.5 max-w-[95vw] xl:max-w-full overflow-visible no-scrollbar transition-all hover:shadow-[8px_8px_0px_rgba(0,0,0,0.2)]"
+          : "pointer-events-auto flex flex-wrap xl:flex-nowrap items-center gap-1 xl:gap-1.5 w-full overflow-x-auto no-scrollbar"
         }>
         <div className="flex items-center mr-0.5">
           <ToolbarButton onClick={() => editor.chain().focus().undo().run()} title="Desfazer">
-            <Undo className="w-4 h-4 md:w-3.5 md:h-3.5" />
+            <Undo className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
           </ToolbarButton>
           <ToolbarButton onClick={() => editor.chain().focus().redo().run()} title="Refazer">
-            <Redo className="w-4 h-4 md:w-3.5 md:h-3.5" />
+            <Redo className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
           </ToolbarButton>
         </div>
 
@@ -840,51 +857,49 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
             isActive={editor.isActive('bold')} 
             title="Negrito"
           >
-            <Bold className="w-4 h-4 md:w-3.5 md:h-3.5" />
+            <Bold className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
           </ToolbarButton>
           <ToolbarButton 
             onClick={() => editor.chain().focus().toggleItalic().run()} 
             isActive={editor.isActive('italic')} 
             title="Itálico"
           >
-            <Italic className="w-4 h-4 md:w-3.5 md:h-3.5" />
+            <Italic className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
           </ToolbarButton>
           <ToolbarButton 
             onClick={() => editor.chain().focus().toggleUnderline().run()} 
             isActive={editor.isActive('underline')} 
             title="Sublinhado"
           >
-            <UnderlineIcon className="w-4 h-4 md:w-3.5 md:h-3.5" />
+            <UnderlineIcon className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
           </ToolbarButton>
         </div>
 
-        {isFocusMode && (
-          <div className="hidden md:flex items-center gap-1 mr-1 animate-in fade-in slide-in-from-left-2 duration-300">
-            <CustomSelect 
-              label="Fonte"
-              icon={Type}
-              value={
-                editor.isActive('textStyle', { fontFamily: 'Inter' }) ? 'Inter' :
-                editor.isActive('textStyle', { fontFamily: 'Playfair Display' }) ? 'Playfair' :
-                editor.isActive('textStyle', { fontFamily: 'Georgia' }) ? 'Georgia' :
-                editor.isActive('textStyle', { fontFamily: 'monospace' }) ? 'Mono' : ''
-              }
-              onChange={(val) => editor.chain().focus().setFontFamily(val).run()}
-              options={[
-                { label: 'Inter', value: 'Inter' },
-                { label: 'Playfair', value: 'Playfair Display' },
-                { label: 'Georgia', value: 'Georgia' },
-                { label: 'Monospace', value: 'monospace' },
-              ]}
-            />
-          </div>
-        )}
+        <div className="hidden xl:flex items-center gap-1 mr-1 animate-in fade-in slide-in-from-left-2 duration-300">
+          <CustomSelect 
+            label="Fonte"
+            icon={Type}
+            value={
+              editor.isActive('textStyle', { fontFamily: 'Inter' }) ? 'Inter' :
+              editor.isActive('textStyle', { fontFamily: 'Playfair Display' }) ? 'Playfair' :
+              editor.isActive('textStyle', { fontFamily: 'Georgia' }) ? 'Georgia' :
+              editor.isActive('textStyle', { fontFamily: 'monospace' }) ? 'Mono' : ''
+            }
+            onChange={(val) => editor.chain().focus().setFontFamily(val).run()}
+            options={[
+              { label: 'Inter', value: 'Inter' },
+              { label: 'Playfair', value: 'Playfair Display' },
+              { label: 'Georgia', value: 'Georgia' },
+              { label: 'Monospace', value: 'monospace' },
+            ]}
+          />
+        </div>
 
-        <div className="hidden md:flex items-center gap-1 mr-1 animate-in fade-in slide-in-from-left-2 duration-300">
+        <div className="hidden xl:flex items-center gap-1 mr-1 animate-in fade-in slide-in-from-left-2 duration-300">
           <CustomSelect 
             label="Tamanho"
             icon={Type}
-            hideLabel={!isFocusMode}
+            hideLabel={false}
             value={editor.getAttributes('textStyle').fontSize || '16px'}
             onChange={(val) => editor.chain().focus().setFontSize(val).run()}
             options={[
@@ -900,44 +915,42 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
           />
         </div>
 
-        {isFocusMode && (
-          <div className="hidden md:flex items-center gap-1 mr-1 animate-in fade-in slide-in-from-left-2 duration-300">
-            <CustomSelect 
-              label="Cor"
-              icon={Palette}
-              value={editor.getAttributes('textStyle').color || 'Padrão'}
-              onChange={(val) => {
-                if (val === 'default') editor.chain().focus().unsetColor().run();
-                else editor.chain().focus().setColor(val).run();
-              }}
-              options={[
-                { label: 'Padrão', value: 'default' },
-                { label: 'Preto', value: '#000000' },
-                { label: 'Cinza', value: '#666666' },
-                { label: 'Vermelho', value: '#EF4444' },
-                { label: 'Laranja', value: '#F97316' },
-                { label: 'Amarelo', value: '#EAB308' },
-                { label: 'Verde', value: '#22C55E' },
-                { label: 'Azul', value: '#3B82F6' },
-                { label: 'Roxo', value: '#A855F7' },
-              ]}
-            />
-            <ToolbarButton 
-              onClick={() => editor.chain().focus().toggleBlockquote().run()} 
-              isActive={editor.isActive('blockquote')} 
-              title="Citação"
-            >
-              <Quote className="w-4 h-4 md:w-3.5 md:h-3.5" />
-            </ToolbarButton>
-            <ToolbarButton 
-              onClick={() => editor.chain().focus().toggleCodeBlock().run()} 
-              isActive={editor.isActive('codeBlock')} 
-              title="Bloco de Código"
-            >
-              <SquareCode className="w-4 h-4 md:w-3.5 md:h-3.5" />
-            </ToolbarButton>
-          </div>
-        )}
+        <div className="hidden xl:flex items-center gap-1 mr-1 animate-in fade-in slide-in-from-left-2 duration-300">
+          <CustomSelect 
+            label="Cor"
+            icon={Palette}
+            value={editor.getAttributes('textStyle').color || 'Padrão'}
+            onChange={(val) => {
+              if (val === 'default') editor.chain().focus().unsetColor().run();
+              else editor.chain().focus().setColor(val).run();
+            }}
+            options={[
+              { label: 'Padrão', value: 'default' },
+              { label: 'Preto', value: '#000000' },
+              { label: 'Cinza', value: '#666666' },
+              { label: 'Vermelho', value: '#EF4444' },
+              { label: 'Laranja', value: '#F97316' },
+              { label: 'Amarelo', value: '#EAB308' },
+              { label: 'Verde', value: '#22C55E' },
+              { label: 'Azul', value: '#3B82F6' },
+              { label: 'Roxo', value: '#A855F7' },
+            ]}
+          />
+          <ToolbarButton 
+            onClick={() => editor.chain().focus().toggleBlockquote().run()} 
+            isActive={editor.isActive('blockquote')} 
+            title="Citação"
+          >
+            <Quote className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
+          </ToolbarButton>
+          <ToolbarButton 
+            onClick={() => editor.chain().focus().toggleCodeBlock().run()} 
+            isActive={editor.isActive('codeBlock')} 
+            title="Bloco de Código"
+          >
+            <SquareCode className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
+          </ToolbarButton>
+        </div>
 
         <div className="flex items-center mr-0.5">
           <ToolbarButton 
@@ -945,43 +958,40 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
             isActive={editor.isActive('bulletList')} 
             title="Lista"
           >
-            <List className="w-4 h-4 md:w-3.5 md:h-3.5" />
+            <List className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
           </ToolbarButton>
           <ToolbarButton 
             onClick={() => editor.chain().focus().toggleTaskList().run()} 
             isActive={editor.isActive('taskList')} 
             title="Tarefas"
           >
-            <CheckSquare className="w-4 h-4 md:w-3.5 md:h-3.5" />
+            <CheckSquare className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
           </ToolbarButton>
-          {isFocusMode && (
-            <>
-              <ToolbarButton 
-                onClick={() => {
-                  const url = window.prompt('URL externa:');
-                  if (url) {
-                    if (url === '') editor.chain().focus().unsetLink().run();
-                    else editor.chain().focus().setLink({ href: url }).run();
-                  }
-                }} 
-                isActive={editor.isActive('link')} 
-                title="Link Externo"
-              >
-                <LinkIcon className="w-4 h-4 md:w-3.5 md:h-3.5" />
-              </ToolbarButton>
-              <ToolbarButton 
-                onClick={() => setNoteLinkModal(true)} 
-                isActive={false} 
-                title="Conectar Nota"
-                className="hidden md:inline-flex"
-              >
-                <Layers className="w-4 h-4 md:w-3.5 md:h-3.5 text-[var(--accent)]" />
-              </ToolbarButton>
-            </>
-          )}
+          <ToolbarButton 
+            onClick={() => {
+              const url = window.prompt('URL externa:');
+              if (url) {
+                if (url === '') editor.chain().focus().unsetLink().run();
+                else editor.chain().focus().setLink({ href: url }).run();
+              }
+            }} 
+            isActive={editor.isActive('link')} 
+            title="Link Externo"
+            className={isFocusMode ? "" : "hidden xl:inline-flex"}
+          >
+            <LinkIcon className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
+          </ToolbarButton>
+          <ToolbarButton 
+            onClick={() => setNoteLinkModal(true)} 
+            isActive={false} 
+            title="Conectar Nota"
+            className="hidden xl:inline-flex"
+          >
+            <Layers className="w-4 h-4 xl:w-3.5 xl:h-3.5 text-[var(--accent)]" />
+          </ToolbarButton>
         </div>
 
-        <div className="hidden md:flex items-center mr-1 animate-in fade-in slide-in-from-left-2 duration-300">
+        <div className="hidden xl:flex items-center mr-1 animate-in fade-in slide-in-from-left-2 duration-300">
           <CustomSelect 
             label="Alinhar"
             icon={
@@ -989,7 +999,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
               editor.isActive({ textAlign: 'right' }) ? AlignRight :
               editor.isActive({ textAlign: 'justify' }) ? AlignJustify : AlignLeft
             }
-            hideLabel={!isFocusMode}
+            hideLabel={false}
             value={
               editor.isActive({ textAlign: 'left' }) ? 'left' :
               editor.isActive({ textAlign: 'center' }) ? 'center' :
@@ -1011,16 +1021,16 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
             onClick={() => setIsAiAutocompleteEnabled(!isAiAutocompleteEnabled)} 
             isActive={isAiAutocompleteEnabled} 
             title="Autocompletar com IA"
-            className="hidden md:inline-flex"
+            className="hidden xl:inline-flex"
           >
-            <Sparkles className="w-4 h-4 md:w-3.5 md:h-3.5" />
+            <Sparkles className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
           </ToolbarButton>
           <button
             onClick={toggleTranscription}
-            className={`w-9 h-9 md:w-7 md:h-7 flex items-center justify-center rounded-none transition-all hidden md:flex ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60'}`}
+            className={`w-9 h-9 xl:w-7 xl:h-7 flex items-center justify-center rounded-none transition-all hidden xl:flex ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60'}`}
             title="Voz para Texto"
           >
-            <Mic className="w-4 h-4 md:w-3.5 md:h-3.5" />
+            <Mic className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
           </button>
           <button
             onClick={(e) => {
@@ -1028,21 +1038,21 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
               if (isRecordingAudio) stopAudioRecording();
               else startAudioRecording();
             }}
-            className={`w-9 h-9 md:w-7 md:h-7 flex items-center justify-center rounded-none transition-all hidden md:flex ${isRecordingAudio ? 'bg-[#FF4F00] text-white animate-pulse' : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60'}`}
+            className={`w-9 h-9 xl:w-7 xl:h-7 flex items-center justify-center rounded-none transition-all hidden xl:flex ${isRecordingAudio ? 'bg-[#FF4F00] text-white animate-pulse' : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60'}`}
             title={isRecordingAudio ? "Parar Gravação" : "Gravar Áudio (Temporário)"}
           >
-            <AudioLines className="w-4 h-4 md:w-3.5 md:h-3.5" />
+            <AudioLines className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
           </button>
           <ToolbarButton 
             onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} 
             title="Limpar"
-            className="hidden md:inline-flex"
+            className="hidden xl:inline-flex"
           >
-            <Eraser className="w-4 h-4 md:w-3.5 md:h-3.5" />
+            <Eraser className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
           </ToolbarButton>
 
-          {/* Mobile "More Options" button */}
-          <div className="relative md:hidden flex items-center">
+          {/* Mobile/Notebook "More Options" button */}
+          <div className="relative xl:hidden flex items-center">
             <button
               onClick={(e) => {
                 e.preventDefault();
@@ -1055,7 +1065,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
               }`}
               title="Mais Opções"
             >
-              <MoreHorizontal className="w-4 h-4 md:w-3.5 md:h-3.5" />
+              <MoreHorizontal className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
             </button>
 
             <AnimatePresence>
@@ -1069,7 +1079,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 5, scale: 0.95 }}
-                    className="absolute right-0 bottom-full mb-2 z-[70] bg-[var(--background)]/95 backdrop-blur-xl border border-[var(--border)] shadow-[6px_6px_0px_rgba(0,0,0,0.15)] rounded-none min-w-[200px] py-1.5 overflow-hidden flex flex-col"
+                    className="absolute right-0 top-full mt-2 z-[70] bg-[var(--background)]/95 backdrop-blur-xl border border-[var(--border)] shadow-[6px_6px_0px_rgba(0,0,0,0.15)] rounded-none min-w-[200px] py-1.5 overflow-hidden flex flex-col"
                   >
                     {isFocusMode && (
                       <button

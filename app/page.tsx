@@ -1054,23 +1054,34 @@ export default function Home() {
     printContainer.style.margin = '0';
     printContainer.style.padding = '0';
 
-    const dateStr = note.updatedAt
-      ? format(note.updatedAt.toDate(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
-      : 'Agora';
+    const createdAtStr = note.createdAt
+      ? format(note.createdAt.toDate(), "dd/MM/yyyy HH:mm", { locale: ptBR })
+      : 'Desconhecida';
+    const updatedAtStr = note.updatedAt
+      ? format(note.updatedAt.toDate(), "dd/MM/yyyy HH:mm", { locale: ptBR })
+      : 'Desconhecida';
+    const tagsStr = note.tags && note.tags.length > 0
+      ? note.tags.map(tag => `<span style="display: inline-block; background: #f0f0f0; border: 1px solid #e0e0e0; border-radius: 4px; padding: 2px 6px; margin-right: 4px; font-size: 7.5pt; font-weight: 600; color: #333;">${tag}</span>`).join('')
+      : '<span style="color: #888; font-style: italic;">Nenhum</span>';
 
-    // 2. Injeta o HTML. Usamos classes prose nativas para paridade 1:1 com o editor.
+    // 2. Injeta o HTML com estilização avançada para impressão
     printContainer.innerHTML = `
       <style>
         /* Regras de impressão estritas */
         @media print {
-          @page { margin: 20mm; }
+          @page {
+            margin: 25mm 20mm 20mm 20mm;
+          }
           
           /* Reseta o tamanho da tela para evitar páginas em branco no final */
           html, body {
             height: auto !important;
             min-height: auto !important;
             background: white !important;
+            color: #111111 !important;
             overflow: visible !important;
+            font-size: 11pt;
+            line-height: 1.6;
           }
 
           /* Esconde todo o aplicativo, mostra apenas a nota */
@@ -1082,28 +1093,151 @@ export default function Home() {
             display: block !important;
           }
 
-          /* FORÇA ABSOLUTA de cor preta, esmagando qualquer herança do Tailwind/Dark Mode */
-          #printable-note-container,
+          /* Garantir boa legibilidade e cores escuras apropriadas para impressão */
           #printable-note-container * {
-            color: #000000 !important;
+            color: #111111 !important;
           }
 
           /* Oculta URLs injetadas pelo Chrome no rodapé dos links */
           a[href]:after { content: none !important; }
+
+          /* Quebra de páginas inteligente para evitar elementos órfãos */
+          h1, h2, h3, h4, h5, h6 {
+            page-break-after: avoid;
+            break-after: avoid;
+            color: #000000 !important;
+            font-weight: 700;
+          }
+
+          blockquote, pre, table, tr, li, img {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          /* Blocos de Citação */
+          blockquote {
+            border-left: 3px solid #666 !important;
+            padding-left: 15px !important;
+            margin: 15px 0 !important;
+            font-style: italic !important;
+            color: #333 !important;
+          }
+
+          /* Blocos de Código */
+          pre, code {
+            background-color: #f7f7f7 !important;
+            border: 1px solid #e1e1e1 !important;
+            border-radius: 4px !important;
+            padding: 8px 12px !important;
+            font-family: monospace !important;
+            font-size: 9.5pt !important;
+            white-space: pre-wrap !important;
+            word-break: break-all !important;
+          }
+
+          /* Tabelas */
+          table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            margin: 20px 0 !important;
+          }
+
+          th, td {
+            border: 1px solid #ddd !important;
+            padding: 8px 10px !important;
+            text-align: left !important;
+          }
+
+          th {
+            background-color: #f5f5f5 !important;
+            font-weight: bold !important;
+          }
+
+          /* Checkboxes no Tiptap para Listas de Tarefas */
+          ul[data-type="taskList"] {
+            list-style: none !important;
+            padding-left: 0 !important;
+          }
+          ul[data-type="taskList"] li {
+            display: flex !important;
+            align-items: flex-start !important;
+            gap: 8px !important;
+            margin-bottom: 6px !important;
+          }
+          ul[data-type="taskList"] input[type="checkbox"] {
+            appearance: none !important;
+            -webkit-appearance: none !important;
+            width: 12px !important;
+            height: 12px !important;
+            border: 1px solid #000 !important;
+            border-radius: 2px !important;
+            margin-top: 4px !important;
+            position: relative !important;
+            display: inline-block !important;
+            background: white !important;
+          }
+          ul[data-type="taskList"] li[data-checked="true"] input[type="checkbox"]::after {
+            content: "\\\\2713" !important; /* Símbolo check */
+            font-size: 10px !important;
+            font-weight: bold !important;
+            position: absolute !important;
+            top: -3px !important;
+            left: 1px !important;
+            color: #000 !important;
+          }
+          ul[data-type="taskList"] li[data-checked="true"] > div {
+            text-decoration: line-through !important;
+            opacity: 0.6 !important;
+          }
         }
       </style>
-      <div style="border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 30px;">
-        <h1 style="font-family: Georgia, 'Times New Roman', serif; font-size: 28pt; margin: 0 0 15px 0; font-weight: 700; line-height: 1.2; color: #000;">
+
+      <!-- Cabeçalho Técnico de Metadados e Branding -->
+      <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin-bottom: 30px; border-bottom: 2px solid #111; padding-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+              <span style="display: inline-block; width: 8px; height: 8px; background-color: #FF4F00; border-radius: 50%;"></span>
+              <span style="font-size: 8pt; font-weight: 800; tracking-widest: 0.15em; text-transform: uppercase; color: #111; letter-spacing: 0.1em;">SEGUNDO CÉREBRO</span>
+            </div>
+            <span style="font-size: 14pt; font-weight: 950; letter-spacing: 0.05em; text-transform: uppercase; color: #111;">MEMÓRIA NEURAL</span>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 7pt; font-weight: 700; color: #666; text-transform: uppercase; margin-bottom: 2px; letter-spacing: 0.05em;">REGISTRO ID</div>
+            <div style="font-size: 8.5pt; font-family: monospace; font-weight: bold; color: #111;">${note.id ? note.id.substring(0, 8).toUpperCase() : 'N/A'}</div>
+          </div>
+        </div>
+
+        <h1 style="font-family: Georgia, 'Times New Roman', serif; font-size: 26pt; margin: 15px 0 20px 0; font-weight: 700; line-height: 1.25; color: #000; letter-spacing: -0.02em;">
           ${note.title || 'Sem título'}
         </h1>
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <span style="font-size: 10pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; background: #000; color: #fff; padding: 4px 8px;">MEMÓRIA NEURAL</span>
-          <span style="font-size: 11pt; font-weight: 500; color: #666;">${dateStr}</span>
+
+        <!-- Ficha Técnico de Controle -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; background-color: #fcfcfc; border: 1px solid #e5e5e5; padding: 12px 15px; border-radius: 6px; font-size: 8.5pt; color: #111;">
+          <div>
+            <span style="color: #555; font-weight: 700; text-transform: uppercase; font-size: 7.5pt; display: block; margin-bottom: 3px; letter-spacing: 0.02em;">Criação</span>
+            <span style="font-weight: 500;">${createdAtStr}</span>
+          </div>
+          <div>
+            <span style="color: #555; font-weight: 700; text-transform: uppercase; font-size: 7.5pt; display: block; margin-bottom: 3px; letter-spacing: 0.02em;">Modificação</span>
+            <span style="font-weight: 500;">${updatedAtStr}</span>
+          </div>
+          <div>
+            <span style="color: #555; font-weight: 700; text-transform: uppercase; font-size: 7.5pt; display: block; margin-bottom: 3px; letter-spacing: 0.02em;">Marcadores</span>
+            <div style="display: flex; flex-wrap: wrap; gap: 4px; font-weight: 500;">${tagsStr}</div>
+          </div>
         </div>
       </div>
-      <!-- Classe prose garante o exato mesmo visual do editor -->
-      <div class="prose prose-sm max-w-none text-black" style="color: #000;">
+
+      <!-- Conteúdo Principal -->
+      <div class="prose prose-sm max-w-none text-black" style="color: #111; font-family: Georgia, 'Times New Roman', serif; font-size: 11pt; line-height: 1.65;">
         ${note.content}
+      </div>
+
+      <!-- Rodapé com Metadados e Hash de Assinatura -->
+      <div style="margin-top: 60px; border-top: 1px solid #e5e5e5; padding-top: 15px; display: flex; justify-content: space-between; align-items: center; font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; font-size: 7.5pt; color: #666;">
+        <span>Documento exportado via Segundo Cérebro • Sistema de Memória Neural</span>
+        <span>Impresso em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</span>
       </div>
     `;
 
@@ -1112,7 +1246,7 @@ export default function Home() {
     const originalTitle = document.title;
     document.title = note.title ? note.title.trim() : 'Nota sem título';
 
-    // 4. Acopla ao body e ativa o modo de impressão global
+    // 4. Acopla ao body e altera o modo de impressão global
     document.body.appendChild(printContainer);
     document.body.classList.add('is-printing-note');
 
@@ -1128,9 +1262,6 @@ export default function Home() {
       }
     }, 150);
   };
-
-
-
 
   const exportAsTXT = (note: Note) => {
     const element = document.createElement("a");

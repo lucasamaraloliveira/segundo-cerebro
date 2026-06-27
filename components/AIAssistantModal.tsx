@@ -17,6 +17,23 @@ import {
   Wrench
 } from 'lucide-react';
 
+const cleanHtmlTags = (text: string) => {
+  if (!text) return '';
+  return text
+    // Replace <bold> or <strong> or <b> tags with markdown **
+    .replace(/<(?:bold|strong|b)(?:\s+[^>]*?)?>(.*?)<\/(?:bold|strong|b)>/gi, '**$1**')
+    // Replace <em> or <i> tags with markdown *
+    .replace(/<(?:em|i)(?:\s+[^>]*?)?>(.*?)<\/(?:em|i)>/gi, '*$1*')
+    // Replace h1, h2, h3 tags with markdown #, ##, ###
+    .replace(/<h1(?:\s+[^>]*?)?>(.*?)<\/h1>/gi, '# $1')
+    .replace(/<h2(?:\s+[^>]*?)?>(.*?)<\/h2>/gi, '## $1')
+    .replace(/<h3(?:\s+[^>]*?)?>(.*?)<\/h3>/gi, '### $1')
+    // Replace p tags
+    .replace(/<p(?:\s+[^>]*?)?>(.*?)<\/p>/gi, '\n\n$1\n\n')
+    // Replace br tags
+    .replace(/<br\s*\/?>/gi, '\n');
+};
+
 // Simple helper to convert markdown-style response from AI to HTML for the editor
 const markdownToHtml = (markdown: string) => {
   if (!markdown) return '';
@@ -54,7 +71,7 @@ const ASSISTANT_OPTIONS = [
     description: 'Corrige erros de gramática, pontuação e melhora a fluidez do texto.',
     icon: Wand2,
     color: 'bg-blue-500',
-    prompt: (text: string) => `Você é um editor profissional. Refine o seguinte texto, corrigindo gramática, pontuação e melhorando a fluidez, mas mantendo o sentido original. Se parecer uma transcrição de áudio, limpe vícios de linguagem. Retorne APENAS o texto refinado, sem comentários.\n\nTEXTO:\n${text}`
+    prompt: (text: string) => `Você é um editor profissional. Refine o seguinte texto, corrigindo gramática, pontuação e melhorando a fluidez, mas mantendo o sentido original. Se parecer uma transcrição de áudio, limpe vícios de linguagem. Use apenas formatação Markdown padrão (como **, *, #, -) para qualquer ênfase ou estrutura. NÃO use tags HTML (como <bold>, <h3>, <em>, etc.) sob nenhuma circunstância. Retorne APENAS o texto refinado, sem comentários.\n\nTEXTO:\n${text}`
   },
   {
     id: 'summarize',
@@ -62,7 +79,7 @@ const ASSISTANT_OPTIONS = [
     description: 'Cria um resumo conciso com os pontos mais importantes.',
     icon: FileText,
     color: 'bg-purple-500',
-    prompt: (text: string) => `Crie um resumo executivo conciso do seguinte texto. Use tópicos se necessário. Retorne APENAS o resumo.\n\nTEXTO:\n${text}`
+    prompt: (text: string) => `Crie um resumo executivo conciso do seguinte texto. Use tópicos se necessário. Use apenas formatação Markdown padrão para ênfase (como **, *). Não use tags HTML em nenhuma circunstância. Retorne APENAS o resumo.\n\nTEXTO:\n${text}`
   },
   {
     id: 'tasks',
@@ -70,7 +87,7 @@ const ASSISTANT_OPTIONS = [
     description: 'Identifica compromissos e action items no texto.',
     icon: ListChecks,
     color: 'bg-green-500',
-    prompt: (text: string) => `Analise o texto abaixo e extraia apenas os itens de ação, tarefas ou compromissos mencionados. Formate como uma lista de tarefas. Se não houver tarefas, diga "Nenhuma tarefa identificada".\n\nTEXTO:\n${text}`
+    prompt: (text: string) => `Analise o texto abaixo e extraia apenas os itens de ação, tarefas ou compromissos mencionados. Formate como uma lista de tarefas em Markdown. Não use tags HTML em nenhuma circunstância. Se não houver tarefas, diga "Nenhuma tarefa identificada".\n\nTEXTO:\n${text}`
   },
   {
     id: 'tech_report',
@@ -107,7 +124,7 @@ ${text}`
     description: 'Sugere etiquetas inteligentes para organizar sua nota.',
     icon: TagIcon,
     color: 'bg-amber-500',
-    prompt: (text: string) => `Analise o texto e sugira até 5 tags (etiquetas) curtas que descrevam o conteúdo. Retorne APENAS as tags separadas por vírgula, sem outros comentários.\n\nTEXTO:\n${text}`
+    prompt: (text: string) => `Analise o texto e sugira até 5 tags (etiquetas) curtas que descrevam o conteúdo. Retorne APENAS as tags separadas por vírgula, sem outros comentários. Não use tags HTML.\n\nTEXTO:\n${text}`
   },
   {
     id: 'tone',
@@ -115,7 +132,7 @@ ${text}`
     description: 'Reescreve a nota em um tom mais profissional ou criativo.',
     icon: Type,
     color: 'bg-rose-500',
-    prompt: (text: string) => `Reescreva o texto abaixo em um tom profissional, direto e elegante (estilo executivo). Retorne APENAS o novo texto.\n\nTEXTO:\n${text}`
+    prompt: (text: string) => `Reescreva o texto abaixo em um tom profissional, direto e elegante (estilo executivo). Use apenas formatação Markdown padrão para ênfase (como **, *). Não use tags HTML. Retorne APENAS o novo texto.\n\nTEXTO:\n${text}`
   }
 ];
 
@@ -144,7 +161,7 @@ export default function AIAssistantModal({ isOpen, onClose, content, onApply, on
       const data = await res.json();
 
       if (data.text) {
-        setResult(data.text);
+        setResult(cleanHtmlTags(data.text));
       } else {
         throw new Error(data.error || 'Falha ao gerar conteúdo');
       }
