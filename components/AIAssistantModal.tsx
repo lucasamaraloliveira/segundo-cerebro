@@ -2,7 +2,7 @@
 
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Sparkles, 
   X, 
@@ -59,7 +59,9 @@ interface AIAssistantModalProps {
   isOpen: boolean;
   onClose: () => void;
   content: string;
-  onApply: (newContent: string) => void;
+  selectionText?: string;
+  selectionHtml?: string;
+  onApply: (newContent: string, isSelectionOnly: boolean) => void;
   onAddTags: (tags: string[]) => void;
   existingTags?: string[];
 }
@@ -136,12 +138,22 @@ ${text}`
   }
 ];
 
-export default function AIAssistantModal({ isOpen, onClose, content, onApply, onAddTags, existingTags = [] }: AIAssistantModalProps) {
+export default function AIAssistantModal({ isOpen, onClose, content, selectionText = "", selectionHtml = "", onApply, onAddTags, existingTags = [] }: AIAssistantModalProps) {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showApplyOptions, setShowApplyOptions] = useState(false);
+  const [scope, setScope] = useState<'selection' | 'full'>('full');
+
+  useEffect(() => {
+    if (isOpen) {
+      setScope(selectionText ? 'selection' : 'full');
+      setResult(null);
+      setSelectedOption(null);
+      setShowApplyOptions(false);
+    }
+  }, [isOpen, selectionText]);
 
   const handleAction = async (optionId: string) => {
     const option = ASSISTANT_OPTIONS.find(o => o.id === optionId);
@@ -152,11 +164,13 @@ export default function AIAssistantModal({ isOpen, onClose, content, onApply, on
     setError(null);
     setResult(null);
 
+    const textToProcess = scope === 'selection' ? selectionText : content;
+
     try {
       const res = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: option.prompt(content) })
+        body: JSON.stringify({ prompt: option.prompt(textToProcess) })
       });
       const data = await res.json();
 
@@ -172,17 +186,21 @@ export default function AIAssistantModal({ isOpen, onClose, content, onApply, on
     }
   };
 
-  const handleApply = (mode: 'replace' | 'append' | 'tags') => {
+  const handleApply = (mode: 'replace' | 'append' | 'tags' | 'selection') => {
     if (!result) return;
     
     if (mode === 'tags') {
       const tags = result.split(',').map(t => t.trim().toLowerCase()).filter(t => t !== '');
       onAddTags(tags);
+    } else if (mode === 'selection') {
+      onApply(markdownToHtml(result), true);
+      const tags = result.split(',').map(t => t.trim().toLowerCase()).filter(t => t !== '');
+      onAddTags(tags);
     } else if (mode === 'replace') {
-      onApply(markdownToHtml(result));
+      onApply(markdownToHtml(result), false);
     } else if (mode === 'append') {
       const separator = content.trim() ? '<br><hr><br>' : '';
-      onApply(content + separator + markdownToHtml(result));
+      onApply(content + separator + markdownToHtml(result), false);
     }
 
     onClose();
@@ -222,6 +240,35 @@ export default function AIAssistantModal({ isOpen, onClose, content, onApply, on
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+              {selectionText && !result && !isLoading && (
+                <div className="space-y-3 mb-4">
+                  <div className="flex items-center justify-between p-3 border border-black/5 bg-[#FF4F00]/5 shadow-[2px_2px_0px_rgba(0,0,0,0.05)]">
+                    <div className="flex items-center gap-2">
+                      <Sparkles size={16} className="text-[#FF4F00]" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--foreground)]">Foco do Assistente Neural</span>
+                    </div>
+                    <div className="flex border border-black/20 rounded overflow-hidden">
+                      <button
+                        onClick={() => setScope('selection')}
+                        className={`px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider transition-colors ${scope === 'selection' ? 'bg-[#FF4F00] text-white' : 'bg-[var(--background)] hover:bg-black/5 text-[var(--foreground)]'}`}
+                      >
+                        Apenas Seleção
+                      </button>
+                      <button
+                        onClick={() => setScope('full')}
+                        className={`px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider transition-colors ${scope === 'full' ? 'bg-[#FF4F00] text-white' : 'bg-[var(--background)] hover:bg-black/5 text-[var(--foreground)]'}`}
+                      >
+                        Nota Inteira
+                      </button>
+                    </div>
+                  </div>
+                  {scope === 'selection' && (
+                    <div className="p-3 bg-[var(--muted)] border border-black/5 text-xs opacity-75 max-h-24 overflow-y-auto font-serif italic rounded">
+                      &ldquo;{selectionText}&rdquo;
+                    </div>
+                  )}
+                </div>
+              )}
               {!result && !isLoading ? (
                 <>
                   <p className="text-xs font-bold uppercase opacity-40 tracking-widest">Selecione uma Habilidade Neural</p>
@@ -296,7 +343,30 @@ export default function AIAssistantModal({ isOpen, onClose, content, onApply, on
             {result && !isLoading && (
               <div className="p-4 border-t-2 border-black bg-[var(--background)]">
                 <AnimatePresence mode="wait">
-                  {!showApplyOptions ? (
+                  {scope === 'selection' && selectedOption !== 'tags' ? (
+                    <motion.div 
+                      key="selection-actions"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="flex gap-3"
+                    >
+                      <button
+                        onClick={() => handleApply('selection')}
+                        className="flex-1 bg-black text-white py-3 font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 hover:bg-[#FF4F00] transition-colors border border-black/5 shadow-[4px_4px_0px_rgba(0,0,0,0.1)] hover:translate-y-[-1px] active:translate-y-[0px] active:shadow-none"
+                      >
+                        <Check size={16} />
+                        Substituir Trecho Selecionado
+                      </button>
+                      <button
+                        onClick={() => handleAction(selectedOption!)}
+                        className="px-4 bg-[var(--muted)] border border-black/5 shadow-[4px_4px_0px_rgba(0,0,0,0.1)] flex items-center justify-center hover:bg-black hover:text-white transition-colors"
+                        title="Tentar Novamente"
+                      >
+                        <RotateCcw size={18} />
+                      </button>
+                    </motion.div>
+                  ) : !showApplyOptions ? (
                     <motion.div 
                       key="actions"
                       initial={{ opacity: 0, y: 10 }}

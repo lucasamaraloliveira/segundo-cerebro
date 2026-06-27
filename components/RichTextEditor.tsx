@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Extension } from '@tiptap/core';
+import { Extension, getHTMLFromFragment } from '@tiptap/core';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Underline } from '@tiptap/extension-underline';
@@ -200,6 +200,9 @@ interface RichTextEditorProps {
   isFocusMode?: boolean;
   notes?: any[];
   activeNoteId?: string;
+  onSelectionChange?: (selection: { text: string; html: string } | null) => void;
+  replaceSelectionContent?: string | null;
+  onReplaceSelectionComplete?: () => void;
 }
 
 
@@ -360,7 +363,7 @@ const markdownToHtml = (markdown: string) => {
     .replace(/<\/ul><ul>/g, '');
 };
 
-export default function RichTextEditor({ content, onChange, placeholder, isFocusMode = false, notes = [], activeNoteId }: RichTextEditorProps) {
+export default function RichTextEditor({ content, onChange, placeholder, isFocusMode = false, notes = [], activeNoteId, onSelectionChange, replaceSelectionContent, onReplaceSelectionComplete }: RichTextEditorProps) {
   const [pasteModal, setPasteModal] = useState<{ show: boolean, text: string, html: string } | null>(null);
   const [noteLinkModal, setNoteLinkModal] = useState(false);
   const [noteSearch, setNoteSearch] = useState('');
@@ -370,6 +373,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
   const [neuralSuggestion, setNeuralSuggestion] = useState<{ id: string, title: string, score: number } | null>(null);
   const [ignoredSuggestions, setIgnoredSuggestions] = useState<Set<string>>(new Set());
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
   const lastAnalyzedText = useRef('');
 
   // Temporary Audio Recording States
@@ -581,6 +585,18 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
+    },
+    onSelectionUpdate: ({ editor }) => {
+      const { from, to } = editor.state.selection;
+      if (from === to) {
+        if (editor.isFocused) {
+          onSelectionChange?.(null);
+        }
+      } else {
+        const text = editor.state.doc.textBetween(from, to, ' ');
+        const html = getHTMLFromFragment(editor.state.selection.content().content, editor.schema);
+        onSelectionChange?.({ text, html });
+      }
     },
     editorProps: {
       attributes: {

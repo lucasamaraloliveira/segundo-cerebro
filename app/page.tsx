@@ -152,7 +152,7 @@ const TagButton = React.memo(({
 TagButton.displayName = 'TagButton';
 
 
-const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isAiLoading, handleAiAction, exportAsPDF, deleteNote, setIsFullscreen, setIsTagModalOpen, setNewTagInput, relatedNotes, setActiveNoteId, setIsAIAssistantOpen, backlinks, allNotes, refreshKey, setTagToDelete, setIsTagDeleteModalOpen }: any) => {
+const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isAiLoading, handleAiAction, exportAsPDF, deleteNote, setIsFullscreen, setIsTagModalOpen, setNewTagInput, relatedNotes, setActiveNoteId, setIsAIAssistantOpen, backlinks, allNotes, refreshKey, setTagToDelete, setIsTagDeleteModalOpen, onSelectionChange, replaceSelectionContent, onReplaceSelectionComplete, hasSelection }: any) => {
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const [localTitle, setLocalTitle] = useState(activeNote.title || '');
   const [localContent, setLocalContent] = useState(activeNote.content || '');
@@ -501,6 +501,8 @@ export default function Home() {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
+  const [activeSelection, setActiveSelection] = useState<{ text: string; html: string } | null>(null);
+  const [pendingSelectionReplacement, setPendingSelectionReplacement] = useState<string | null>(null);
   const [editorRefreshKey, setEditorRefreshKey] = useState(0);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState<Note | null>(null);
