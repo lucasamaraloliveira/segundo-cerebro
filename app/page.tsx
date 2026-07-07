@@ -20,6 +20,7 @@ import { Note } from '@/lib/types';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Plus,
+  Copy,
   Search as SearchIcon,
   LogOut,
   MoreVertical,
@@ -152,12 +153,13 @@ const TagButton = React.memo(({
 TagButton.displayName = 'TagButton';
 
 
-const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isAiLoading, handleAiAction, exportAsPDF, deleteNote, setIsFullscreen, setIsTagModalOpen, setNewTagInput, relatedNotes, setActiveNoteId, setIsAIAssistantOpen, backlinks, allNotes, refreshKey, setTagToDelete, setIsTagDeleteModalOpen, onSelectionChange, replaceSelectionContent, onReplaceSelectionComplete, hasSelection }: any) => {
+const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isAiLoading, handleAiAction, exportAsPDF, deleteNote, cloneNote, setIsFullscreen, setIsTagModalOpen, setNewTagInput, relatedNotes, setActiveNoteId, setIsAIAssistantOpen, backlinks, allNotes, refreshKey, setTagToDelete, setIsTagDeleteModalOpen, onSelectionChange, replaceSelectionContent, onReplaceSelectionComplete, hasSelection }: any) => {
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const [localTitle, setLocalTitle] = useState(activeNote.title || '');
   const [localContent, setLocalContent] = useState(activeNote.content || '');
   const [showAllTags, setShowAllTags] = useState(false);
   const [isTempModalOpen, setIsTempModalOpen] = useState(false);
+  const [isActionsDropdownOpen, setIsActionsDropdownOpen] = useState(false);
   const localTitleRef = useRef(activeNote.id);
 
   // Auto-resize title textarea
@@ -274,36 +276,83 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
               )}
             </div>
           </div>
-          <div className="flex items-center gap-3 md:gap-6 h-8 overflow-x-auto no-scrollbar flex-nowrap pr-4">
+          {/* Actions Dropdown (Universal) */}
+          <div className="relative flex items-center">
             <button
-              onClick={() => setIsAIAssistantOpen(true)}
-              className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter hover:text-[#FF4F00] transition-all group text-[var(--foreground)]"
+              onClick={() => setIsActionsDropdownOpen(!isActionsDropdownOpen)}
+              className="p-1.5 hover:bg-[var(--muted)] text-[var(--foreground)]/60 transition-colors relative"
+              title="Mais ações da nota"
             >
-              <Sparkles className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100 group-hover:text-[#FF4F00]" />
-              <span className="whitespace-nowrap">Assistente IA</span>
+              <MoreVertical className="w-4 h-4" />
             </button>
-            <div className="flex-shrink-0 w-[1px] h-3 bg-[var(--border)] hidden md:block" />
-            <button
-              onClick={() => exportAsPDF(activeNote)}
-              className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter hover:text-[var(--foreground)] transition-all group text-[var(--foreground)]"
-            >
-              <Printer className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100" />
-              <span className="whitespace-nowrap">Imprimir</span>
-            </button>
-            <button
-              onClick={() => setIsFullscreen(!isFullscreen)}
-              className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter hover:text-[var(--foreground)] transition-all group text-[var(--foreground)]"
-            >
-              <Maximize2 className={`w-3.5 h-3.5 ${isFullscreen ? 'text-blue-600' : 'opacity-40 group-hover:opacity-100'}`} />
-              <span className="whitespace-nowrap">{isFullscreen ? 'Sair Foco' : 'Modo Foco'}</span>
-            </button>
-            <button
-              onClick={() => deleteNote(activeNote.id)}
-              className="flex-shrink-0 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-tighter text-red-400 hover:text-red-600 transition-all group"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span className="whitespace-nowrap">Excluir</span>
-            </button>
+
+            <AnimatePresence>
+              {isActionsDropdownOpen && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-[120]" 
+                    onClick={() => setIsActionsDropdownOpen(false)}
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 5, scale: 0.95 }}
+                    className="absolute right-0 top-full mt-2 z-[130] bg-[var(--background)] border border-black/20 dark:border-white/20 p-2 shadow-[8px_8px_0px_rgba(0,0,0,0.1)] flex flex-col gap-1.5 w-44 text-left"
+                  >
+                    <button
+                      onClick={() => {
+                        setIsAIAssistantOpen(true);
+                        setIsActionsDropdownOpen(false);
+                      }}
+                      className="text-[9px] font-bold uppercase py-2 px-3 border border-black/10 dark:border-white/10 bg-[var(--muted)] hover:bg-[#FF4F00] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 rounded"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Assistente IA</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        exportAsPDF(activeNote);
+                        setIsActionsDropdownOpen(false);
+                      }}
+                      className="text-[9px] font-bold uppercase py-2 px-3 border border-black/10 dark:border-white/10 bg-[var(--muted)] hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 rounded"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Imprimir</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsFullscreen(!isFullscreen);
+                        setIsActionsDropdownOpen(false);
+                      }}
+                      className="text-[9px] font-bold uppercase py-2 px-3 border border-black/10 dark:border-white/10 bg-[var(--muted)] hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 rounded"
+                    >
+                      <Maximize2 className="w-3.5 h-3.5" />
+                      <span>{isFullscreen ? 'Sair Foco' : 'Modo Foco'}</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        cloneNote(activeNote);
+                        setIsActionsDropdownOpen(false);
+                      }}
+                      className="text-[9px] font-bold uppercase py-2 px-3 border border-black/10 dark:border-white/10 bg-[var(--muted)] hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 rounded"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Clonar</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        deleteNote(activeNote.id);
+                        setIsActionsDropdownOpen(false);
+                      }}
+                      className="text-[9px] font-bold uppercase py-2 px-3 border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors flex items-center gap-2 rounded"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Excluir</span>
+                    </button>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 
@@ -888,6 +937,21 @@ export default function Home() {
       updatedAt: serverTimestamp()
     };
     const docRef = await addDoc(collection(db, 'notes'), newNote);
+    setActiveNoteId(docRef.id);
+  };
+
+  const cloneNote = async (note: Note) => {
+    if (!user) return;
+    const clonedNote = {
+      title: `${note.title || 'Sem título'} (Cópia)`,
+      content: note.content || '',
+      tags: note.tags || [],
+      userId: user.uid,
+      isBookmarked: false,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+    const docRef = await addDoc(collection(db, 'notes'), clonedNote);
     setActiveNoteId(docRef.id);
   };
 
@@ -1651,6 +1715,7 @@ export default function Home() {
               handleAiAction={handleAiAction}
               exportAsPDF={exportAsPDF}
               deleteNote={deleteNote}
+              cloneNote={cloneNote}
               setIsFullscreen={setIsFullscreen}
               setIsTagModalOpen={setIsTagModalOpen}
               setNewTagInput={setNewTagInput}
