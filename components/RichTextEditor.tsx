@@ -852,7 +852,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
       {/* Toolbar Container */}
       <div className={isFocusMode 
         ? "sticky top-4 z-50 flex justify-center w-full pointer-events-none mb-4" 
-        : "w-full border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur-sm sticky top-0 z-30 px-6 py-2.5 flex items-center justify-between gap-4"
+        : "w-full border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur-sm sticky top-0 z-30 px-3 md:px-6 py-2 md:py-2.5 flex items-center justify-between gap-2 md:gap-4"
       }>
         <div className={isFocusMode 
           ? "pointer-events-auto bg-[var(--background)]/90 backdrop-blur-xl border border-[var(--border)] shadow-[6px_6px_0px_rgba(0,0,0,0.15)] rounded-none px-2.5 py-1 xl:px-3 xl:py-1.5 flex items-center gap-1 xl:gap-0.5 max-w-[95vw] xl:max-w-full overflow-visible no-scrollbar transition-all hover:shadow-[8px_8px_0px_rgba(0,0,0,0.2)]"
@@ -893,6 +893,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
             onClick={() => editor.chain().focus().toggleBlockquote().run()} 
             isActive={editor.isActive('blockquote')} 
             title="Citação"
+            className="hidden md:inline-flex"
           >
             <Quote className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
           </ToolbarButton>
@@ -900,6 +901,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
             onClick={() => editor.chain().focus().toggleCodeBlock().run()} 
             isActive={editor.isActive('codeBlock')} 
             title="Bloco de Código"
+            className="hidden md:inline-flex"
           >
             <SquareCode className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
           </ToolbarButton>
@@ -1096,7 +1098,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 5, scale: 0.95 }}
-                    className="absolute right-0 top-full mt-2 z-[70] bg-[var(--background)]/95 backdrop-blur-xl border border-[var(--border)] shadow-[6px_6px_0px_rgba(0,0,0,0.15)] rounded-none min-w-[200px] py-1.5 overflow-hidden flex flex-col"
+                    className="absolute right-[-8px] md:right-0 top-full mt-2 z-[70] bg-[var(--background)]/95 backdrop-blur-xl border border-[var(--border)] shadow-[6px_6px_0px_rgba(0,0,0,0.15)] rounded-none w-[280px] py-1.5 overflow-hidden flex flex-col"
                   >
                     {/* Fonte Selector */}
                     <div className="px-4 py-2 border-b border-[var(--border)]/10 flex flex-col gap-1">
