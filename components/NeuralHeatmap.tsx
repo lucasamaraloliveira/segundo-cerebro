@@ -89,7 +89,7 @@ export default function NeuralHeatmap({ notes }: NeuralHeatmapProps) {
         <div className="flex items-center gap-3 mb-8">
           <Flame className="w-6 h-6 text-orange-500" />
           <div>
-            <h2 className="text-2xl font-serif italic tracking-tight">Pulso de Atividade</h2>
+            <h2 className="text-xl font-sans font-bold tracking-tight">Pulso de Atividade</h2>
             <p className="text-[10px] font-bold uppercase tracking-widest opacity-40">Frequência de conexões nos últimos 90 dias</p>
           </div>
         </div>
@@ -132,7 +132,7 @@ export default function NeuralHeatmap({ notes }: NeuralHeatmapProps) {
                   style={{ width: `${Math.min(100, (tag.count / notes.length) * 300)}%` }}
                 />
                 <div className="relative flex justify-between items-center">
-                  <span className="font-serif italic text-lg text-[var(--accent)]">#{tag.name}</span>
+                  <span className="font-sans font-semibold text-base text-[var(--accent)]">#{tag.name}</span>
                   <span className="text-[10px] font-bold opacity-40">{tag.count} notas</span>
                 </div>
               </div>
@@ -152,7 +152,7 @@ export default function NeuralHeatmap({ notes }: NeuralHeatmapProps) {
             {tagInsights.forgotten.map(tag => (
               <div key={tag.name} className="p-4 border border-[var(--border)] border-dashed hover:border-blue-400 transition-colors group">
                 <div className="flex justify-between items-center">
-                  <span className="font-serif italic text-lg opacity-60 group-hover:opacity-100">#{tag.name}</span>
+                  <span className="font-sans font-semibold text-base opacity-70 group-hover:opacity-100">#{tag.name}</span>
                   <div className="text-right">
                     <p className="text-[10px] font-bold text-blue-500 opacity-60">Sem visitas há {tag.daysSinceLastSeen} dias</p>
                     <p className="text-[8px] uppercase tracking-tighter opacity-30 italic">Último acesso: {format(tag.lastSeen, 'MMM yyyy', { locale: ptBR })}</p>
@@ -167,7 +167,7 @@ export default function NeuralHeatmap({ notes }: NeuralHeatmapProps) {
       {/* Info Footer */}
       <div className="flex items-start gap-3 p-6 bg-blue-500/5 border border-blue-500/10 rounded-none text-blue-500">
         <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-        <p className="text-xs leading-relaxed italic font-serif">
+        <p className="text-xs leading-relaxed font-sans opacity-90">
           Sua rede neural de conhecimento é viva. Áreas com menos atividade tendem a se desconectar do fluxo de pensamento atual. Tente revisitar o "Conhecimento Esquecido" para reforçar sinapses antigas.
         </p>
       </div>

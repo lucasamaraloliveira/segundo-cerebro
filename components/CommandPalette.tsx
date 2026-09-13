@@ -121,7 +121,7 @@ export default function CommandPalette({ isOpen, onClose, notes, onAction }: Com
                 placeholder="O que você deseja fazer? (ou busque uma nota...)"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                className="flex-1 bg-transparent border-none outline-none text-lg font-serif italic placeholder:opacity-30"
+                className="flex-1 bg-transparent border-none outline-none text-base font-sans font-medium placeholder:opacity-30"
               />
               <div className="px-2 py-1 border border-[var(--border)] text-[9px] font-bold opacity-30">
                 ESC
@@ -158,7 +158,7 @@ export default function CommandPalette({ isOpen, onClose, notes, onAction }: Com
                 </div>
               ) : (
                 <div className="px-6 py-12 text-center opacity-30">
-                  <p className="text-sm font-serif italic">Nenhum comando ou nota encontrada...</p>
+                  <p className="text-sm font-sans font-medium">Nenhum comando ou nota encontrada...</p>
                 </div>
               )}
             </div>

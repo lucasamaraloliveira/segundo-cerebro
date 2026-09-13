@@ -124,7 +124,7 @@ const NoteCard = React.memo(({
           {note.isBookmarked && <Bookmark className="w-3 h-3 fill-[var(--accent)] text-[var(--accent)] opacity-30" />}
         </div>
       </div>
-      <h3 className={`font-serif font-bold text-base md:text-lg leading-snug mb-1 line-clamp-3 text-[var(--foreground)] ${note.isCompleted ? 'line-through opacity-40' : ''}`}>
+      <h3 className={`font-sans font-semibold text-base leading-snug tracking-tight mb-1 line-clamp-3 text-[var(--foreground)] ${note.isCompleted ? 'line-through opacity-40' : ''}`}>
         {note.title || 'Sem título'}
       </h3>
       <p className={`text-[13px] opacity-60 line-clamp-2 leading-tight text-[var(--foreground)] ${note.isCompleted ? 'line-through opacity-40' : ''}`}>
@@ -182,9 +182,10 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
   React.useLayoutEffect(() => {
     if (titleRef.current) {
       titleRef.current.style.height = 'auto';
-      titleRef.current.style.height = `${titleRef.current.scrollHeight}px`;
+      const computedHeight = Math.max(titleRef.current.scrollHeight, 44);
+      titleRef.current.style.height = `${computedHeight}px`;
     }
-  }, [localTitle]);
+  }, [localTitle, activeNote.id]);
 
   useEffect(() => {
     // Only update local title if it's currently empty or the default, 
@@ -446,7 +447,7 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
               </div>
               <div className="text-right">
                 <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Atualizado em</p>
-                <p className="text-sm font-serif italic">
+                <p className="text-xs font-sans font-medium opacity-70">
                   {activeNote.updatedAt ? format(activeNote.updatedAt.toDate(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : 'Agora'}
                 </p>
               </div>
@@ -457,12 +458,19 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
               value={localTitle}
               placeholder="Título da nota"
               onChange={(e) => setLocalTitle(e.target.value.replace(/\n/g, ''))}
+              onFocus={() => {
+                if (titleRef.current) {
+                  titleRef.current.style.height = 'auto';
+                  const computedHeight = Math.max(titleRef.current.scrollHeight, 44);
+                  titleRef.current.style.height = `${computedHeight}px`;
+                }
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
                 }
               }}
-              className="w-full text-3xl md:text-3xl lg:text-4xl xl:text-6xl font-serif font-bold tracking-tighter leading-[1.1] bg-transparent border-none focus:outline-none mb-0 p-0 placeholder:text-[var(--foreground)]/40 text-[var(--foreground)] resize-none overflow-hidden"
+              className="w-full min-h-[44px] text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-sans font-bold tracking-tight leading-tight bg-transparent border-none focus:outline-none mb-0 p-0 placeholder:text-[var(--foreground)]/40 text-[var(--foreground)] resize-none overflow-hidden"
             />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-4 mb-0 pb-3 border-b border-[var(--border)] mt-4 md:mt-6">
               <div className="space-y-1">
@@ -531,7 +539,7 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
                       <ArrowRight className="w-3 h-3 text-[var(--accent)]" />
                     </div>
                     <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--foreground)] opacity-20 mb-2">Nota Relacionada</p>
-                    <h4 className="text-sm font-serif italic mb-2 leading-snug group-hover:text-[var(--accent)] transition-colors line-clamp-2">{note.title || 'Sem título'}</h4>
+                    <h4 className="text-sm font-sans font-semibold mb-2 leading-snug group-hover:text-[var(--accent)] transition-colors line-clamp-2">{note.title || 'Sem título'}</h4>
                     <div className="mt-auto flex flex-wrap gap-1.5 pt-2">
                       {note.tags?.slice(0, 3).map((tag: string) => (
                         <span key={tag} className="text-[8px] font-bold uppercase tracking-tighter opacity-30 group-hover:opacity-60">#{tag}</span>
@@ -561,7 +569,7 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
                       <Undo2 className="w-3 h-3 text-[var(--accent)] rotate-180" />
                     </div>
                     <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--foreground)] opacity-20 mb-2">Referenciada em</p>
-                    <h4 className="text-sm font-serif italic mb-2 leading-snug group-hover:text-[var(--accent)] transition-colors line-clamp-2">{note.title || 'Sem título'}</h4>
+                    <h4 className="text-sm font-sans font-semibold mb-2 leading-snug group-hover:text-[var(--accent)] transition-colors line-clamp-2">{note.title || 'Sem título'}</h4>
                     <div className="mt-auto flex flex-wrap gap-1.5 pt-2">
                       {note.tags?.slice(0, 3).map((tag: string) => (
                         <span key={tag} className="text-[8px] font-bold uppercase tracking-tighter opacity-30 group-hover:opacity-60">#{tag}</span>
@@ -980,6 +988,7 @@ export default function Home() {
     };
     const docRef = await addDoc(collection(db, 'notes'), newNote);
     setActiveNoteId(docRef.id);
+    setMobileView('editor');
   };
 
   const cloneNote = async (note: Note) => {
@@ -995,6 +1004,7 @@ export default function Home() {
     };
     const docRef = await addDoc(collection(db, 'notes'), clonedNote);
     setActiveNoteId(docRef.id);
+    setMobileView('editor');
   };
 
   const updateNote = async (id: string, data: Partial<Note>) => {
@@ -1675,7 +1685,7 @@ export default function Home() {
               placeholder={isSemanticSearch ? "Busca Semântica ativa..." : "Buscar..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full bg-transparent pl-8 pr-12 py-1 outline-none text-sm font-serif italic text-base md:text-lg text-[var(--foreground)] placeholder:text-[var(--foreground)]/20 transition-all ${isSemanticSearch ? 'text-[var(--accent)]' : ''}`}
+              className={`w-full bg-transparent pl-8 pr-12 py-1 outline-none text-sm font-sans font-medium text-[var(--foreground)] placeholder:text-[var(--foreground)]/30 transition-all ${isSemanticSearch ? 'text-[var(--accent)]' : ''}`}
             />
             <button
               onClick={() => setIsSemanticSearch(!isSemanticSearch)}
@@ -1891,7 +1901,7 @@ export default function Home() {
               <div className="w-12 h-1.5 bg-[var(--border)] rounded-none mx-auto mb-8 opacity-50" />
 
               <div className="mb-8">
-                <h3 className="text-3xl font-serif mb-2 tracking-tight">Filtrar por Tags</h3>
+                <h3 className="text-2xl font-sans font-bold mb-2 tracking-tight">Filtrar por Tags</h3>
                 <p className="text-[10px] text-[var(--foreground)]/40 uppercase font-bold tracking-[0.2em]">Selecione uma etiqueta para filtrar</p>
               </div>
 
@@ -1954,7 +1964,7 @@ export default function Home() {
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500" />
 
               <div className="mb-6">
-                <h3 className="text-2xl font-serif mb-2 tracking-tight text-[var(--foreground)]">Nova Etiqueta</h3>
+                <h3 className="text-xl font-sans font-bold mb-2 tracking-tight text-[var(--foreground)]">Nova Etiqueta</h3>
                 <p className="text-xs text-[var(--foreground)]/40 uppercase font-bold tracking-widest">Organize seu pensamento</p>
               </div>
 
@@ -2143,7 +2153,7 @@ export default function Home() {
 
                 <div className="space-y-2">
                   <h3 className="text-[10px] uppercase tracking-[0.3em] font-bold text-[var(--accent)]">Alerta Neural</h3>
-                  <h2 className="text-2xl font-serif italic">{currentReminderNote.title || 'Pensamento Sem Título'}</h2>
+                  <h2 className="text-xl font-sans font-semibold text-[var(--foreground)]">{currentReminderNote.title || 'Pensamento Sem Título'}</h2>
                   <p className="text-xs opacity-60 line-clamp-2 max-w-[280px] mx-auto">
                     {((currentReminderNote.content || '').replace(/<[^>]*>/g, '') || 'Este pensamento requer sua atenção agora.').substring(0, 120)}...
                   </p>
@@ -2194,7 +2204,7 @@ export default function Home() {
               <div className="p-6 md:p-10 overflow-y-auto custom-scrollbar">
                 <div className="flex items-center justify-between mb-10">
                   <div>
-                    <h2 className="text-3xl font-serif italic mb-2 tracking-tight">Configurações</h2>
+                    <h2 className="text-2xl font-sans font-bold mb-2 tracking-tight">Configurações</h2>
                     <p className="text-[10px] font-bold uppercase tracking-[0.3em] opacity-40">Personalize sua interface neural</p>
                   </div>
                   <button onClick={() => setIsSettingsOpen(false)} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 transition-all">
@@ -2280,7 +2290,7 @@ export default function Home() {
                     <div className="p-4 border border-[var(--border)] bg-[var(--muted)]/20 space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-medium opacity-60">Aplicação</span>
-                        <span className="text-xs font-bold font-serif italic">{APP_NAME}</span>
+                        <span className="text-xs font-bold font-sans">{APP_NAME}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-medium opacity-60">Versão Atual</span>
@@ -2293,6 +2303,14 @@ export default function Home() {
                         <span className="text-[10px] font-mono uppercase tracking-wider opacity-60">
                           {process.env.NODE_ENV === 'production' ? 'Produção' : 'Desenvolvimento'}
                         </span>
+                      </div>
+                      <div className="pt-2 border-t border-[var(--border)] space-y-1.5">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--accent)]">Notas da Atualização ({APP_VERSION})</p>
+                        <p className="text-[10px] opacity-70 leading-relaxed">
+                          • Correção de visibilidade e carregamento do título no mobile.<br />
+                          • Abertura imediata do editor ao criar ou duplicar notas.<br />
+                          • Blindagem contra colapso de layout em campos de texto.
+                        </p>
                       </div>
                       <div className="pt-2 border-t border-[var(--border)] text-[10px] opacity-40 leading-relaxed">
                         Sistema neural de gestão de conhecimento, notas estruturadas e síntese cognitiva.
@@ -2372,7 +2390,7 @@ export default function Home() {
                 <h2 className="text-xl font-bold uppercase tracking-widest">Exclusão Global</h2>
               </div>
               <p className="text-sm text-[var(--foreground)]/60 mb-8 leading-relaxed">
-                Você está prestes a remover a tag <span className="font-bold text-[var(--foreground)]">#{globalTagToDelete}</span> de <span className="font-bold text-[var(--foreground)] font-serif italic">{notes.filter(n => n.tags?.includes(globalTagToDelete)).length} notas</span>. Deseja continuar?
+                Você está prestes a remover a tag <span className="font-bold text-[var(--foreground)]">#{globalTagToDelete}</span> de <span className="font-bold text-[var(--foreground)]">{notes.filter(n => n.tags?.includes(globalTagToDelete)).length} notas</span>. Deseja continuar?
               </p>
               <div className="flex gap-4">
                 <button

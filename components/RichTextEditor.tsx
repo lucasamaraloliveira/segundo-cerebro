@@ -2082,7 +2082,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
                 </div>
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-widest opacity-40 mb-1">Conexão Neural ({neuralSuggestion.score}%)</p>
-                  <p className="text-sm font-serif italic mb-3 leading-tight">
+                  <p className="text-sm font-sans font-medium mb-3 leading-tight">
                     Esta nota tem forte relação com <span className="font-bold">&quot;{neuralSuggestion.title}&quot;</span>.
                   </p>
                   <div className="flex gap-2">
@@ -2133,7 +2133,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
               <div className="flex-1">
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-50 mb-1">Neural Listening</p>
                 <div className="flex items-baseline gap-1">
-                  <p className="text-sm font-serif italic truncate max-w-[200px]">{interimText || 'Ouvindo seus pensamentos...'}</p>
+                  <p className="text-sm font-sans font-medium truncate max-w-[200px]">{interimText || 'Ouvindo seus pensamentos...'}</p>
                   <span className="flex gap-0.5">
                     <span className="w-1 h-1 bg-[var(--accent)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                     <span className="w-1 h-1 bg-[var(--accent)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -2151,7 +2151,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
       {pasteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-[var(--background)] rounded-none shadow-2xl p-8 max-w-md w-full border border-[var(--border)] animate-in zoom-in-95 duration-200">
-            <h3 className="text-2xl font-serif mb-4 tracking-tight text-[var(--foreground)]">Como deseja colar?</h3>
+            <h3 className="text-xl font-sans font-bold mb-4 tracking-tight text-[var(--foreground)]">Como deseja colar?</h3>
             <p className="text-sm text-[var(--foreground)]/60 mb-8 leading-relaxed">
               O conteúdo copiado possui formatação original. Escolha como deseja integrá-lo à sua nota.
             </p>
@@ -2197,7 +2197,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
               exit={{ scale: 0.95, opacity: 0 }}
               className="relative w-full max-w-lg bg-[var(--background)] border border-[var(--border)] p-8 shadow-[30px_30px_0px_rgba(0,0,0,0.1)]"
             >
-              <h3 className="text-2xl font-serif mb-2 tracking-tight">Conectar Nota Neural</h3>
+              <h3 className="text-xl font-sans font-bold mb-2 tracking-tight">Conectar Nota Neural</h3>
               <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-6">Selecione uma nota para criar um backlink</p>
               
               <input 
@@ -2206,7 +2206,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
                 placeholder="Buscar nota pelo título..."
                 value={noteSearch}
                 onChange={(e) => setNoteSearch(e.target.value)}
-                className="w-full bg-[var(--muted)] border-none px-4 py-3 text-sm font-serif italic mb-6 focus:ring-1 focus:ring-[var(--accent)] outline-none"
+                className="w-full bg-[var(--muted)] border-none px-4 py-3 text-sm font-sans font-medium mb-6 focus:ring-1 focus:ring-[var(--accent)] outline-none"
               />
 
               <div className="max-h-[300px] overflow-y-auto custom-scrollbar pr-2 space-y-2">
@@ -2222,7 +2222,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
                       }}
                       className="w-full p-4 text-left border border-[var(--border)] hover:border-[var(--accent)] hover:bg-[var(--accent)]/5 transition-all group"
                     >
-                      <p className="text-sm font-serif italic group-hover:text-[var(--accent)]">{n.title || 'Sem título'}</p>
+                      <p className="text-sm font-sans font-semibold group-hover:text-[var(--accent)]">{n.title || 'Sem título'}</p>
                       <p className="text-[9px] opacity-30 mt-1 uppercase font-bold">{n.tags?.join(' · ') || 'Sem tags'}</p>
                     </button>
                   ))
@@ -2259,7 +2259,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
               <div className="flex-1">
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-50 mb-1">Gravando Áudio IA</p>
                 <div className="flex items-baseline gap-1">
-                  <p className="text-sm font-serif italic">{formatDuration(recordingAudioDuration)}</p>
+                  <p className="text-sm font-mono font-bold">{formatDuration(recordingAudioDuration)}</p>
                   <span className="flex gap-0.5 ml-2">
                     <span className="w-1 h-1 bg-[#FF4F00] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                     <span className="w-1 h-1 bg-[#FF4F00] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -2296,7 +2296,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
               exit={{ scale: 0.95, opacity: 0 }}
               className="relative w-full max-w-2xl bg-[var(--background)] border border-[var(--border)] p-8 shadow-[30px_30px_0px_rgba(0,0,0,0.1)] max-h-[90vh] overflow-y-auto custom-scrollbar"
             >
-              <h3 className="text-2xl font-serif mb-2 tracking-tight">Processar Gravação de Áudio</h3>
+              <h3 className="text-xl font-sans font-bold mb-2 tracking-tight">Processar Gravação de Áudio</h3>
               <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-6">Revise o áudio gravado e selecione o formato do relatório</p>
 
               {/* Styled Audio Player */}

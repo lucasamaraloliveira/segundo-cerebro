@@ -679,7 +679,7 @@ export default function KnowledgeGraph({
       <div className="absolute bottom-10 right-10 pointer-events-none text-right hidden md:block">
         <div className="space-y-1">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40 text-[var(--foreground)]">Matriz de Constelações</p>
-          <p className="text-xl font-serif italic text-[var(--foreground)]">{notes.length} Pensamentos Ativos</p>
+          <p className="text-sm font-mono font-bold text-[var(--foreground)]">{notes.length} Pensamentos Ativos</p>
           <div className="w-32 h-[1px] bg-[var(--accent)] ml-auto mt-2"></div>
         </div>
       </div>

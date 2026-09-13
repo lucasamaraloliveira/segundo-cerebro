@@ -38,7 +38,7 @@ export default function NeuralTimeline({ notes }: NeuralTimelineProps) {
       <div className="flex items-center gap-3 mb-12 border-b border-[var(--border)] pb-6">
         <Clock className="w-6 h-6 text-[var(--accent)]" />
         <div>
-          <h2 className="text-2xl font-serif italic tracking-tight">Linha do Tempo Neural</h2>
+          <h2 className="text-xl font-sans font-bold tracking-tight">Linha do Tempo Neural</h2>
           <p className="text-[10px] font-bold uppercase tracking-widest opacity-40">Evolução cronológica de pensamentos</p>
         </div>
       </div>
@@ -76,11 +76,11 @@ export default function NeuralTimeline({ notes }: NeuralTimelineProps) {
                     </div>
                   </div>
                   
-                  <h4 className="text-lg font-serif font-bold mb-2 group-hover:text-[var(--accent)] transition-colors leading-tight">
+                  <h4 className="text-base font-sans font-semibold mb-2 group-hover:text-[var(--accent)] transition-colors leading-tight">
                     {note.title || 'Sem título'}
                   </h4>
                   
-                  <p className="text-xs opacity-60 line-clamp-3 leading-relaxed font-serif italic">
+                  <p className="text-xs opacity-60 line-clamp-3 leading-relaxed font-sans">
                     {note.content?.replace(/<[^>]*>/g, '').slice(0, 200)}...
                   </p>
 

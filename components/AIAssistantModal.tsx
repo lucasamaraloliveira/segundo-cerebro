@@ -263,7 +263,7 @@ export default function AIAssistantModal({ isOpen, onClose, content, selectionTe
                     </div>
                   </div>
                   {scope === 'selection' && (
-                    <div className="p-3 bg-[var(--muted)] border border-black/5 text-xs opacity-75 max-h-24 overflow-y-auto font-serif italic rounded">
+                    <div className="p-3 bg-[var(--muted)] border border-black/5 text-xs opacity-75 max-h-24 overflow-y-auto font-sans italic rounded">
                       &ldquo;{selectionText}&rdquo;
                     </div>
                   )}
@@ -310,7 +310,7 @@ export default function AIAssistantModal({ isOpen, onClose, content, selectionTe
                   {isLoading ? (
                     <div className="py-20 flex flex-col items-center justify-center gap-4 text-[var(--foreground)] opacity-40">
                       <Loader2 size={40} className="animate-spin text-[#FF4F00]" />
-                      <p className="text-xs italic font-serif">&quot;Acessando camadas neurais...&quot;</p>
+                      <p className="text-xs font-sans font-medium">&quot;Acessando camadas neurais...&quot;</p>
                     </div>
                   ) : error ? (
                     <div className="p-4 border-2 border-red-500 bg-red-50 text-red-600 text-sm">

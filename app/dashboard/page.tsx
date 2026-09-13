@@ -154,7 +154,7 @@ export default function Dashboard() {
       <div className="h-screen flex items-center justify-center bg-[var(--background)]">
         <div className="animate-pulse flex flex-col items-center gap-4 text-[var(--foreground)]">
           <Brain className="w-12 h-12 opacity-20 text-[var(--accent)]" />
-          <p className="font-serif italic opacity-40 text-xl">Sincronizando Sinapses...</p>
+          <p className="font-sans font-medium opacity-50 text-base">Sincronizando Sinapses...</p>
         </div>
       </div>
     );
@@ -164,7 +164,7 @@ export default function Dashboard() {
     return (
       <div className="h-screen flex items-center justify-center bg-[var(--background)] p-8">
         <div className="text-center text-[var(--foreground)] max-w-sm">
-          <h1 className="text-3xl font-serif italic mb-6">Matriz Bloqueada</h1>
+          <h1 className="text-2xl font-sans font-bold mb-4">Matriz Bloqueada</h1>
           <p className="text-sm opacity-60 mb-8 leading-relaxed">Acesse sua conta para visualizar o mapeamento neural de seus pensamentos.</p>
           <Link href="/" className="px-8 py-4 bg-[var(--accent)] text-white text-[10px] font-bold uppercase tracking-widest hover:opacity-90 transition-all">
             Ir para Login
@@ -185,7 +185,7 @@ export default function Dashboard() {
           </Link>
           <div className="w-[1px] h-4 bg-[var(--border)]" />
           <div>
-            <h1 className="font-serif italic text-2xl tracking-tight flex items-center gap-3">
+            <h1 className="font-sans font-bold text-xl tracking-tight flex items-center gap-3">
               <Layers className="w-6 h-6 text-[var(--accent)]" /> Dashboard Neural
             </h1>
           </div>
@@ -214,7 +214,7 @@ export default function Dashboard() {
           <div className="w-[1px] h-4 bg-[var(--border)]" />
           <div className="text-right">
             <p className="text-[10px] font-bold uppercase tracking-widest opacity-30">Total de Notas</p>
-            <p className="text-xl font-serif italic">{stats.totalNotes}</p>
+            <p className="text-xl font-mono font-bold">{stats.totalNotes}</p>
           </div>
         </div>
       </header>
@@ -361,7 +361,7 @@ export default function Dashboard() {
                             }}
                             className="w-full flex items-center justify-between p-2 hover:bg-[var(--muted)]/40 border border-transparent hover:border-[var(--border)] transition-all text-left cursor-pointer group"
                           >
-                            <span className="text-xs font-serif italic truncate max-w-[240px] text-[var(--foreground)] group-hover:text-[var(--accent)]">
+                            <span className="text-xs font-sans font-medium truncate max-w-[240px] text-[var(--foreground)] group-hover:text-[var(--accent)]">
                               {n.title || 'Sem título'}
                             </span>
                             <span className="text-[8px] font-mono opacity-40 shrink-0">
@@ -404,7 +404,7 @@ export default function Dashboard() {
                     >
                       <div className={`w-2 h-2 transition-all ${selectedTag === tag ? 'bg-[var(--accent)] scale-150 rotate-45 shadow-[0_0_10px_var(--accent)]' : 'bg-[var(--accent)]/40 group-hover:bg-[var(--accent)]'}`} />
                       <div>
-                        <p className={`text-sm font-serif italic leading-none transition-colors ${selectedTag === tag ? 'text-[var(--accent)]' : 'text-[var(--foreground)]'}`}>{tag}</p>
+                        <p className={`text-sm font-sans font-medium leading-none transition-colors ${selectedTag === tag ? 'text-[var(--accent)] font-semibold' : 'text-[var(--foreground)]'}`}>{tag}</p>
                         <p className="text-[9px] font-bold uppercase tracking-tighter opacity-30">{count} conexões</p>
                       </div>
                     </button>
@@ -437,7 +437,7 @@ export default function Dashboard() {
         <div className="flex-1 relative h-full">
           {notes.length === 0 ? (
             <div className="absolute inset-0 flex items-center justify-center text-center p-8">
-              <p className="font-serif italic text-2xl opacity-20 max-w-md">
+              <p className="font-sans font-medium text-lg opacity-30 max-w-md">
                 Aguardando a primeira sinapse... Adicione tags às suas notas para gerar o mapeamento.
               </p>
             </div>
@@ -501,7 +501,7 @@ export default function Dashboard() {
               <div className="p-6 flex-1 overflow-y-auto custom-scrollbar space-y-6">
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <h2 className="text-xl font-serif italic text-[var(--foreground)] leading-snug">
+                    <h2 className="text-lg font-sans font-semibold text-[var(--foreground)] leading-snug">
                       {inspectedNote.title || 'Sem título'}
                     </h2>
                     {inspectedNote.isBookmarked && (

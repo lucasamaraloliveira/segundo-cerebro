@@ -108,6 +108,11 @@ A versão da aplicação é gerenciada dinamicamente e sincronizada:
 
 ## 5. Histórico de Versões & Melhorias
 
+### v1.2.1 (Setembro 2026) - Correção de Título & Experiência Mobile
+*   **Correção de Visibilidade do Título no Mobile**: Resolução do colapso de altura (`0px`) no textarea de título ao ser montado em containers com `display: none` ou durante animações. Adicionada cota mínima de altura (`min-h-[44px]`) e observação de `activeNote.id`.
+*   **Navegação Direta no Mobile**: Ao tocar no botão flutuante (`+`) ou clonar uma nota, a visualização mobile agora transiciona instantaneamente para a tela do editor (`setMobileView('editor')`), eliminando a permanência na lista.
+*   **Recálculo no Toque/Foco**: Garantia de redimensionamento instantâneo do título ao receber foco (`onFocus`) no teclado mobile.
+
 ### v1.2.0 (Setembro 2026) - Toolbar Inteligente, Transições Fluidas, Nova Suíte Tipográfica & Controles Táteis
 *   **Sistema de Transbordo Inteligente (*Smart Overflow*)**: Organização da toolbar em níveis prioritários (Tier 1 a 4) com sincronização em tempo real via `useLayoutEffect` e medição contínua a 60fps sem necessidade de cliques.
 *   **Micro-Animações Orgânicas**: Entrada e saída elástica de botões com `framer-motion` (`AnimatePresence` + `motion.div`), eliminando cortes secos e engasgos de layout ao redimensionar a tela.
@@ -138,4 +143,4 @@ A versão da aplicação é gerenciada dinamicamente e sincronizada:
 *   **Botão Sair Foco sumiu**: O botão é renderizado de forma flutuante no `app/page.tsx` apenas quando `isFullscreen` é true. Verifique o Z-index se ele estiver sendo coberto por outros elementos.
 
 ---
-*Documentação atualizada para a versão v1.2.0.*
+*Documentação atualizada para a versão v1.2.1.*

@@ -651,8 +651,8 @@ export default function SpecialistChat() {
                     {messages.length === 0 && (
                       <div className="h-full flex flex-col items-center justify-center text-center p-6 opacity-30">
                         <Brain size={48} className="mb-4" />
-                        <p className="text-sm font-serif italic text-[var(--foreground)]">
-                          "O conhecimento está latente. Faça sua pergunta."
+                        <p className="text-sm font-sans font-medium text-[var(--foreground)]">
+                          &quot;O conhecimento está latente. Faça sua pergunta.&quot;
                         </p>
                       </div>
                     )}
@@ -805,7 +805,7 @@ export default function SpecialistChat() {
                   </div>
 
                   {chatHistory.length === 0 ? (
-                    <p className="text-xs opacity-40 text-center py-16 italic font-serif">Nenhuma conversa registrada.</p>
+                    <p className="text-xs opacity-40 text-center py-16 font-sans">Nenhuma conversa registrada.</p>
                   ) : (
                     <div className="space-y-3">
                       {chatHistory.map((session) => (
