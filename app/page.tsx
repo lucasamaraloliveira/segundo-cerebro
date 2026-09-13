@@ -2307,9 +2307,9 @@ export default function Home() {
                       <div className="pt-2 border-t border-[var(--border)] space-y-1.5">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--accent)]">Notas da Atualização ({APP_VERSION})</p>
                         <p className="text-[10px] opacity-70 leading-relaxed">
-                          • Correção de visibilidade e carregamento do título no mobile.<br />
-                          • Abertura imediata do editor ao criar ou duplicar notas.<br />
-                          • Blindagem contra colapso de layout em campos de texto.
+                          • Padronização tipográfica moderna e legível (Inter/Sans) em todas as telas.<br />
+                          • Badge de anexo dedicado e contenção anti-overflow no Especialista Neural.<br />
+                          • Retrocompatibilidade total e preservação de layout no histórico.
                         </p>
                       </div>
                       <div className="pt-2 border-t border-[var(--border)] text-[10px] opacity-40 leading-relaxed">

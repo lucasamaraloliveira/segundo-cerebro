@@ -9,6 +9,31 @@ import { X, Send, Brain, Loader2, Info, ChevronDown, Paperclip, Copy, Check, His
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
 
+// Helper to parse user message and extract attachment metadata if present
+function parseUserMessage(rawContent: string): { attachmentName: string | null; cleanContent: string } {
+  if (!rawContent) return { attachmentName: null, cleanContent: '' };
+  
+  // Format 1: "📎 [Anexo: nome_do_arquivo.ext]\n\npergunta..."
+  const matchBracket = rawContent.match(/^📎\s*\[Anexo:\s*(.*?)\](?:\r?\n\r?\n)?([\s\S]*)$/);
+  if (matchBracket) {
+    return {
+      attachmentName: matchBracket[1].trim(),
+      cleanContent: matchBracket[2]?.trim() || '',
+    };
+  }
+
+  // Format 2: "📎 Anexou arquivo: nome_do_arquivo.ext"
+  const matchAttached = rawContent.match(/^📎\s*Anexou arquivo:\s*(.*?)$/);
+  if (matchAttached) {
+    return {
+      attachmentName: matchAttached[1].trim(),
+      cleanContent: '',
+    };
+  }
+
+  return { attachmentName: null, cleanContent: rawContent };
+}
+
 export default function SpecialistChat() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [user, setUser] = useState<any>(null);
@@ -657,39 +682,65 @@ export default function SpecialistChat() {
                       </div>
                     )}
 
-                    {messages.map((msg, i) => (
-                      <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[85%] w-fit border border-black/5 relative group ${msg.role === 'user'
-                            ? 'bg-[#FF4F00] text-white shadow-[2px_2px_0px_rgba(0,0,0,0.1)] px-3 py-1.5'
-                            : 'bg-[var(--muted)] text-[var(--foreground)] shadow-[2px_2px_0px_rgba(0,0,0,0.1)] p-3'
+                    {messages.map((msg, i) => {
+                      const isUser = msg.role === 'user';
+                      const parsed = isUser ? parseUserMessage(msg.content) : null;
+
+                      return (
+                        <div key={i} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-[85%] w-fit min-w-0 overflow-hidden border border-black/5 relative group ${
+                            isUser
+                              ? 'bg-[#FF4F00] text-white shadow-[2px_2px_0px_rgba(0,0,0,0.1)] px-3 py-2'
+                              : 'bg-[var(--muted)] text-[var(--foreground)] shadow-[2px_2px_0px_rgba(0,0,0,0.1)] p-3'
                           }`}>
-                          {msg.role === 'assistant' && (
-                            <button
-                              onClick={() => copyToClipboard(msg.content, i.toString())}
-                              className="absolute -top-2 -right-2 w-7 h-7 bg-black text-white border border-white flex items-center justify-center hover:bg-[#FF4F00] transition-colors z-10 opacity-0 group-hover:opacity-100 shadow-md"
-                              title="Copiar transcrição"
-                            >
-                              {copiedId === i.toString() ? <Check size={14} /> : <Copy size={14} />}
-                            </button>
-                          )}
-                          <div className={msg.role === 'user'
-                            ? "text-sm leading-tight whitespace-pre-wrap"
-                            : "text-sm leading-snug prose prose-sm dark:prose-invert max-w-none prose-p:my-0.5 prose-ul:my-1 prose-li:my-0 prose-headings:text-[var(--foreground)] prose-strong:text-inherit"
-                          }>
-                            {msg.role === 'user' ? msg.content : <ReactMarkdown>{msg.content}</ReactMarkdown>}
+                            {msg.role === 'assistant' && (
+                              <button
+                                onClick={() => copyToClipboard(msg.content, i.toString())}
+                                className="absolute -top-2 -right-2 w-7 h-7 bg-black text-white border border-white flex items-center justify-center hover:bg-[#FF4F00] transition-colors z-10 opacity-0 group-hover:opacity-100 shadow-md"
+                                title="Copiar transcrição"
+                              >
+                                {copiedId === i.toString() ? <Check size={14} /> : <Copy size={14} />}
+                              </button>
+                            )}
+
+                            {isUser ? (
+                              <div className="text-sm leading-tight whitespace-pre-wrap break-words [overflow-wrap:anywhere] min-w-0">
+                                {parsed?.attachmentName && (
+                                  <div
+                                    className="mb-2 inline-flex items-center gap-1.5 px-2 py-1 bg-black/25 hover:bg-black/35 border border-white/20 text-white text-[11px] font-sans font-medium rounded-none max-w-full transition-colors cursor-default select-none"
+                                    title={parsed.attachmentName}
+                                  >
+                                    <Paperclip size={12} className="shrink-0 text-white/80" />
+                                    <span className="truncate max-w-[190px] sm:max-w-[280px]">
+                                      {parsed.attachmentName}
+                                    </span>
+                                  </div>
+                                )}
+                                {parsed?.cleanContent && (
+                                  <div className="break-words [overflow-wrap:anywhere]">
+                                    {parsed.cleanContent}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="text-sm leading-snug prose prose-sm dark:prose-invert max-w-none break-words [overflow-wrap:anywhere] prose-p:my-0.5 prose-ul:my-1 prose-li:my-0 prose-headings:text-[var(--foreground)] prose-strong:text-inherit">
+                                <ReactMarkdown>{msg.content}</ReactMarkdown>
+                              </div>
+                            )}
+
+                            {msg.sources && msg.sources.length > 0 && (
+                              <div className="mt-4 pt-2 border-t border-[var(--border)] flex flex-wrap gap-2">
+                                {msg.sources.map((s: { id: string, title: string }) => (
+                                  <span key={s.id} className="text-[9px] font-bold uppercase bg-black text-white px-2 py-0.5">
+                                    {s.title}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                          {msg.sources && msg.sources.length > 0 && (
-                            <div className="mt-4 pt-2 border-t border-[var(--border)] flex flex-wrap gap-2">
-                              {msg.sources.map((s: { id: string, title: string }) => (
-                                <span key={s.id} className="text-[9px] font-bold uppercase bg-black text-white px-2 py-0.5">
-                                  {s.title}
-                                </span>
-                              ))}
-                            </div>
-                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     {(isLoading || isUploading) && (
                       <div className="flex justify-start">
                         <div className="bg-[var(--muted)] p-3 border border-black/5 shadow-[2px_2px_0px_rgba(0,0,0,0.1)] flex items-center gap-2">
@@ -867,21 +918,45 @@ export default function SpecialistChat() {
                   </div>
 
                   <div className="space-y-4">
-                    {selectedSession.messages.map((msg: any, i: number) => (
-                      <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[85%] w-fit border border-black/5 relative group ${msg.role === 'user'
-                            ? 'bg-[#FF4F00]/50 text-white shadow-[2px_2px_0px_rgba(0,0,0,0.1)] px-3 py-1.5'
-                            : 'bg-[var(--muted)]/60 text-[var(--foreground)]/70 shadow-[2px_2px_0px_rgba(0,0,0,0.1)] p-3'
+                    {selectedSession.messages.map((msg: any, i: number) => {
+                      const isUser = msg.role === 'user';
+                      const parsed = isUser ? parseUserMessage(msg.content) : null;
+
+                      return (
+                        <div key={i} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-[85%] w-fit min-w-0 overflow-hidden border border-black/5 relative group ${
+                            isUser
+                              ? 'bg-[#FF4F00]/50 text-white shadow-[2px_2px_0px_rgba(0,0,0,0.1)] px-3 py-2'
+                              : 'bg-[var(--muted)]/60 text-[var(--foreground)]/70 shadow-[2px_2px_0px_rgba(0,0,0,0.1)] p-3'
                           }`}>
-                          <div className={msg.role === 'user'
-                            ? "text-sm leading-tight whitespace-pre-wrap"
-                            : "text-sm leading-snug prose prose-sm dark:prose-invert max-w-none prose-p:my-0.5 prose-ul:my-1 prose-li:my-0 prose-headings:text-[var(--foreground)]/80 prose-strong:text-inherit"
-                          }>
-                            {msg.role === 'user' ? msg.content : <ReactMarkdown>{msg.content}</ReactMarkdown>}
+                            {isUser ? (
+                              <div className="text-sm leading-tight whitespace-pre-wrap break-words [overflow-wrap:anywhere] min-w-0">
+                                {parsed?.attachmentName && (
+                                  <div
+                                    className="mb-2 inline-flex items-center gap-1.5 px-2 py-1 bg-black/25 hover:bg-black/35 border border-white/20 text-white text-[11px] font-sans font-medium rounded-none max-w-full transition-colors cursor-default select-none"
+                                    title={parsed.attachmentName}
+                                  >
+                                    <Paperclip size={12} className="shrink-0 text-white/80" />
+                                    <span className="truncate max-w-[190px] sm:max-w-[280px]">
+                                      {parsed.attachmentName}
+                                    </span>
+                                  </div>
+                                )}
+                                {parsed?.cleanContent && (
+                                  <div className="break-words [overflow-wrap:anywhere]">
+                                    {parsed.cleanContent}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="text-sm leading-snug prose prose-sm dark:prose-invert max-w-none break-words [overflow-wrap:anywhere] prose-p:my-0.5 prose-ul:my-1 prose-li:my-0 prose-headings:text-[var(--foreground)]/80 prose-strong:text-inherit">
+                                <ReactMarkdown>{msg.content}</ReactMarkdown>
+                              </div>
+                            )}
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
