@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   collection,
   query,
@@ -55,8 +56,10 @@ import {
   CheckCircle,
   Circle,
   Check,
-  Clock
+  Clock,
+  Info
 } from 'lucide-react';
+import { APP_VERSION, APP_NAME } from '@/lib/version';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import jsPDF from 'jspdf';
@@ -160,7 +163,20 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
   const [showAllTags, setShowAllTags] = useState(false);
   const [isTempModalOpen, setIsTempModalOpen] = useState(false);
   const [isActionsDropdownOpen, setIsActionsDropdownOpen] = useState(false);
+  const actionsButtonRef = useRef<HTMLButtonElement>(null);
+  const [actionsCoords, setActionsCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const localTitleRef = useRef(activeNote.id);
+
+  // Auto-close dropdowns when scrolling
+  useEffect(() => {
+    if (!isActionsDropdownOpen && !isTempModalOpen) return;
+    const handleScroll = () => {
+      if (isActionsDropdownOpen) setIsActionsDropdownOpen(false);
+      if (isTempModalOpen) setIsTempModalOpen(false);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isActionsDropdownOpen, isTempModalOpen]);
 
   // Auto-resize title textarea
   React.useLayoutEffect(() => {
@@ -204,7 +220,7 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
       exit={{ opacity: 0, y: -10 }}
       className="flex-1 flex flex-col h-full overflow-hidden"
     >
-      <div className="px-4 md:px-12 py-4 md:py-6 border-b border-[var(--border)] flex items-center justify-between bg-[var(--background)]/80 backdrop-blur-sm sticky top-0 z-20">
+      <div className="px-4 md:px-12 py-4 md:py-6 border-b border-[var(--border)] flex items-center justify-between bg-[var(--background)]/80 backdrop-blur-sm sticky top-0 z-40">
           <div className="flex items-center gap-3 md:gap-6">
             <div className="w-1.5 h-1.5 bg-green-500 rounded-none animate-pulse flex-shrink-0" title="Sincronizado" />
 
@@ -279,86 +295,112 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
           {/* Actions Dropdown (Universal) */}
           <div className="relative flex items-center">
             <button
-              onClick={() => setIsActionsDropdownOpen(!isActionsDropdownOpen)}
+              ref={actionsButtonRef}
+              onClick={() => {
+                if (!isActionsDropdownOpen && actionsButtonRef.current) {
+                  const rect = actionsButtonRef.current.getBoundingClientRect();
+                  const menuWidth = 180;
+                  const left = Math.max(8, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 12));
+                  setActionsCoords({
+                    top: rect.bottom + 8,
+                    left,
+                  });
+                }
+                setIsActionsDropdownOpen(!isActionsDropdownOpen);
+              }}
               className="p-1.5 hover:bg-[var(--muted)] text-[var(--foreground)]/60 transition-colors relative"
               title="Mais ações da nota"
             >
               <MoreVertical className="w-4 h-4" />
             </button>
 
-            <AnimatePresence>
-              {isActionsDropdownOpen && (
-                <>
-                  <div 
-                    className="fixed inset-0 z-[120]" 
-                    onClick={() => setIsActionsDropdownOpen(false)}
-                  />
-                  <motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 5, scale: 0.95 }}
-                    className="absolute right-0 top-full mt-2 z-[130] bg-[var(--background)] border border-black/20 dark:border-white/20 p-2 shadow-[8px_8px_0px_rgba(0,0,0,0.1)] flex flex-col gap-1.5 w-44 text-left"
-                  >
-                    <button
-                      onClick={() => {
-                        setIsAIAssistantOpen(true);
-                        setIsActionsDropdownOpen(false);
+            {typeof document !== 'undefined' && createPortal(
+              <AnimatePresence>
+                {isActionsDropdownOpen && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-[9990]" 
+                      onClick={() => setIsActionsDropdownOpen(false)}
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: 5, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 5, scale: 0.95 }}
+                      style={{
+                        position: 'fixed',
+                        top: actionsCoords.top,
+                        left: actionsCoords.left,
                       }}
-                      className="text-[9px] font-bold uppercase py-2 px-3 border border-black/10 dark:border-white/10 bg-[var(--muted)] hover:bg-[#FF4F00] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 rounded"
+                      className="z-[9999] bg-[var(--background)]/95 backdrop-blur-xl border border-black/20 dark:border-white/20 p-2 shadow-[8px_8px_0px_rgba(0,0,0,0.15)] flex flex-col gap-1.5 w-44 text-left"
                     >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Assistente IA</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        exportAsPDF(activeNote);
-                        setIsActionsDropdownOpen(false);
-                      }}
-                      className="text-[9px] font-bold uppercase py-2 px-3 border border-black/10 dark:border-white/10 bg-[var(--muted)] hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 rounded"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                      <span>Imprimir</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsFullscreen(!isFullscreen);
-                        setIsActionsDropdownOpen(false);
-                      }}
-                      className="text-[9px] font-bold uppercase py-2 px-3 border border-black/10 dark:border-white/10 bg-[var(--muted)] hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 rounded"
-                    >
-                      <Maximize2 className="w-3.5 h-3.5" />
-                      <span>{isFullscreen ? 'Sair Foco' : 'Modo Foco'}</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        cloneNote(activeNote);
-                        setIsActionsDropdownOpen(false);
-                      }}
-                      className="text-[9px] font-bold uppercase py-2 px-3 border border-black/10 dark:border-white/10 bg-[var(--muted)] hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 rounded"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Clonar</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        deleteNote(activeNote.id);
-                        setIsActionsDropdownOpen(false);
-                      }}
-                      className="text-[9px] font-bold uppercase py-2 px-3 border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors flex items-center gap-2 rounded"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Excluir</span>
-                    </button>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
+                      <button
+                        onClick={() => {
+                          setIsAIAssistantOpen(true);
+                          setIsActionsDropdownOpen(false);
+                        }}
+                        className="text-[9px] font-bold uppercase py-2 px-3 border border-black/10 dark:border-white/10 bg-[var(--muted)] hover:bg-[#FF4F00] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 rounded"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Assistente IA</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          exportAsPDF(activeNote);
+                          setIsActionsDropdownOpen(false);
+                        }}
+                        className="text-[9px] font-bold uppercase py-2 px-3 border border-black/10 dark:border-white/10 bg-[var(--muted)] hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 rounded"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        <span>Imprimir</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsFullscreen(!isFullscreen);
+                          setIsActionsDropdownOpen(false);
+                        }}
+                        className="text-[9px] font-bold uppercase py-2 px-3 border border-black/10 dark:border-white/10 bg-[var(--muted)] hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 rounded"
+                      >
+                        <Maximize2 className="w-3.5 h-3.5" />
+                        <span>{isFullscreen ? 'Sair Foco' : 'Modo Foco'}</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          cloneNote(activeNote);
+                          setIsActionsDropdownOpen(false);
+                        }}
+                        className="text-[9px] font-bold uppercase py-2 px-3 border border-black/10 dark:border-white/10 bg-[var(--muted)] hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 rounded"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Clonar</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          deleteNote(activeNote.id);
+                          setIsActionsDropdownOpen(false);
+                        }}
+                        className="text-[9px] font-bold uppercase py-2 px-3 border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors flex items-center gap-2 rounded"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Excluir</span>
+                      </button>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>,
+              document.body
+            )}
           </div>
         </div>
 
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-12 lg:p-20 bg-[var(--muted)]/30 custom-scrollbar">
-        <div className="max-w-[850px] mx-auto w-full bg-[var(--background)] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] min-h-[1100px] border border-[var(--border)] overflow-visible relative">
+      <div 
+        onScroll={() => {
+          if (isActionsDropdownOpen) setIsActionsDropdownOpen(false);
+          if (isTempModalOpen) setIsTempModalOpen(false);
+        }}
+        className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-12 lg:p-20 bg-[var(--muted)]/30 custom-scrollbar"
+      >
+        <div className="@container/editor max-w-[850px] mx-auto w-full bg-[var(--background)] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] min-h-[1100px] border border-[var(--border)] overflow-visible relative">
           {activeNote.isTemporary && (
             <div className="bg-[#FF4F00] text-white text-[9px] font-bold uppercase tracking-[0.2em] py-2.5 px-4 text-center animate-pulse border-b border-black/10 flex items-center justify-center gap-2 z-10">
               <Clock className="w-3.5 h-3.5" />
@@ -1393,9 +1435,19 @@ export default function Home() {
       >
         <div className="p-10 flex-1 flex flex-col h-full">
           <div className="mb-10 flex items-center justify-between">
-            <h2 className="font-serif italic text-3xl tracking-tight flex items-center gap-2">
-              Cérebro²
-            </h2>
+            <div>
+              <h2 className="font-serif italic text-3xl tracking-tight flex items-center gap-2">
+                Cérebro²
+              </h2>
+              <button
+                onClick={() => setIsSettingsOpen(true)}
+                title="Ver detalhes da versão"
+                className="text-[10px] font-mono tracking-widest uppercase opacity-40 hover:opacity-100 hover:text-[var(--accent)] transition-all flex items-center gap-1.5 mt-1 cursor-pointer"
+              >
+                <span>{APP_VERSION}</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 inline-block" title="Sistema Operacional" />
+              </button>
+            </div>
             <button
               onClick={toggleTheme}
               className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-none transition-colors text-[var(--foreground)] opacity-60 hover:opacity-100"
@@ -1574,7 +1626,16 @@ export default function Home() {
 
         {/* Mobile Header for List View */}
         <div className="md:hidden flex items-center justify-between p-5 pb-0 bg-[var(--background)]">
-          <h2 className="font-serif italic text-2xl tracking-tight text-[var(--foreground)]">Cérebro²</h2>
+          <div>
+            <h2 className="font-serif italic text-2xl tracking-tight text-[var(--foreground)]">Cérebro²</h2>
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              title="Ver detalhes da versão"
+              className="text-[9px] font-mono tracking-widest uppercase opacity-40 hover:opacity-100 transition-all flex items-center gap-1 mt-0.5"
+            >
+              <span>{APP_VERSION}</span>
+            </button>
+          </div>
           <div className="flex items-center gap-1">
             <button
               onClick={() => window.dispatchEvent(new CustomEvent('open-specialist-chat'))}
@@ -2206,6 +2267,36 @@ export default function Home() {
                       {allTags.length === 0 && (
                         <p className="text-[10px] opacity-30 italic">Nenhuma etiqueta criada ainda.</p>
                       )}
+                    </div>
+                  </section>
+
+                  {/* SOBRE O SISTEMA */}
+                  <section className="space-y-4">
+                    <div className="flex items-center gap-3 border-l-4 border-[var(--accent)] pl-4">
+                      <Info className="w-5 h-5 text-[var(--accent)]" />
+                      <h3 className="text-sm font-bold uppercase tracking-widest">Sobre o Sistema</h3>
+                    </div>
+
+                    <div className="p-4 border border-[var(--border)] bg-[var(--muted)]/20 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium opacity-60">Aplicação</span>
+                        <span className="text-xs font-bold font-serif italic">{APP_NAME}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium opacity-60">Versão Atual</span>
+                        <span className="text-xs font-mono font-bold px-2 py-0.5 bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20">
+                          {APP_VERSION}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium opacity-60">Ambiente</span>
+                        <span className="text-[10px] font-mono uppercase tracking-wider opacity-60">
+                          {process.env.NODE_ENV === 'production' ? 'Produção' : 'Desenvolvimento'}
+                        </span>
+                      </div>
+                      <div className="pt-2 border-t border-[var(--border)] text-[10px] opacity-40 leading-relaxed">
+                        Sistema neural de gestão de conhecimento, notas estruturadas e síntese cognitiva.
+                      </div>
                     </div>
                   </section>
                 </div>

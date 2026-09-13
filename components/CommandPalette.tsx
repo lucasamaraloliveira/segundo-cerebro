@@ -15,6 +15,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { Note } from '@/lib/types';
+import { APP_VERSION } from '@/lib/version';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -168,7 +169,7 @@ export default function CommandPalette({ isOpen, onClose, notes, onAction }: Com
                 <span>↑↓ Navegar</span>
                 <span>ENTER Selecionar</span>
               </div>
-              <span>Terminal Neural v1.0</span>
+              <span>Terminal Neural {APP_VERSION}</span>
             </div>
           </motion.div>
         </div>

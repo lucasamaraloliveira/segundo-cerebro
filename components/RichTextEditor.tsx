@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Extension, getHTMLFromFragment } from '@tiptap/core';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -205,6 +206,40 @@ interface RichTextEditorProps {
   onReplaceSelectionComplete?: () => void;
 }
 
+export const FONT_OPTIONS = [
+  { label: 'Inter', value: 'Inter', category: 'Sans Moderna', fontFamily: 'var(--font-sans), Inter, sans-serif' },
+  { label: 'Roboto', value: 'Roboto', category: 'Sans Material', fontFamily: 'var(--font-roboto), Roboto, sans-serif' },
+  { label: 'Ubuntu', value: 'Ubuntu', category: 'Sans Humanista', fontFamily: 'var(--font-ubuntu), Ubuntu, sans-serif' },
+  { label: 'Plus Jakarta', value: 'Plus Jakarta Sans', category: 'Sans Geométrica', fontFamily: 'var(--font-plus-jakarta), "Plus Jakarta Sans", sans-serif' },
+  { label: 'Arial', value: 'Arial', category: 'Sans Padrão', fontFamily: 'Arial, Helvetica, sans-serif' },
+  { label: 'Times New Roman', value: 'Times New Roman', category: 'Serif Acadêmica', fontFamily: '"Times New Roman", Times, serif' },
+  { label: 'Cormorant', value: 'Cormorant Garamond', category: 'Serif Literária', fontFamily: 'var(--font-serif), "Cormorant Garamond", Georgia, serif' },
+  { label: 'Lora', value: 'Lora', category: 'Serif Editorial', fontFamily: 'var(--font-lora), Lora, Georgia, serif' },
+  { label: 'JetBrains', value: 'JetBrains Mono', category: 'Mono Código', fontFamily: 'var(--font-mono), "JetBrains Mono", monospace' },
+  { label: 'Space Mono', value: 'Space Mono', category: 'Mono Terminal', fontFamily: 'var(--font-space-mono), "Space Mono", monospace' },
+  { label: 'Caveat', value: 'Caveat', category: 'Manuscrita', fontFamily: 'var(--font-caveat), Caveat, cursive' },
+];
+
+export const COLOR_OPTIONS = [
+  { label: 'Padrão', value: 'default', color: 'currentColor' },
+  { label: 'Preto', value: '#000000', color: '#000000' },
+  { label: 'Cinza', value: '#666666', color: '#666666' },
+  { label: 'Vermelho', value: '#EF4444', color: '#EF4444' },
+  { label: 'Laranja', value: '#F97316', color: '#F97316' },
+  { label: 'Amarelo', value: '#EAB308', color: '#EAB308' },
+  { label: 'Verde', value: '#22C55E', color: '#22C55E' },
+  { label: 'Azul', value: '#3B82F6', color: '#3B82F6' },
+  { label: 'Roxo', value: '#A855F7', color: '#A855F7' },
+];
+
+export const FONT_SIZES = ['12px', '14px', '16px', '18px', '20px', '24px', '30px', '36px'];
+
+export const ALIGNMENT_OPTIONS = [
+  { label: 'Esquerda', value: 'left', icon: AlignLeft },
+  { label: 'Centro', value: 'center', icon: AlignCenter },
+  { label: 'Direita', value: 'right', icon: AlignRight },
+  { label: 'Justificado', value: 'justify', icon: AlignJustify },
+];
 
 // Sub-components moved outside to avoid re-definition and state loss on render
 const ToolbarButton = ({ 
@@ -226,7 +261,7 @@ const ToolbarButton = ({
       onClick();
     }}
     title={title}
-    className={`w-9 h-9 md:w-7 md:h-7 flex items-center justify-center rounded-none transition-all relative shrink-0 ${
+    className={`w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center rounded-none transition-all relative shrink-0 ${
       isActive 
         ? 'bg-[var(--accent)] text-white shadow-sm' 
         : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-70 hover:opacity-100 hover:scale-105 active:scale-95'
@@ -251,77 +286,142 @@ const CustomSelect = ({
   onChange, 
   options, 
   label,
-  hideLabel = false
+  hideLabel = false,
+  colorIndicator = false,
 }: { 
   icon: any, 
   value?: string, 
   onChange: (val: string) => void, 
-  options: { label: string, value: string, isActive?: boolean }[],
+  options: { label: string, value: string, isActive?: boolean, color?: string, icon?: any, fontFamily?: string, category?: string }[],
   label: string,
-  hideLabel?: boolean
+  hideLabel?: boolean,
+  colorIndicator?: boolean,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const selectedLabel = options.find(opt => opt.value === value)?.label || label;
+  const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const selectedOption = options.find(opt => opt.value === value);
+  const selectedLabel = selectedOption?.label || label;
+
+  const toggleOpen = () => {
+    if (!isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const menuWidth = 200;
+      const left = Math.max(8, Math.min(rect.left, window.innerWidth - menuWidth - 12));
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const top = spaceBelow < 280 && rect.top > 280 ? Math.max(8, rect.top - 280) : rect.bottom + 6;
+      setCoords({
+        top,
+        left,
+      });
+    }
+    setIsOpen(!isOpen);
+  };
 
   return (
-    <div className="relative">
+    <div className="relative shrink-0">
       <button
         ref={buttonRef}
+        onMouseDown={(e) => e.preventDefault()}
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          setIsOpen(!isOpen);
+          toggleOpen();
         }}
-        className={`flex items-center justify-center gap-1 ${hideLabel ? 'p-1.5' : 'px-2 py-1'} rounded-none bg-[var(--muted)]/50 text-[var(--foreground)] border border-[var(--border)]/10 hover:border-[var(--accent)]/50 transition-all group ${isOpen ? 'ring-1 ring-[var(--accent)] border-[var(--accent)]/50' : ''}`}
+        title={label}
+        className={`flex items-center justify-center gap-1 ${
+          hideLabel ? 'w-8 h-8 sm:w-7 sm:h-7 p-1' : 'h-8 sm:h-7 px-1.5 py-1'
+        } rounded-none bg-[var(--muted)]/50 text-[var(--foreground)] border border-[var(--border)]/10 hover:border-[var(--accent)]/50 transition-all group shrink-0 ${
+          isOpen ? 'ring-1 ring-[var(--accent)] border-[var(--accent)]/50' : ''
+        }`}
       >
-        <Icon className="w-3.5 h-3.5 md:w-3 md:h-3 opacity-50 group-hover:opacity-100 transition-opacity" />
+        <Icon className="w-3.5 h-3.5 sm:w-3 sm:h-3 opacity-60 group-hover:opacity-100 transition-opacity shrink-0" />
+        {colorIndicator && (
+          <span 
+            className="w-2 h-2 rounded-full border border-black/20 shrink-0" 
+            style={{ backgroundColor: value && value !== 'default' ? value : 'var(--foreground)' }} 
+          />
+        )}
         {!hideLabel && (
           <>
-            <span className="text-[9px] md:text-[8px] font-bold uppercase tracking-wider truncate max-w-[40px] md:max-w-[45px]">
+            <span className="text-[9px] font-bold uppercase tracking-wider truncate max-w-[62px]">
               {selectedLabel}
             </span>
-            <ChevronDown className={`w-2.5 h-2.5 ml-auto opacity-20 group-hover:opacity-100 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-2.5 h-2.5 ml-auto opacity-30 group-hover:opacity-100 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
           </>
         )}
       </button>
 
-      <AnimatePresence>
-        {isOpen && (
-          <>
-            <div 
-              className="fixed inset-0 z-[60]" 
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsOpen(false);
-              }} 
-            />
-            <motion.div 
-              initial={{ opacity: 0, y: 10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 5, scale: 0.95 }}
-              className="absolute top-full left-0 mt-2 z-[70] bg-[var(--background)]/95 backdrop-blur-xl border border-[var(--border)] shadow-[6px_6px_0px_rgba(0,0,0,0.15)] rounded-none min-w-[180px] py-1.5 overflow-hidden"
-            >
-              <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
-                {options.map(opt => (
-                  <button
-                    key={opt.value}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onChange(opt.value);
-                      setIsOpen(false); 
-                    }}
-                    className={`w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center justify-between ${opt.isActive || value === opt.value ? 'bg-[var(--accent)]/5 text-[var(--accent)]' : ''}`}
-                  >
-                    <span>{opt.label}</span>
-                    {(opt.isActive || value === opt.value) && <div className="w-1 h-1 bg-[var(--accent)] rounded-full" />}
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {isOpen && (
+            <>
+              <div 
+                className="fixed inset-0 z-[9990]" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsOpen(false);
+                }} 
+              />
+              <motion.div 
+                initial={{ opacity: 0, y: 5, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 5, scale: 0.95 }}
+                style={{
+                  position: 'fixed',
+                  top: coords.top,
+                  left: coords.left,
+                }}
+                className="z-[9999] bg-[var(--background)]/95 backdrop-blur-xl border border-[var(--border)] shadow-[6px_6px_0px_rgba(0,0,0,0.15)] rounded-none min-w-[190px] py-1.5 overflow-hidden"
+              >
+                <div className="max-h-[320px] overflow-y-auto custom-scrollbar">
+                  {options.map(opt => {
+                    const OptionIcon = opt.icon;
+                    return (
+                      <button
+                        key={opt.value}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onChange(opt.value);
+                          setIsOpen(false); 
+                        }}
+                        className={`w-full text-left px-3.5 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center justify-between group/opt ${opt.isActive || value === opt.value ? 'bg-[var(--accent)]/5 text-[var(--accent)]' : ''}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {OptionIcon && <OptionIcon className="w-3.5 h-3.5 opacity-70 group-hover/opt:text-white" />}
+                          {opt.color && (
+                            <span 
+                              className="w-2.5 h-2.5 rounded-full border border-black/20 shrink-0" 
+                              style={{ backgroundColor: opt.color === 'currentColor' ? 'var(--foreground)' : opt.color }}
+                            />
+                          )}
+                          <div className="flex flex-col">
+                            <span 
+                              className="text-[11px] normal-case tracking-normal" 
+                              style={opt.fontFamily ? { fontFamily: opt.fontFamily } : undefined}
+                            >
+                              {opt.label}
+                            </span>
+                            {opt.category && (
+                              <span className="text-[7.5px] opacity-40 group-hover/opt:text-white/80 group-hover/opt:opacity-100 uppercase tracking-wider font-mono font-normal">
+                                {opt.category}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {(opt.isActive || value === opt.value) && <div className="w-1.5 h-1.5 bg-[var(--accent)] group-hover/opt:bg-white rounded-full shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 };
@@ -373,6 +473,71 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
   const [neuralSuggestion, setNeuralSuggestion] = useState<{ id: string, title: string, score: number } | null>(null);
   const [ignoredSuggestions, setIgnoredSuggestions] = useState<Set<string>>(new Set());
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [isPopoverFontExpanded, setIsPopoverFontExpanded] = useState(false);
+  const [isMobileFontExpanded, setIsMobileFontExpanded] = useState(false);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const [moreCoords, setMoreCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const editorContainerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth;
+    }
+    return 850;
+  });
+
+  useLayoutEffect(() => {
+    if (editorContainerRef.current && editorContainerRef.current.offsetWidth > 0) {
+      setContainerWidth(editorContainerRef.current.offsetWidth);
+    }
+  }, []);
+
+  useEffect(() => {
+    setIsMounted(true);
+    let rafId: number | null = null;
+    const updateWidth = (w: number) => {
+      if (w <= 0) return;
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        setContainerWidth(w);
+      });
+    };
+
+    if (editorContainerRef.current && editorContainerRef.current.offsetWidth > 0) {
+      updateWidth(editorContainerRef.current.offsetWidth);
+    }
+
+    const handleWindowResize = () => {
+      if (editorContainerRef.current && editorContainerRef.current.offsetWidth > 0) {
+        updateWidth(editorContainerRef.current.offsetWidth);
+      } else if (typeof window !== 'undefined') {
+        updateWidth(window.innerWidth);
+      }
+    };
+
+    window.addEventListener('resize', handleWindowResize, { passive: true });
+
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && editorContainerRef.current) {
+      observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          if (entry.contentRect.width > 0) {
+            updateWidth(entry.contentRect.width);
+          }
+        }
+      });
+      observer.observe(editorContainerRef.current);
+    }
+
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', handleWindowResize);
+      if (observer) observer.disconnect();
+    };
+  }, []);
+
+  const isTier2Visible = containerWidth >= 480;
+  const isTier3Visible = containerWidth >= 720;
   
   const lastAnalyzedText = useRef('');
 
@@ -611,6 +776,9 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
       },
     },
   });
+
+  const currentFontFamily = editor?.getAttributes('textStyle')?.fontFamily || 'Inter';
+  const currentFont = FONT_OPTIONS.find(f => f.value === currentFontFamily) || FONT_OPTIONS[0];
   
   // Sync external content changes (e.g. from AI Assistant)
   useEffect(() => {
@@ -848,478 +1016,1052 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
   }
 
   return (
-    <div className="flex flex-col w-full relative">
+    <div ref={editorContainerRef} className="@container/editor flex flex-col w-full relative">
       {/* Toolbar Container */}
       <div className={isFocusMode 
         ? "sticky top-4 z-50 flex justify-center w-full pointer-events-none mb-4" 
-        : "w-full border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur-sm sticky top-0 z-30 px-3 md:px-6 py-2 md:py-2.5 flex items-center justify-between gap-2 md:gap-4"
+        : "w-full border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur-sm sticky top-0 z-30 px-2 sm:px-4 md:px-6 py-2 flex items-center justify-between gap-1 sm:gap-2"
       }>
         <div className={isFocusMode 
-          ? "pointer-events-auto bg-[var(--background)]/90 backdrop-blur-xl border border-[var(--border)] shadow-[6px_6px_0px_rgba(0,0,0,0.15)] rounded-none px-2.5 py-1 xl:px-3 xl:py-1.5 flex items-center gap-1 xl:gap-0.5 max-w-[95vw] xl:max-w-full overflow-visible no-scrollbar transition-all hover:shadow-[8px_8px_0px_rgba(0,0,0,0.2)]"
-          : "pointer-events-auto flex flex-wrap xl:flex-nowrap items-center gap-1 xl:gap-1.5 w-full overflow-visible"
+          ? "pointer-events-auto bg-[var(--background)]/90 backdrop-blur-xl border border-[var(--border)] shadow-[6px_6px_0px_rgba(0,0,0,0.15)] rounded-none px-2 py-1 lg:px-3 lg:py-1.5 flex items-center justify-between max-w-[calc(100%-1.5rem)] sm:max-w-[720px] w-fit mx-auto transition-all hover:shadow-[8px_8px_0px_rgba(0,0,0,0.2)]"
+          : "pointer-events-auto flex items-center justify-between w-full"
         }>
-        <div className="flex items-center mr-0.5">
-          <ToolbarButton onClick={() => editor.chain().focus().undo().run()} title="Desfazer">
-            <Undo className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
-          </ToolbarButton>
-          <ToolbarButton onClick={() => editor.chain().focus().redo().run()} title="Refazer">
-            <Redo className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
-          </ToolbarButton>
-        </div>
+          {/* Trilha de botões rolável suavemente se a largura for ultra-estreita */}
+          <div className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto no-scrollbar py-0.5 min-w-0 flex-1">
+            {/* GRUPO 1: HISTÓRICO (Sempre visível) */}
+            <div className="flex items-center shrink-0">
+              <ToolbarButton onClick={() => editor.chain().focus().undo().run()} title="Desfazer (Ctrl+Z)">
+                <Undo className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+              </ToolbarButton>
+              <ToolbarButton onClick={() => editor.chain().focus().redo().run()} title="Refazer (Ctrl+Y)">
+                <Redo className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+              </ToolbarButton>
+            </div>
 
-        <div className="flex items-center mr-0.5 bg-[var(--muted)]/10 rounded-none px-0.5 py-0.5">
-          <ToolbarButton 
-            onClick={() => editor.chain().focus().toggleBold().run()} 
-            isActive={editor.isActive('bold')} 
-            title="Negrito"
-          >
-            <Bold className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
-          </ToolbarButton>
-          <ToolbarButton 
-            onClick={() => editor.chain().focus().toggleItalic().run()} 
-            isActive={editor.isActive('italic')} 
-            title="Itálico"
-          >
-            <Italic className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
-          </ToolbarButton>
-          <ToolbarButton 
-            onClick={() => editor.chain().focus().toggleUnderline().run()} 
-            isActive={editor.isActive('underline')} 
-            title="Sublinhado"
-          >
-            <UnderlineIcon className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
-          </ToolbarButton>
-          <ToolbarButton 
-            onClick={() => editor.chain().focus().toggleBlockquote().run()} 
-            isActive={editor.isActive('blockquote')} 
-            title="Citação"
-            className="hidden md:inline-flex"
-          >
-            <Quote className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
-          </ToolbarButton>
-          <ToolbarButton 
-            onClick={() => editor.chain().focus().toggleCodeBlock().run()} 
-            isActive={editor.isActive('codeBlock')} 
-            title="Bloco de Código"
-            className="hidden md:inline-flex"
-          >
-            <SquareCode className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
-          </ToolbarButton>
-        </div>
+            {/* Divisor */}
+            <div className="w-[1px] h-3.5 bg-[var(--border)]/30 mx-0.5 shrink-0" />
 
-        <div className={isFocusMode ? "hidden xl:flex items-center gap-1 mr-1 animate-in fade-in slide-in-from-left-2 duration-300" : "hidden"}>
-          <CustomSelect 
-            label="Fonte"
-            icon={Type}
-            value={
-              editor.isActive('textStyle', { fontFamily: 'Inter' }) ? 'Inter' :
-              editor.isActive('textStyle', { fontFamily: 'Playfair Display' }) ? 'Playfair' :
-              editor.isActive('textStyle', { fontFamily: 'Georgia' }) ? 'Georgia' :
-              editor.isActive('textStyle', { fontFamily: 'monospace' }) ? 'Mono' : ''
-            }
-            onChange={(val) => editor.chain().focus().setFontFamily(val).run()}
-            options={[
-              { label: 'Inter', value: 'Inter' },
-              { label: 'Playfair', value: 'Playfair Display' },
-              { label: 'Georgia', value: 'Georgia' },
-              { label: 'Monospace', value: 'monospace' },
-            ]}
-          />
-        </div>
+            {/* GRUPO 2: ESTILO BÁSICO (Bold/Italic sempre; Underline a partir de 480px) */}
+            <div className="flex items-center shrink-0">
+              <ToolbarButton 
+                onClick={() => editor.chain().focus().toggleBold().run()} 
+                isActive={editor.isActive('bold')} 
+                title="Negrito (Ctrl+B)"
+              >
+                <Bold className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+              </ToolbarButton>
+              <ToolbarButton 
+                onClick={() => editor.chain().focus().toggleItalic().run()} 
+                isActive={editor.isActive('italic')} 
+                title="Itálico (Ctrl+I)"
+              >
+                <Italic className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+              </ToolbarButton>
+              <AnimatePresence initial={false}>
+                {isTier2Visible && (
+                  <motion.div
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: 'auto' }}
+                    exit={{ opacity: 0, width: 0 }}
+                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                    className="overflow-hidden flex items-center shrink-0"
+                  >
+                    <ToolbarButton 
+                      onClick={() => editor.chain().focus().toggleUnderline().run()} 
+                      isActive={editor.isActive('underline')} 
+                      title="Sublinhado (Ctrl+U)"
+                    >
+                      <UnderlineIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                    </ToolbarButton>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
-        <div className={isFocusMode ? "hidden xl:flex items-center gap-1 mr-1 animate-in fade-in slide-in-from-left-2 duration-300" : "hidden"}>
-          <CustomSelect 
-            label="Tamanho"
-            icon={Type}
-            hideLabel={false}
-            value={editor.getAttributes('textStyle').fontSize || '16px'}
-            onChange={(val) => editor.chain().focus().setFontSize(val).run()}
-            options={[
-              { label: '12px', value: '12px' },
-              { label: '14px', value: '14px' },
-              { label: '16px', value: '16px' },
-              { label: '18px', value: '18px' },
-              { label: '20px', value: '20px' },
-              { label: '24px', value: '24px' },
-              { label: '30px', value: '30px' },
-              { label: '36px', value: '36px' },
-            ]}
-          />
-        </div>
+            {/* GRUPO 3: BLOCOS (Citação e Código a partir de 480px) */}
+            <AnimatePresence initial={false}>
+              {isTier2Visible && (
+                <motion.div
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                  className="flex items-center shrink-0 overflow-hidden"
+                >
+                  <div className="w-[1px] h-3.5 bg-[var(--border)]/30 mx-0.5 shrink-0" />
+                  <ToolbarButton 
+                    onClick={() => editor.chain().focus().toggleBlockquote().run()} 
+                    isActive={editor.isActive('blockquote')} 
+                    title="Citação"
+                  >
+                    <Quote className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                  </ToolbarButton>
+                  <ToolbarButton 
+                    onClick={() => editor.chain().focus().toggleCodeBlock().run()} 
+                    isActive={editor.isActive('codeBlock')} 
+                    title="Bloco de Código"
+                  >
+                    <SquareCode className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                  </ToolbarButton>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-        <div className={isFocusMode ? "hidden xl:flex items-center gap-1 mr-1 animate-in fade-in slide-in-from-left-2 duration-300" : "hidden"}>
-          <CustomSelect 
-            label="Cor"
-            icon={Palette}
-            value={editor.getAttributes('textStyle').color || 'Padrão'}
-            onChange={(val) => {
-              if (val === 'default') editor.chain().focus().unsetColor().run();
-              else editor.chain().focus().setColor(val).run();
-            }}
-            options={[
-              { label: 'Padrão', value: 'default' },
-              { label: 'Preto', value: '#000000' },
-              { label: 'Cinza', value: '#666666' },
-              { label: 'Vermelho', value: '#EF4444' },
-              { label: 'Laranja', value: '#F97316' },
-              { label: 'Amarelo', value: '#EAB308' },
-              { label: 'Verde', value: '#22C55E' },
-              { label: 'Azul', value: '#3B82F6' },
-              { label: 'Roxo', value: '#A855F7' },
-            ]}
-          />
-        </div>
+            {/* GRUPO 4: TIPOGRAFIA (Fonte, Tamanho, Cor, Alinhamento a partir de 720px) */}
+            <AnimatePresence initial={false}>
+              {isTier3Visible && (
+                <motion.div
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                  className="flex items-center gap-1 shrink-0 overflow-hidden"
+                >
+                  <div className="w-[1px] h-3.5 bg-[var(--border)]/30 mx-0.5 shrink-0" />
+                  <CustomSelect 
+                    label="Fonte"
+                    icon={Type}
+                    value={editor.getAttributes('textStyle').fontFamily || 'Inter'}
+                    onChange={(val) => editor.chain().focus().setFontFamily(val).run()}
+                    options={FONT_OPTIONS}
+                  />
 
-        <div className="flex items-center mr-0.5">
-          <ToolbarButton 
-            onClick={() => editor.chain().focus().toggleBulletList().run()} 
-            isActive={editor.isActive('bulletList')} 
-            title="Lista"
-          >
-            <List className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
-          </ToolbarButton>
-          <ToolbarButton 
-            onClick={() => editor.chain().focus().toggleTaskList().run()} 
-            isActive={editor.isActive('taskList')} 
-            title="Tarefas"
-          >
-            <CheckSquare className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
-          </ToolbarButton>
-          <ToolbarButton 
-            onClick={() => {
-              const url = window.prompt('URL externa:');
-              if (url) {
-                if (url === '') editor.chain().focus().unsetLink().run();
-                else editor.chain().focus().setLink({ href: url }).run();
-              }
-            }} 
-            isActive={editor.isActive('link')} 
-            title="Link Externo"
-            className="hidden xl:inline-flex"
-          >
-            <LinkIcon className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
-          </ToolbarButton>
-          <ToolbarButton 
-            onClick={() => setNoteLinkModal(true)} 
-            isActive={false} 
-            title="Conectar Nota"
-            className="hidden xl:inline-flex"
-          >
-            <Layers className="w-4 h-4 xl:w-3.5 xl:h-3.5 text-[var(--accent)]" />
-          </ToolbarButton>
-        </div>
+                  <CustomSelect 
+                    label="Tam"
+                    icon={Type}
+                    value={editor.getAttributes('textStyle').fontSize || '16px'}
+                    onChange={(val) => editor.chain().focus().setFontSize(val).run()}
+                    options={[
+                      { label: '12', value: '12px' },
+                      { label: '14', value: '14px' },
+                      { label: '16', value: '16px' },
+                      { label: '18', value: '18px' },
+                      { label: '20', value: '20px' },
+                      { label: '24', value: '24px' },
+                      { label: '30', value: '30px' },
+                      { label: '36', value: '36px' },
+                    ]}
+                  />
 
-        <div className={isFocusMode ? "hidden xl:flex items-center mr-1 animate-in fade-in slide-in-from-left-2 duration-300" : "hidden"}>
-          <CustomSelect 
-            label="Alinhar"
-            icon={
-              editor.isActive({ textAlign: 'center' }) ? AlignCenter :
-              editor.isActive({ textAlign: 'right' }) ? AlignRight :
-              editor.isActive({ textAlign: 'justify' }) ? AlignJustify : AlignLeft
-            }
-            hideLabel={false}
-            value={
-              editor.isActive({ textAlign: 'left' }) ? 'left' :
-              editor.isActive({ textAlign: 'center' }) ? 'center' :
-              editor.isActive({ textAlign: 'right' }) ? 'right' :
-              editor.isActive({ textAlign: 'justify' }) ? 'justify' : 'left'
-            }
-            onChange={(val) => editor.chain().focus().setTextAlign(val).run()}
-            options={[
-              { label: 'Esquerda', value: 'left' },
-              { label: 'Centro', value: 'center' },
-              { label: 'Direita', value: 'right' },
-              { label: 'Justificado', value: 'justify' },
-            ]}
-          />
-        </div>
+                  <CustomSelect 
+                    label="Cor"
+                    icon={Palette}
+                    hideLabel={true}
+                    colorIndicator={true}
+                    value={editor.getAttributes('textStyle').color || 'default'}
+                    onChange={(val) => {
+                      if (val === 'default') editor.chain().focus().unsetColor().run();
+                      else editor.chain().focus().setColor(val).run();
+                    }}
+                    options={[
+                      { label: 'Padrão', value: 'default', color: 'currentColor' },
+                      { label: 'Preto', value: '#000000', color: '#000000' },
+                      { label: 'Cinza', value: '#666666', color: '#666666' },
+                      { label: 'Vermelho', value: '#EF4444', color: '#EF4444' },
+                      { label: 'Laranja', value: '#F97316', color: '#F97316' },
+                      { label: 'Amarelo', value: '#EAB308', color: '#EAB308' },
+                      { label: 'Verde', value: '#22C55E', color: '#22C55E' },
+                      { label: 'Azul', value: '#3B82F6', color: '#3B82F6' },
+                      { label: 'Roxo', value: '#A855F7', color: '#A855F7' },
+                    ]}
+                  />
 
-        <div className="flex items-center gap-0.5">
-          <ToolbarButton 
-            onClick={() => setIsAiAutocompleteEnabled(!isAiAutocompleteEnabled)} 
-            isActive={isAiAutocompleteEnabled} 
-            title="Autocompletar com IA"
-            className="hidden xl:inline-flex"
-          >
-            <Sparkles className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
-          </ToolbarButton>
-          <button
-            onClick={toggleTranscription}
-            className={`w-9 h-9 xl:w-7 xl:h-7 flex items-center justify-center rounded-none transition-all hidden xl:flex ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60'}`}
-            title="Voz para Texto"
-          >
-            <Mic className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
-          </button>
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              if (isRecordingAudio) stopAudioRecording();
-              else startAudioRecording();
-            }}
-            className={`w-9 h-9 xl:w-7 xl:h-7 flex items-center justify-center rounded-none transition-all hidden xl:flex ${isRecordingAudio ? 'bg-[#FF4F00] text-white animate-pulse' : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-60'}`}
-            title={isRecordingAudio ? "Parar Gravação" : "Gravar Áudio (Temporário)"}
-          >
-            <AudioLines className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
-          </button>
-          <ToolbarButton 
-            onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} 
-            title="Limpar"
-            className="hidden xl:inline-flex"
-          >
-            <Eraser className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
-          </ToolbarButton>
-        </div>
+                  <CustomSelect 
+                    label="Alinhar"
+                    icon={
+                      editor.isActive({ textAlign: 'center' }) ? AlignCenter :
+                      editor.isActive({ textAlign: 'right' }) ? AlignRight :
+                      editor.isActive({ textAlign: 'justify' }) ? AlignJustify : AlignLeft
+                    }
+                    hideLabel={true}
+                    value={
+                      editor.isActive({ textAlign: 'left' }) ? 'left' :
+                      editor.isActive({ textAlign: 'center' }) ? 'center' :
+                      editor.isActive({ textAlign: 'right' }) ? 'right' :
+                      editor.isActive({ textAlign: 'justify' }) ? 'justify' : 'left'
+                    }
+                    onChange={(val) => editor.chain().focus().setTextAlign(val).run()}
+                    options={[
+                      { label: 'Esquerda', value: 'left', icon: AlignLeft },
+                      { label: 'Centro', value: 'center', icon: AlignCenter },
+                      { label: 'Direita', value: 'right', icon: AlignRight },
+                      { label: 'Justificado', value: 'justify', icon: AlignJustify },
+                    ]}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-          {/* Mobile/Notebook "More Options" button */}
-          <div className={`relative flex items-center ${isFocusMode ? 'xl:hidden' : ''}`}>
+            {/* Divisor */}
+            <div className="w-[1px] h-3.5 bg-[var(--border)]/30 mx-0.5 shrink-0" />
+
+            {/* GRUPO 5: LISTAS E LINKS */}
+            <div className="flex items-center shrink-0">
+              <CustomSelect 
+                label="Listas"
+                icon={
+                  editor.isActive('taskList') ? CheckSquare :
+                  editor.isActive('orderedList') ? ListOrdered : List
+                }
+                hideLabel={true}
+                value={
+                  editor.isActive('taskList') ? 'taskList' :
+                  editor.isActive('orderedList') ? 'orderedList' :
+                  editor.isActive('bulletList') ? 'bulletList' : ''
+                }
+                onChange={(val) => {
+                  if (val === 'bulletList') editor.chain().focus().toggleBulletList().run();
+                  else if (val === 'orderedList') editor.chain().focus().toggleOrderedList().run();
+                  else if (val === 'taskList') editor.chain().focus().toggleTaskList().run();
+                }}
+                options={[
+                  { label: 'Marcadores', value: 'bulletList', icon: List, isActive: editor.isActive('bulletList') },
+                  { label: 'Numerada', value: 'orderedList', icon: ListOrdered, isActive: editor.isActive('orderedList') },
+                  { label: 'Checklist', value: 'taskList', icon: CheckSquare, isActive: editor.isActive('taskList') },
+                ]}
+              />
+              <AnimatePresence initial={false}>
+                {isTier2Visible && (
+                  <motion.div
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: 'auto' }}
+                    exit={{ opacity: 0, width: 0 }}
+                    transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                    className="overflow-hidden flex items-center shrink-0 ml-0.5"
+                  >
+                    <ToolbarButton 
+                      onClick={() => {
+                        const url = window.prompt('URL externa:');
+                        if (url) {
+                          if (url === '') editor.chain().focus().unsetLink().run();
+                          else editor.chain().focus().setLink({ href: url }).run();
+                        }
+                      }} 
+                      isActive={editor.isActive('link')} 
+                      title="Link Externo"
+                    >
+                      <LinkIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                    </ToolbarButton>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              <AnimatePresence initial={false}>
+                {isTier3Visible && (
+                  <motion.div
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: 'auto' }}
+                    exit={{ opacity: 0, width: 0 }}
+                    transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                    className="overflow-hidden flex items-center shrink-0"
+                  >
+                    <ToolbarButton 
+                      onClick={() => setNoteLinkModal(true)} 
+                      isActive={false} 
+                      title="Conectar Nota Interna"
+                    >
+                      <Layers className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-[var(--accent)]" />
+                    </ToolbarButton>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* GRUPO 6: INTELIGÊNCIA IA */}
+            <AnimatePresence initial={false}>
+              {isTier3Visible && (
+                <motion.div
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                  className="flex items-center shrink-0 overflow-hidden"
+                >
+                  <div className="w-[1px] h-3.5 bg-[var(--border)]/30 mx-0.5 shrink-0" />
+                  <ToolbarButton 
+                    onClick={() => setIsAiAutocompleteEnabled(!isAiAutocompleteEnabled)} 
+                    isActive={isAiAutocompleteEnabled} 
+                    title="Autocompletar com IA"
+                  >
+                    <Sparkles className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                  </ToolbarButton>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Indicador se gravação estiver ativa */}
+            {(isRecording || isRecordingAudio) && (
+              <div className="flex items-center gap-1 px-1.5 py-0.5 bg-red-500/10 border border-red-500/30 text-red-500 animate-pulse text-[9px] font-mono font-bold ml-1 shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                <span>REC</span>
+              </div>
+            )}
+
+            {/* Interim Text Indicator */}
+            {isRecording && interimText && (
+              <div className="flex items-center px-2 py-0.5 bg-black/5 dark:bg-white/5 border-l border-[var(--accent)] animate-in slide-in-from-left-2 shrink-0">
+                <span className="text-[10px] italic opacity-40 truncate max-w-[140px]">{interimText}...</span>
+              </div>
+            )}
+          </div>
+
+          {/* Divisor antes do botão Mais Opções */}
+          <div className="w-[1px] h-3.5 bg-[var(--border)]/30 mx-0.5 sm:mx-1 shrink-0" />
+
+          {/* GRUPO 7: MAIS OPÇÕES (...) - FORA DA TRILHA DE OVERFLOW! */}
+          <div className="relative flex items-center shrink-0">
             <button
+              ref={moreButtonRef}
               onClick={(e) => {
                 e.preventDefault();
+                if (editorContainerRef.current) {
+                  setContainerWidth(editorContainerRef.current.offsetWidth);
+                }
+                if (!isMobileMenuOpen && moreButtonRef.current) {
+                  const rect = moreButtonRef.current.getBoundingClientRect();
+                  setMoreCoords({
+                    top: rect.bottom + 6,
+                    left: Math.max(8, rect.right - 280),
+                  });
+                }
                 setIsMobileMenuOpen(!isMobileMenuOpen);
               }}
-              className={`w-9 h-9 flex items-center justify-center rounded-none transition-all relative shrink-0 ${
+              className={`w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center rounded-none transition-all relative shrink-0 ${
                 isMobileMenuOpen 
                   ? 'bg-[var(--accent)] text-white shadow-sm' 
                   : 'hover:bg-[var(--muted)] text-[var(--foreground)] opacity-70 hover:opacity-100'
               }`}
-              title="Mais Opções"
+              title="Mais Opções & Ferramentas"
             >
-              <MoreHorizontal className="w-4 h-4 xl:w-3.5 xl:h-3.5" />
+              <MoreHorizontal className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
             </button>
 
-            <AnimatePresence>
-              {isMobileMenuOpen && (
-                <>
-                  <div 
-                    className="fixed inset-0 z-[60]" 
-                    onClick={() => setIsMobileMenuOpen(false)} 
-                  />
-                  <motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 5, scale: 0.95 }}
-                    className="absolute right-[-8px] md:right-0 top-full mt-2 z-[70] bg-[var(--background)]/95 backdrop-blur-xl border border-[var(--border)] shadow-[6px_6px_0px_rgba(0,0,0,0.15)] rounded-none w-[280px] py-1.5 overflow-hidden flex flex-col"
-                  >
-                    {/* Fonte Selector */}
-                    <div className="px-4 py-2 border-b border-[var(--border)]/10 flex flex-col gap-1">
-                      <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground">Fonte</span>
-                      <select 
-                        value={
-                          editor.isActive('textStyle', { fontFamily: 'Inter' }) ? 'Inter' :
-                          editor.isActive('textStyle', { fontFamily: 'Playfair Display' }) ? 'Playfair Display' :
-                          editor.isActive('textStyle', { fontFamily: 'Georgia' }) ? 'Georgia' :
-                          editor.isActive('textStyle', { fontFamily: 'monospace' }) ? 'monospace' : 'Inter'
-                        }
-                        onChange={(e) => {
-                          editor.chain().focus().setFontFamily(e.target.value).run();
-                          setIsMobileMenuOpen(false);
-                        }}
-                        className="w-full bg-[var(--muted)] text-[var(--foreground)] text-xs rounded-none border border-[var(--border)] px-2 py-1 focus:outline-none"
-                      >
-                        <option value="Inter">Inter</option>
-                        <option value="Playfair Display">Playfair</option>
-                        <option value="Georgia">Georgia</option>
-                        <option value="monospace">Monospace</option>
-                      </select>
-                    </div>
+            {/* Menu Popover Desktop (apenas telas sm+) via Portal */}
+            {typeof document !== 'undefined' && createPortal(
+              <AnimatePresence>
+                {isMobileMenuOpen && (
+                  <div className="hidden sm:block">
+                    <div 
+                      className="fixed inset-0 z-[9990]" 
+                      onClick={() => setIsMobileMenuOpen(false)} 
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: 5, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 5, scale: 0.95 }}
+                      style={{
+                        position: 'fixed',
+                        top: moreCoords.top,
+                        left: moreCoords.left,
+                      }}
+                      className="z-[9999] bg-[var(--background)]/95 backdrop-blur-xl border border-[var(--border)] shadow-[8px_8px_0px_rgba(0,0,0,0.15)] rounded-none w-[280px] py-1.5 overflow-hidden flex flex-col"
+                    >
+                      {/* TIER 2: BLOCOS & FORMATAÇÃO TRANSBORDADOS (Visíveis quando a folha for < 480px) */}
+                      <AnimatePresence initial={false}>
+                        {!isTier2Visible && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                            className="overflow-hidden px-3 py-2 border-b border-[var(--border)]/10"
+                          >
+                            <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground block mb-1.5">Blocos & Formatação</span>
+                            <div className="grid grid-cols-4 gap-1">
+                              <button
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  editor.chain().focus().toggleUnderline().run();
+                                }}
+                                className={`py-1.5 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border transition-colors rounded-none ${
+                                  editor.isActive('underline')
+                                    ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                                    : 'border-[var(--border)] text-[var(--foreground)] bg-[var(--muted)]/40 hover:bg-[var(--muted)]'
+                                }`}
+                                title="Sublinhado"
+                              >
+                                <UnderlineIcon className="w-3.5 h-3.5" />
+                                <span>Subl.</span>
+                              </button>
 
-                    {/* Tamanho Selector */}
-                    <div className="px-4 py-2 border-b border-[var(--border)]/10 flex flex-col gap-1">
-                      <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground">Tamanho</span>
-                      <select 
-                        value={editor.getAttributes('textStyle').fontSize || '16px'}
-                        onChange={(e) => {
-                          editor.chain().focus().setFontSize(e.target.value).run();
-                          setIsMobileMenuOpen(false);
-                        }}
-                        className="w-full bg-[var(--muted)] text-[var(--foreground)] text-xs rounded-none border border-[var(--border)] px-2 py-1 focus:outline-none"
-                      >
-                        {['12px', '14px', '16px', '18px', '20px', '24px', '30px', '36px'].map(size => (
-                          <option key={size} value={size}>{size}</option>
-                        ))}
-                      </select>
-                    </div>
+                              <button
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  editor.chain().focus().toggleBlockquote().run();
+                                }}
+                                className={`py-1.5 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border transition-colors rounded-none ${
+                                  editor.isActive('blockquote')
+                                    ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                                    : 'border-[var(--border)] text-[var(--foreground)] bg-[var(--muted)]/40 hover:bg-[var(--muted)]'
+                                }`}
+                                title="Citação"
+                              >
+                                <Quote className="w-3.5 h-3.5" />
+                                <span>Citar</span>
+                              </button>
 
-                    {/* Cor Selector */}
-                    <div className="px-4 py-2 border-b border-[var(--border)]/10 flex flex-col gap-1">
-                      <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground">Cor do Texto</span>
-                      <select 
-                        value={editor.getAttributes('textStyle').color || 'default'}
-                        onChange={(e) => {
-                          if (e.target.value === 'default') editor.chain().focus().unsetColor().run();
-                          else editor.chain().focus().setColor(e.target.value).run();
-                          setIsMobileMenuOpen(false);
-                        }}
-                        className="w-full bg-[var(--muted)] text-[var(--foreground)] text-xs rounded-none border border-[var(--border)] px-2 py-1 focus:outline-none"
-                      >
-                        <option value="default">Padrão</option>
-                        <option value="#000000">Preto</option>
-                        <option value="#666666">Cinza</option>
-                        <option value="#EF4444">Vermelho</option>
-                        <option value="#F97316">Laranja</option>
-                        <option value="#EAB308">Amarelo</option>
-                        <option value="#22C55E">Verde</option>
-                        <option value="#3B82F6">Azul</option>
-                        <option value="#A855F7">Roxo</option>
-                      </select>
-                    </div>
+                              <button
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  editor.chain().focus().toggleCodeBlock().run();
+                                }}
+                                className={`py-1.5 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border transition-colors rounded-none ${
+                                  editor.isActive('codeBlock')
+                                    ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                                    : 'border-[var(--border)] text-[var(--foreground)] bg-[var(--muted)]/40 hover:bg-[var(--muted)]'
+                                }`}
+                                title="Código"
+                              >
+                                <SquareCode className="w-3.5 h-3.5" />
+                                <span>Código</span>
+                              </button>
 
-                    {/* Alinhamento Selector */}
-                    <div className="px-4 py-2 border-b border-[var(--border)]/10 flex flex-col gap-1">
-                      <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground">Alinhamento</span>
-                      <select 
-                        value={
-                          editor.isActive({ textAlign: 'left' }) ? 'left' :
-                          editor.isActive({ textAlign: 'center' }) ? 'center' :
-                          editor.isActive({ textAlign: 'right' }) ? 'right' :
-                          editor.isActive({ textAlign: 'justify' }) ? 'justify' : 'left'
-                        }
-                        onChange={(e) => {
-                          editor.chain().focus().setTextAlign(e.target.value).run();
-                          setIsMobileMenuOpen(false);
-                        }}
-                        className="w-full bg-[var(--muted)] text-[var(--foreground)] text-xs rounded-none border border-[var(--border)] px-2 py-1 focus:outline-none"
-                      >
-                        <option value="left">Esquerda</option>
-                        <option value="center">Centro</option>
-                        <option value="right">Direita</option>
-                        <option value="justify">Justificado</option>
-                      </select>
-                    </div>
+                              <button
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  const url = window.prompt('URL externa:');
+                                  if (url) {
+                                    if (url === '') editor.chain().focus().unsetLink().run();
+                                    else editor.chain().focus().setLink({ href: url }).run();
+                                  }
+                                }}
+                                className={`py-1.5 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border transition-colors rounded-none ${
+                                  editor.isActive('link')
+                                    ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                                    : 'border-[var(--border)] text-[var(--foreground)] bg-[var(--muted)]/40 hover:bg-[var(--muted)]'
+                                }`}
+                                title="Link"
+                              >
+                                <LinkIcon className="w-3.5 h-3.5" />
+                                <span>Link</span>
+                              </button>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
 
-                    {/* Quick Button Grid */}
-                    <div className="grid grid-cols-2 gap-1 p-2 border-b border-[var(--border)]/10">
+                      {/* TIER 3: TIPOGRAFIA & CONEXÕES TRANSBORDADAS (Visíveis quando a folha for < 720px) */}
+                      <AnimatePresence initial={false}>
+                        {!isTier3Visible && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                            className="overflow-hidden"
+                          >
+                            {/* Fonte em Acordeão com Preview Real */}
+                            <div className="px-3 py-2 border-b border-[var(--border)]/10 flex flex-col gap-1.5">
+                              <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground">Fonte</span>
+                              <button
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => setIsPopoverFontExpanded(!isPopoverFontExpanded)}
+                                className="w-full flex items-center justify-between px-2.5 py-1.5 bg-[var(--muted)]/50 hover:bg-[var(--muted)] border border-[var(--border)]/30 transition-all rounded-none text-left"
+                              >
+                                <div className="flex items-center gap-2 truncate">
+                                  <Type className="w-3.5 h-3.5 opacity-60 shrink-0" />
+                                  <span 
+                                    className="text-[11px] truncate"
+                                    style={currentFont?.fontFamily ? { fontFamily: currentFont.fontFamily } : undefined}
+                                  >
+                                    {currentFont?.label || 'Inter'}
+                                  </span>
+                                  {currentFont?.category && (
+                                    <span className="text-[7.5px] opacity-40 uppercase tracking-wider font-mono shrink-0">
+                                      {currentFont.category}
+                                    </span>
+                                  )}
+                                </div>
+                                <ChevronDown className={`w-3 h-3 opacity-40 transition-transform shrink-0 ${isPopoverFontExpanded ? 'rotate-180' : ''}`} />
+                              </button>
+
+                              <AnimatePresence>
+                                {isPopoverFontExpanded && (
+                                  <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                                    className="overflow-hidden border border-[var(--border)]/20 bg-[var(--background)] max-h-[170px] overflow-y-auto custom-scrollbar mt-0.5"
+                                  >
+                                    {FONT_OPTIONS.map((font) => {
+                                      const isCurrent = currentFontFamily === font.value;
+                                      return (
+                                        <button
+                                          key={font.value}
+                                          type="button"
+                                          onMouseDown={(e) => e.preventDefault()}
+                                          onClick={() => {
+                                            editor.chain().focus().setFontFamily(font.value).run();
+                                            setIsPopoverFontExpanded(false);
+                                          }}
+                                          className={`w-full text-left px-3 py-1.5 text-[10px] flex items-center justify-between hover:bg-[var(--accent)] hover:text-white transition-colors group/font ${
+                                            isCurrent ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-bold' : 'text-[var(--foreground)]'
+                                          }`}
+                                        >
+                                          <div className="flex flex-col">
+                                            <span className="text-[11px]" style={{ fontFamily: font.fontFamily }}>{font.label}</span>
+                                            <span className="text-[7.5px] opacity-40 group-hover/font:text-white/80 uppercase tracking-wider font-mono">{font.category}</span>
+                                          </div>
+                                          {isCurrent && <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] group-hover/font:bg-white" />}
+                                        </button>
+                                      );
+                                    })}
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+
+                            {/* Tamanho (Grade de Chips Numéricos) */}
+                            <div className="px-3 py-2 border-b border-[var(--border)]/10 flex flex-col gap-1.5">
+                              <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground">Tamanho</span>
+                              <div className="grid grid-cols-4 gap-1">
+                                {FONT_SIZES.map(size => {
+                                  const isCurrent = (editor.getAttributes('textStyle').fontSize || '16px') === size;
+                                  return (
+                                    <button
+                                      key={size}
+                                      type="button"
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => editor.chain().focus().setFontSize(size).run()}
+                                      className={`py-1 text-[10px] font-mono font-bold border transition-colors rounded-none ${
+                                        isCurrent 
+                                          ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-xs' 
+                                          : 'border-[var(--border)]/30 bg-[var(--muted)]/40 hover:bg-[var(--muted)] text-[var(--foreground)]'
+                                      }`}
+                                    >
+                                      {size.replace('px', '')}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Cor do Texto (Swatches Táteis) */}
+                            <div className="px-3 py-2 border-b border-[var(--border)]/10 flex flex-col gap-1.5">
+                              <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground">Cor do Texto</span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {COLOR_OPTIONS.map(c => {
+                                  const activeColor = editor.getAttributes('textStyle').color || 'default';
+                                  const isSelected = activeColor === c.value;
+                                  return (
+                                    <button
+                                      key={c.value}
+                                      type="button"
+                                      title={c.label}
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => {
+                                        if (c.value === 'default') editor.chain().focus().unsetColor().run();
+                                        else editor.chain().focus().setColor(c.value).run();
+                                      }}
+                                      className={`w-5 h-5 rounded-full border transition-all flex items-center justify-center shrink-0 ${
+                                        isSelected ? 'ring-2 ring-[var(--accent)] scale-110' : 'hover:scale-105 border-black/20'
+                                      }`}
+                                      style={{ backgroundColor: c.value === 'default' ? 'var(--foreground)' : c.color }}
+                                    >
+                                      {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white shadow-xs" />}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Alinhamento (Segmented Control com Ícones) */}
+                            <div className="px-3 py-2 border-b border-[var(--border)]/10 flex flex-col gap-1.5">
+                              <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground">Alinhamento</span>
+                              <div className="grid grid-cols-4 gap-1">
+                                {ALIGNMENT_OPTIONS.map(item => {
+                                  const isAlignActive = editor.isActive({ textAlign: item.value }) || (item.value === 'left' && !editor.isActive({ textAlign: 'center' }) && !editor.isActive({ textAlign: 'right' }) && !editor.isActive({ textAlign: 'justify' }));
+                                  const ItemIcon = item.icon;
+                                  return (
+                                    <button
+                                      key={item.value}
+                                      type="button"
+                                      title={item.label}
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => editor.chain().focus().setTextAlign(item.value).run()}
+                                      className={`h-7 flex items-center justify-center border transition-colors rounded-none ${
+                                        isAlignActive 
+                                          ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-xs' 
+                                          : 'border-[var(--border)]/30 bg-[var(--muted)]/40 hover:bg-[var(--muted)] text-[var(--foreground)]'
+                                      }`}
+                                    >
+                                      <ItemIcon className="w-3.5 h-3.5" />
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Conectar Nota Interna */}
+                            <div className="p-2 border-b border-[var(--border)]/10">
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setIsMobileMenuOpen(false);
+                                  setNoteLinkModal(true);
+                                }}
+                                className="w-full px-3 py-2 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 border border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors rounded-none opacity-80"
+                              >
+                                <Layers className="w-3.5 h-3.5 text-[var(--accent)]" />
+                                <span>Conectar Nota Interna</span>
+                              </button>
+                            </div>
+
+                            {/* IA */}
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setIsAiAutocompleteEnabled(!isAiAutocompleteEnabled);
+                                setIsMobileMenuOpen(false);
+                              }}
+                              className={`w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 border-b border-[var(--border)]/10 ${isAiAutocompleteEnabled ? 'bg-[var(--accent)]/5 text-[var(--accent)]' : ''}`}
+                            >
+                              <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" />
+                              <span>Autocompletar IA</span>
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      {/* Utilitários sempre presentes no desktop */}
+                      <div className="flex flex-col">
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setIsMobileMenuOpen(false);
+                            toggleTranscription();
+                          }}
+                          className={`w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 ${isRecording ? 'bg-red-500/10 text-red-500 font-bold' : ''}`}
+                        >
+                          <Mic className="w-3.5 h-3.5 text-[var(--accent)]" />
+                          <span>{isRecording ? "Parar Transcrição" : "Voz para Texto"}</span>
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setIsMobileMenuOpen(false);
+                            if (isRecordingAudio) stopAudioRecording();
+                            else startAudioRecording();
+                          }}
+                          className={`w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 ${isRecordingAudio ? 'bg-red-500/10 text-red-500 font-bold' : ''}`}
+                        >
+                          <AudioLines className="w-3.5 h-3.5 text-[var(--accent)]" />
+                          <span>{isRecordingAudio ? "Parar Gravação" : "Gravar Áudio"}</span>
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setIsMobileMenuOpen(false);
+                            editor.chain().focus().unsetAllMarks().clearNodes().run();
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 border-t border-[var(--border)]/10"
+                        >
+                          <Eraser className="w-3.5 h-3.5 opacity-60" />
+                          <span>Limpar Formatação</span>
+                        </button>
+
+                        {/* Dica rápida de atalhos */}
+                        <div className="px-4 py-2 bg-[var(--muted)]/20 border-t border-[var(--border)]/10 text-[8px] font-mono opacity-40 flex items-center justify-between">
+                          <span>Ctrl+B, I, U, Z</span>
+                          <span>Esc para fechar</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
+              </AnimatePresence>,
+              document.body
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Bottom Sheet Drawer via Portal (imune a qualquer overflow, z-index ou backdrop-blur) */}
+      {isMounted && typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {isMobileMenuOpen && (
+            <div className="sm:hidden fixed inset-0 z-[100] flex flex-col justify-end pointer-events-auto">
+              {/* Backdrop Escuro com Blur */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+              />
+
+              {/* Drawer Inferior */}
+              <motion.div
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+                className="relative z-10 bg-[var(--background)] border-t border-[var(--border)] shadow-2xl rounded-t-2xl max-h-[85vh] flex flex-col overflow-hidden pb-6"
+              >
+                {/* Cabeçalho da Gaveta */}
+                <div className="w-full flex flex-col items-center pt-3 pb-2 border-b border-[var(--border)]/10 px-4">
+                  <div className="w-10 h-1 rounded-full bg-[var(--foreground)]/20 mb-2" />
+                  <div className="w-full flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--foreground)] opacity-70">
+                      Ferramentas & Estilos
+                    </span>
+                    <button 
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="text-[11px] font-bold px-2.5 py-1 bg-[var(--muted)] text-[var(--foreground)] rounded-none hover:opacity-80 transition-opacity"
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+
+                {/* Conteúdo Rolável da Gaveta */}
+                <div className="overflow-y-auto custom-scrollbar px-4 py-3 space-y-4">
+                  {/* SEÇÃO 1: FORMATAÇÕES DE BLOCO & TEXTO */}
+                  <div>
+                    <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground block mb-1.5">Estilo Rápido</span>
+                    <div className="grid grid-cols-4 gap-1.5">
                       <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          editor.chain().focus().toggleBlockquote().run();
-                          setIsMobileMenuOpen(false);
+                        onClick={() => {
+                          editor.chain().focus().toggleUnderline().run();
                         }}
-                        className={`px-2 py-2 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border transition-colors rounded-none ${
-                          editor.isActive('blockquote')
+                        className={`py-2 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border transition-colors rounded-none ${
+                          editor.isActive('underline')
                             ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
-                            : 'border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--muted)] opacity-80'
+                            : 'border-[var(--border)] text-[var(--foreground)] bg-[var(--muted)]/40'
                         }`}
                       >
-                        <Quote className="w-3 h-3" />
-                        <span>Citação</span>
+                        <UnderlineIcon className="w-3.5 h-3.5" />
+                        <span>Subl.</span>
                       </button>
 
                       <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          editor.chain().focus().toggleCodeBlock().run();
-                          setIsMobileMenuOpen(false);
+                        onClick={() => {
+                          editor.chain().focus().toggleBlockquote().run();
                         }}
-                        className={`px-2 py-2 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border transition-colors rounded-none ${
-                          editor.isActive('codeBlock')
+                        className={`py-2 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border transition-colors rounded-none ${
+                          editor.isActive('blockquote')
                             ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
-                            : 'border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--muted)] opacity-80'
+                            : 'border-[var(--border)] text-[var(--foreground)] bg-[var(--muted)]/40'
                         }`}
                       >
-                        <SquareCode className="w-3 h-3" />
+                        <Quote className="w-3.5 h-3.5" />
+                        <span>Citar</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          editor.chain().focus().toggleCodeBlock().run();
+                        }}
+                        className={`py-2 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border transition-colors rounded-none ${
+                          editor.isActive('codeBlock')
+                            ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                            : 'border-[var(--border)] text-[var(--foreground)] bg-[var(--muted)]/40'
+                        }`}
+                      >
+                        <SquareCode className="w-3.5 h-3.5" />
                         <span>Código</span>
                       </button>
 
                       <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setIsMobileMenuOpen(false);
+                        onClick={() => {
                           const url = window.prompt('URL externa:');
                           if (url) {
                             if (url === '') editor.chain().focus().unsetLink().run();
                             else editor.chain().focus().setLink({ href: url }).run();
                           }
                         }}
-                        className={`px-2 py-2 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border transition-colors rounded-none ${
+                        className={`py-2 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border transition-colors rounded-none ${
                           editor.isActive('link')
                             ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
-                            : 'border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--muted)] opacity-80'
+                            : 'border-[var(--border)] text-[var(--foreground)] bg-[var(--muted)]/40'
                         }`}
                       >
-                        <LinkIcon className="w-3 h-3" />
+                        <LinkIcon className="w-3.5 h-3.5" />
                         <span>Link</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* SEÇÃO: LISTAS */}
+                  <div>
+                    <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground block mb-1.5">Listas</span>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <button
+                        onClick={() => {
+                          editor.chain().focus().toggleBulletList().run();
+                        }}
+                        className={`py-2 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border transition-colors rounded-none ${
+                          editor.isActive('bulletList')
+                            ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                            : 'border-[var(--border)] text-[var(--foreground)] bg-[var(--muted)]/40'
+                        }`}
+                      >
+                        <List className="w-3.5 h-3.5" />
+                        <span>Marcadores</span>
                       </button>
 
                       <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setIsMobileMenuOpen(false);
-                          setNoteLinkModal(true);
+                        onClick={() => {
+                          editor.chain().focus().toggleOrderedList().run();
                         }}
-                        className="px-2 py-2 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors rounded-none opacity-80"
+                        className={`py-2 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border transition-colors rounded-none ${
+                          editor.isActive('orderedList')
+                            ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                            : 'border-[var(--border)] text-[var(--foreground)] bg-[var(--muted)]/40'
+                        }`}
                       >
-                        <Layers className="w-3 h-3 text-[var(--accent)]" />
-                        <span>Conectar</span>
+                        <ListOrdered className="w-3.5 h-3.5" />
+                        <span>Numerada</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          editor.chain().focus().toggleTaskList().run();
+                        }}
+                        className={`py-2 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border transition-colors rounded-none ${
+                          editor.isActive('taskList')
+                            ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                            : 'border-[var(--border)] text-[var(--foreground)] bg-[var(--muted)]/40'
+                        }`}
+                      >
+                        <CheckSquare className="w-3.5 h-3.5" />
+                        <span>Checklist</span>
                       </button>
                     </div>
+                  </div>
 
-                    {/* Original IA / Voice / Audio Controls */}
+                  {/* SEÇÃO 2: TIPOGRAFIA (FONTE E TAMANHO) */}
+                  <div className="flex flex-col gap-3">
+                    {/* Fonte em Acordeão */}
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground">Fonte</span>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => setIsMobileFontExpanded(!isMobileFontExpanded)}
+                        className="w-full flex items-center justify-between px-3 py-2 bg-[var(--muted)]/50 hover:bg-[var(--muted)] border border-[var(--border)]/30 transition-all rounded-none text-left"
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <Type className="w-3.5 h-3.5 opacity-60 shrink-0" />
+                          <span 
+                            className="text-xs truncate"
+                            style={currentFont?.fontFamily ? { fontFamily: currentFont.fontFamily } : undefined}
+                          >
+                            {currentFont?.label || 'Inter'}
+                          </span>
+                          {currentFont?.category && (
+                            <span className="text-[8px] opacity-40 uppercase tracking-wider font-mono shrink-0">
+                              {currentFont.category}
+                            </span>
+                          )}
+                        </div>
+                        <ChevronDown className={`w-3.5 h-3.5 opacity-40 transition-transform shrink-0 ${isMobileFontExpanded ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      <AnimatePresence>
+                        {isMobileFontExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                            className="overflow-hidden border border-[var(--border)]/20 bg-[var(--background)] max-h-[190px] overflow-y-auto custom-scrollbar mt-0.5"
+                          >
+                            {FONT_OPTIONS.map((font) => {
+                              const isCurrent = currentFontFamily === font.value;
+                              return (
+                                <button
+                                  key={font.value}
+                                  type="button"
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={() => {
+                                    editor.chain().focus().setFontFamily(font.value).run();
+                                    setIsMobileFontExpanded(false);
+                                  }}
+                                  className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-[var(--accent)] hover:text-white transition-colors group/font ${
+                                    isCurrent ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-bold' : 'text-[var(--foreground)]'
+                                  }`}
+                                >
+                                  <div className="flex flex-col">
+                                    <span className="text-xs" style={{ fontFamily: font.fontFamily }}>{font.label}</span>
+                                    <span className="text-[7.5px] opacity-40 group-hover/font:text-white/80 uppercase tracking-wider font-mono">{font.category}</span>
+                                  </div>
+                                  {isCurrent && <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] group-hover/font:bg-white" />}
+                                </button>
+                              );
+                            })}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    {/* Tamanho (Grade de Chips Numéricos) */}
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground">Tamanho</span>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {FONT_SIZES.map(size => {
+                          const isCurrent = (editor.getAttributes('textStyle').fontSize || '16px') === size;
+                          return (
+                            <button
+                              key={size}
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => editor.chain().focus().setFontSize(size).run()}
+                              className={`py-1.5 text-xs font-mono font-bold border transition-colors rounded-none ${
+                                isCurrent 
+                                  ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-xs' 
+                                  : 'border-[var(--border)]/30 bg-[var(--muted)]/40 hover:bg-[var(--muted)] text-[var(--foreground)]'
+                              }`}
+                            >
+                              {size.replace('px', '')}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SEÇÃO 3: COR E ALINHAMENTO */}
+                  <div className="flex flex-col gap-3">
+                    {/* Cor do Texto (Swatches Táteis) */}
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground">Cor do Texto</span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {COLOR_OPTIONS.map(c => {
+                          const activeColor = editor.getAttributes('textStyle').color || 'default';
+                          const isSelected = activeColor === c.value;
+                          return (
+                            <button
+                              key={c.value}
+                              type="button"
+                              title={c.label}
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                if (c.value === 'default') editor.chain().focus().unsetColor().run();
+                                else editor.chain().focus().setColor(c.value).run();
+                              }}
+                              className={`w-6 h-6 rounded-full border transition-all flex items-center justify-center shrink-0 ${
+                                isSelected ? 'ring-2 ring-[var(--accent)] scale-110' : 'hover:scale-105 border-black/20'
+                              }`}
+                              style={{ backgroundColor: c.value === 'default' ? 'var(--foreground)' : c.color }}
+                            >
+                              {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white shadow-xs" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Alinhamento (Segmented Control com Ícones) */}
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground">Alinhamento</span>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {ALIGNMENT_OPTIONS.map(item => {
+                          const isAlignActive = editor.isActive({ textAlign: item.value }) || (item.value === 'left' && !editor.isActive({ textAlign: 'center' }) && !editor.isActive({ textAlign: 'right' }) && !editor.isActive({ textAlign: 'justify' }));
+                          const ItemIcon = item.icon;
+                          return (
+                            <button
+                              key={item.value}
+                              type="button"
+                              title={item.label}
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => editor.chain().focus().setTextAlign(item.value).run()}
+                              className={`h-8 flex items-center justify-center border transition-colors rounded-none ${
+                                isAlignActive 
+                                  ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-xs' 
+                                  : 'border-[var(--border)]/30 bg-[var(--muted)]/40 hover:bg-[var(--muted)] text-[var(--foreground)]'
+                              }`}
+                            >
+                              <ItemIcon className="w-4 h-4" />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SEÇÃO 4: CONEXÃO DE NOTA & IA */}
+                  <div className="space-y-2 pt-1 border-t border-[var(--border)]/10">
                     <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setIsAiAutocompleteEnabled(!isAiAutocompleteEnabled);
+                      onClick={() => {
                         setIsMobileMenuOpen(false);
+                        setNoteLinkModal(true);
                       }}
-                      className={`w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 ${isAiAutocompleteEnabled ? 'bg-[var(--accent)]/5 text-[var(--accent)]' : ''}`}
+                      className="w-full py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-2 border border-[var(--border)] text-[var(--foreground)] bg-[var(--muted)]/40 hover:bg-[var(--muted)] transition-colors rounded-none"
                     >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Autocompletar IA</span>
+                      <Layers className="w-4 h-4 text-[var(--accent)]" />
+                      <span>Conectar Nota Interna</span>
                     </button>
 
                     <button
-                      onClick={(e) => {
-                        e.preventDefault();
+                      onClick={() => {
+                        setIsAiAutocompleteEnabled(!isAiAutocompleteEnabled);
+                      }}
+                      className={`w-full py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-2 border transition-colors rounded-none ${
+                        isAiAutocompleteEnabled 
+                          ? 'bg-[var(--accent)]/10 border-[var(--accent)] text-[var(--accent)]' 
+                          : 'border-[var(--border)] text-[var(--foreground)] bg-[var(--muted)]/40'
+                      }`}
+                    >
+                      <Sparkles className="w-4 h-4 text-[var(--accent)]" />
+                      <span>{isAiAutocompleteEnabled ? "IA Ativada (Autocompletar)" : "Ativar IA (Autocompletar)"}</span>
+                    </button>
+                  </div>
+
+                  {/* SEÇÃO 5: FERRAMENTAS UTILITÁRIAS */}
+                  <div className="space-y-2 pt-1 border-t border-[var(--border)]/10">
+                    <button
+                      onClick={() => {
                         setIsMobileMenuOpen(false);
                         toggleTranscription();
                       }}
-                      className={`w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 ${isRecording ? 'bg-red-500/10 text-red-500' : ''}`}
+                      className={`w-full py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider flex items-center gap-2 border transition-colors rounded-none ${
+                        isRecording 
+                          ? 'bg-red-500/10 text-red-500 border-red-500/30 font-bold' 
+                          : 'border-[var(--border)] text-[var(--foreground)] bg-[var(--muted)]/40'
+                      }`}
                     >
-                      <Mic className="w-3.5 h-3.5" />
-                      <span>Voz para Texto</span>
+                      <Mic className="w-4 h-4 text-[var(--accent)]" />
+                      <span>{isRecording ? "Parar Transcrição" : "Voz para Texto"}</span>
                     </button>
 
                     <button
-                      onClick={(e) => {
-                        e.preventDefault();
+                      onClick={() => {
                         setIsMobileMenuOpen(false);
                         if (isRecordingAudio) stopAudioRecording();
                         else startAudioRecording();
                       }}
-                      className={`w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 ${isRecordingAudio ? 'bg-[#FF4F00]/10 text-[#FF4F00]' : ''}`}
+                      className={`w-full py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider flex items-center gap-2 border transition-colors rounded-none ${
+                        isRecordingAudio 
+                          ? 'bg-red-500/10 text-red-500 border-red-500/30 font-bold' 
+                          : 'border-[var(--border)] text-[var(--foreground)] bg-[var(--muted)]/40'
+                      }`}
                     >
-                      <AudioLines className="w-3.5 h-3.5" />
-                      <span>Gravar Áudio</span>
+                      <AudioLines className="w-4 h-4 text-[var(--accent)]" />
+                      <span>{isRecordingAudio ? "Parar Gravação" : "Gravar Áudio"}</span>
                     </button>
 
                     <button
-                      onClick={(e) => {
-                        e.preventDefault();
+                      onClick={() => {
                         setIsMobileMenuOpen(false);
                         editor.chain().focus().unsetAllMarks().clearNodes().run();
                       }}
-                      className="w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-[var(--accent)] hover:text-white transition-colors text-[var(--foreground)] flex items-center gap-2 border-t border-[var(--border)]/10"
+                      className="w-full py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider flex items-center gap-2 border border-[var(--border)] text-[var(--foreground)] bg-[var(--muted)]/40 hover:bg-[var(--muted)] transition-colors rounded-none"
                     >
-                      <Eraser className="w-3.5 h-3.5" />
-                      <span>Limpar Estilos</span>
+                      <Eraser className="w-4 h-4 opacity-60" />
+                      <span>Limpar Formatação</span>
                     </button>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
-          </div>
-
-        {/* Interim Text Indicator */}
-        {isRecording && interimText && (
-          <div className="flex items-center px-3 py-1 bg-black/5 dark:bg-white/5 border-l border-[var(--accent)] animate-in slide-in-from-left-2">
-            <span className="text-[10px] italic opacity-40 truncate max-w-[200px]">{interimText}...</span>
-          </div>
-        )}
-
-        {/* Scroll Buffer */}
-        <div className="w-8 flex-shrink-0 h-1" />
-      </div>
-    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
     <div className="flex-1 px-8 md:px-16 lg:px-24 py-8 relative">
       <EditorContent editor={editor} />

@@ -1,13 +1,16 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Note } from '@/lib/types';
 import dynamic from 'next/dynamic';
-import { ArrowLeft, Brain, Layers, Tag as TagIcon, BarChart3, Clock } from 'lucide-react';
+import { ArrowLeft, Brain, Layers, Tag as TagIcon, BarChart3, Clock, Search, X, ExternalLink, Star, Calendar, Sparkles } from 'lucide-react';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'motion/react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const KnowledgeGraph = dynamic(() => import('@/components/KnowledgeGraph'), { 
   ssr: false,
@@ -24,6 +27,69 @@ export default function Dashboard() {
   const [dimensions, setDimensions] = useState<{ width: number, height: number } | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<'graph' | 'timeline' | 'heatmap'>('graph');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [inspectedNote, setInspectedNote] = useState<Note | null>(null);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [activeFilterMode, setActiveFilterMode] = useState<'favorites' | 'recent' | 'connected' | 'isolated' | null>(null);
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+  const searchContainerRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        setIsSearchFocused(true);
+      }
+      if (e.key === 'Escape') {
+        if (isSearchFocused) {
+          setIsSearchFocused(false);
+          searchInputRef.current?.blur();
+        } else if (inspectedNote) {
+          setInspectedNote(null);
+        } else if (searchQuery || activeFilterMode) {
+          setSearchQuery('');
+          setActiveFilterMode(null);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [inspectedNote, searchQuery, isSearchFocused, activeFilterMode]);
+
+  const dismissSearch = useCallback(() => {
+    setIsSearchFocused(false);
+    searchInputRef.current?.blur();
+  }, []);
+
+  useEffect(() => {
+    const handleOutsideInteraction = (e: Event) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        dismissSearch();
+      }
+    };
+
+    const handleWheelInteraction = (e: WheelEvent) => {
+      if (isSearchFocused && searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        dismissSearch();
+      }
+    };
+
+    // Use capture phase so canvas / D3 stopPropagation() cannot block outside clicks/gestures
+    document.addEventListener('pointerdown', handleOutsideInteraction, { capture: true });
+    document.addEventListener('touchstart', handleOutsideInteraction, { capture: true, passive: true });
+    document.addEventListener('wheel', handleWheelInteraction, { capture: true, passive: true });
+
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsideInteraction, { capture: true });
+      document.removeEventListener('touchstart', handleOutsideInteraction, { capture: true });
+      document.removeEventListener('wheel', handleWheelInteraction, { capture: true });
+    };
+  }, [isSearchFocused, dismissSearch]);
+
+  const recentNotes = useMemo(() => {
+    return notes.slice(0, 3);
+  }, [notes]);
 
   useEffect(() => {
     const updateDimensions = () => {
@@ -134,7 +200,10 @@ export default function Dashboard() {
             ].map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveView(tab.id as any)}
+                onClick={() => {
+                  setActiveView(tab.id as any);
+                  dismissSearch();
+                }}
                 className={`flex items-center gap-2 px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${activeView === tab.id ? 'bg-[var(--accent)] text-white' : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-50'}`}
               >
                 <tab.icon className="w-3.5 h-3.5" />
@@ -152,12 +221,170 @@ export default function Dashboard() {
 
       <main className="flex-1 relative flex">
         {/* Background Grid Layer */}
-        <div className="absolute inset-0 bg-dot-matrix opacity-10 pointer-events-none" />
+        <div className="absolute inset-0 bg-dot-matrix opacity-[0.035] dark:opacity-[0.08] pointer-events-none" />
 
         {/* Decorative Coordinate Markers */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 text-[8px] font-mono opacity-20 pointer-events-none uppercase tracking-widest hidden md:block">
           Grid System // Lat: 0.00 Lon: 0.00
         </div>
+
+        {/* Spotlight Search Header with Suggestions Dropdown in Graph mode */}
+        {activeView === 'graph' && (
+          <div ref={searchContainerRef} className="absolute top-6 left-1/2 -translate-x-1/2 z-30 w-full max-w-md px-4 pointer-events-auto">
+            <div className="relative flex items-center">
+              <Search className="absolute left-3.5 w-4 h-4 text-[var(--foreground)] opacity-40 pointer-events-none" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onFocus={() => setIsSearchFocused(true)}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={activeFilterMode ? `Filtro: ${activeFilterMode} (Esc para limpar)` : "Buscar no mapa (Ctrl+K)..."}
+                className={`w-full pl-10 pr-10 py-2.5 bg-[var(--background)]/95 backdrop-blur-md border text-xs font-mono text-[var(--foreground)] shadow-[4px_4px_0px_rgba(0,0,0,0.08)] focus:outline-none transition-all placeholder:text-[var(--foreground)]/40 ${
+                  activeFilterMode ? 'border-[var(--accent)]' : 'border-[var(--border)] focus:border-[var(--accent)]'
+                }`}
+              />
+              {(searchQuery || activeFilterMode) && (
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setActiveFilterMode(null);
+                    dismissSearch();
+                  }}
+                  className="absolute right-3 p-1 hover:opacity-100 opacity-40 transition-opacity cursor-pointer"
+                  title="Limpar filtro e busca"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Active Filter Mode Badge (if any) */}
+            {activeFilterMode && !isSearchFocused && (
+              <div className="mt-2 flex items-center justify-center">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[var(--accent)] text-[var(--accent-foreground)] text-[9px] font-mono font-bold uppercase tracking-widest shadow-[2px_2px_0px_rgba(0,0,0,0.1)]">
+                  <span>Filtrando: {activeFilterMode === 'favorites' ? '⭐ Favoritas' : activeFilterMode === 'recent' ? '🕒 Recentes' : activeFilterMode === 'connected' ? '🔗 Mais Conectadas' : '💤 Ideias Isoladas'}</span>
+                  <button onClick={() => setActiveFilterMode(null)} className="hover:opacity-75 cursor-pointer ml-1">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              </div>
+            )}
+
+            {/* Suggestions Dropdown */}
+            <AnimatePresence>
+              {isSearchFocused && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.15 }}
+                  className="mt-2 bg-[var(--background)]/95 backdrop-blur-xl border border-[var(--border)] shadow-[8px_8px_0px_rgba(0,0,0,0.12)] p-4 space-y-4 text-left"
+                >
+                  {/* Section 1: Quick Filters */}
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] opacity-40 mb-2 flex items-center gap-1.5">
+                      <Sparkles className="w-3 h-3 text-[var(--accent)]" />
+                      <span>Filtros Rápidos Sinápticos</span>
+                    </p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {[
+                        { id: 'favorites', label: 'Favoritas', icon: Star, desc: 'Notas marcadas' },
+                        { id: 'recent', label: 'Recentes', icon: Clock, desc: 'Últimos 7 dias' },
+                        { id: 'connected', label: 'Mais Conexões', icon: Layers, desc: 'Hubs principais' },
+                        { id: 'isolated', label: 'Ideias Isoladas', icon: Brain, desc: 'Sem vínculos' }
+                      ].map(f => (
+                        <button
+                          key={f.id}
+                          onClick={() => {
+                            setActiveFilterMode(activeFilterMode === f.id ? null : (f.id as any));
+                            setIsSearchFocused(false);
+                          }}
+                          className={`flex items-center gap-2 p-2 text-left border transition-all cursor-pointer ${
+                            activeFilterMode === f.id
+                              ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
+                              : 'border-[var(--border)] bg-[var(--muted)]/20 hover:border-[var(--accent)]/40 hover:bg-[var(--muted)]/40'
+                          }`}
+                        >
+                          <f.icon className="w-3.5 h-3.5 shrink-0 text-[var(--accent)]" />
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-bold tracking-wider truncate">{f.label}</p>
+                            <p className="text-[8px] opacity-40 truncate">{f.desc}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Section 2: Top Tags */}
+                  {stats.topTags.length > 0 && (
+                    <div>
+                      <p className="text-[9px] font-bold uppercase tracking-[0.2em] opacity-40 mb-2 flex items-center gap-1.5">
+                        <TagIcon className="w-3 h-3" />
+                        <span>Constelações Populares</span>
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {stats.topTags.map(([tag, count]: any) => (
+                          <button
+                            key={tag}
+                            onClick={() => {
+                              setSelectedTag(selectedTag === tag ? null : tag);
+                              setIsSearchFocused(false);
+                            }}
+                            className={`px-2.5 py-1 text-[10px] font-mono border transition-all cursor-pointer ${
+                              selectedTag === tag
+                                ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                                : 'bg-[var(--muted)]/30 border-[var(--border)] hover:border-[var(--accent)]/50'
+                            }`}
+                          >
+                            #{tag} <span className="opacity-40 text-[8px]">({count})</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Section 3: Recent Thoughts */}
+                  {recentNotes.length > 0 && (
+                    <div>
+                      <p className="text-[9px] font-bold uppercase tracking-[0.2em] opacity-40 mb-2 flex items-center gap-1.5">
+                        <Clock className="w-3 h-3" />
+                        <span>Últimos Pensamentos Editados</span>
+                      </p>
+                      <div className="space-y-1">
+                        {recentNotes.map(n => (
+                          <button
+                            key={n.id}
+                            onClick={() => {
+                              setInspectedNote(n);
+                              setIsSearchFocused(false);
+                            }}
+                            className="w-full flex items-center justify-between p-2 hover:bg-[var(--muted)]/40 border border-transparent hover:border-[var(--border)] transition-all text-left cursor-pointer group"
+                          >
+                            <span className="text-xs font-serif italic truncate max-w-[240px] text-[var(--foreground)] group-hover:text-[var(--accent)]">
+                              {n.title || 'Sem título'}
+                            </span>
+                            <span className="text-[8px] font-mono opacity-40 shrink-0">
+                              {n.updatedAt?.toDate
+                                ? format(n.updatedAt.toDate(), "dd/MM", { locale: ptBR })
+                                : ''}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Footer hint */}
+                  <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between text-[8px] font-mono opacity-40">
+                    <span>Dica: selecione um filtro rápido ou tag</span>
+                    <span>Esc para fechar</span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
         
         {/* Left Stats Sidebar (HUD Style) - Only visible in Graph mode */}
         {activeView === 'graph' && (
@@ -173,7 +400,7 @@ export default function Dashboard() {
                     <button 
                       key={tag} 
                       onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
-                      className={`flex items-center gap-4 w-full text-left transition-all group ${selectedTag && selectedTag !== tag ? 'opacity-30' : 'opacity-100'}`}
+                      className={`flex items-center gap-4 w-full text-left transition-all group cursor-pointer ${selectedTag && selectedTag !== tag ? 'opacity-30' : 'opacity-100'}`}
                     >
                       <div className={`w-2 h-2 transition-all ${selectedTag === tag ? 'bg-[var(--accent)] scale-150 rotate-45 shadow-[0_0_10px_var(--accent)]' : 'bg-[var(--accent)]/40 group-hover:bg-[var(--accent)]'}`} />
                       <div>
@@ -185,7 +412,7 @@ export default function Dashboard() {
                   {selectedTag && (
                     <button 
                       onClick={() => setSelectedTag(null)}
-                      className="mt-4 text-[8px] font-bold uppercase tracking-widest text-[var(--accent)] hover:underline"
+                      className="mt-4 text-[8px] font-bold uppercase tracking-widest text-[var(--accent)] hover:underline cursor-pointer"
                     >
                       × Limpar Filtro
                     </button>
@@ -199,7 +426,7 @@ export default function Dashboard() {
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Guia de Leitura</p>
                 </div>
                 <p className="text-xs leading-relaxed opacity-60">
-                  Cada nodo representa uma nota. O tamanho indica a densidade do conteúdo. Linhas conectam notas que compartilham etiquetas.
+                  <strong>Núcleos (#)</strong> são tópicos centrais. <strong>Nodos circulares</strong> são pensamentos. Use a <strong>Busca</strong> ou clique em um nó para inspecionar.
                 </p>
               </div>
             </div>
@@ -223,6 +450,17 @@ export default function Dashboard() {
                   width={dimensions.width} 
                   height={dimensions.height} 
                   selectedTag={selectedTag}
+                  onTagSelect={(tag) => {
+                    setSelectedTag(tag);
+                    dismissSearch();
+                  }}
+                  onSelectNote={(note) => {
+                    setInspectedNote(note);
+                    dismissSearch();
+                  }}
+                  selectedNoteId={inspectedNote?.id}
+                  searchQuery={searchQuery}
+                  filterMode={activeFilterMode}
                 />
               )}
               {activeView === 'timeline' && <NeuralTimeline notes={notes} />}
@@ -233,6 +471,99 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+
+        {/* Quick Inspector Side Drawer */}
+        <AnimatePresence>
+          {activeView === 'graph' && inspectedNote && (
+            <motion.aside
+              initial={{ x: 400, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 400, opacity: 0 }}
+              transition={{ type: 'spring', damping: 26, stiffness: 280 }}
+              className="absolute top-0 right-0 bottom-0 w-full max-w-sm z-40 bg-[var(--background)]/95 backdrop-blur-xl border-l border-[var(--border)] shadow-[-10px_0px_30px_rgba(0,0,0,0.15)] flex flex-col pointer-events-auto"
+            >
+              {/* Drawer Header */}
+              <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
+                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[var(--accent)]">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Inspeção Sináptica</span>
+                </div>
+                <button
+                  onClick={() => setInspectedNote(null)}
+                  className="p-1.5 hover:bg-black/5 dark:hover:bg-white/5 opacity-50 hover:opacity-100 transition-all cursor-pointer"
+                  title="Fechar painel"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Drawer Body */}
+              <div className="p-6 flex-1 overflow-y-auto custom-scrollbar space-y-6">
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <h2 className="text-xl font-serif italic text-[var(--foreground)] leading-snug">
+                      {inspectedNote.title || 'Sem título'}
+                    </h2>
+                    {inspectedNote.isBookmarked && (
+                      <Star className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0 mt-1" />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] font-mono opacity-40">
+                    <Calendar className="w-3 h-3" />
+                    <span>
+                      {inspectedNote.updatedAt?.toDate
+                        ? format(inspectedNote.updatedAt.toDate(), "dd 'de' MMMM, yyyy", { locale: ptBR })
+                        : 'Recente'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Tags */}
+                {inspectedNote.tags && inspectedNote.tags.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest opacity-40">Constelações / Tags</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {inspectedNote.tags.map(t => (
+                        <button
+                          key={t}
+                          onClick={() => setSelectedTag(selectedTag === t ? null : t)}
+                          className={`px-2.5 py-1 text-[10px] font-mono border transition-all cursor-pointer ${
+                            selectedTag === t
+                              ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                              : 'bg-[var(--muted)]/40 border-[var(--border)] hover:border-[var(--accent)]/50'
+                          }`}
+                        >
+                          #{t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Excerpt */}
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest opacity-40">Conteúdo do Pensamento</p>
+                  <div className="p-4 border border-[var(--border)] bg-[var(--muted)]/20 text-xs leading-relaxed opacity-80 max-h-64 overflow-y-auto custom-scrollbar whitespace-pre-wrap font-sans">
+                    {inspectedNote.content
+                      ? inspectedNote.content.replace(/<[^>]*>?/gm, '').slice(0, 500) + (inspectedNote.content.length > 500 ? '...' : '')
+                      : <span className="italic opacity-40">Sem conteúdo textual.</span>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Drawer Footer */}
+              <div className="p-6 border-t border-[var(--border)] bg-[var(--muted)]/10">
+                <Link
+                  href={`/?note=${inspectedNote.id}`}
+                  className="w-full flex items-center justify-center gap-2 py-3.5 bg-[var(--accent)] text-[var(--accent-foreground)] text-[10px] font-bold uppercase tracking-widest shadow-[4px_4px_0px_rgba(0,0,0,0.1)] hover:opacity-90 transition-all"
+                >
+                  <span>Abrir no Editor Completo</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </motion.aside>
+          )}
+        </AnimatePresence>
       </main>
 
       {/* Footer Branding */}
