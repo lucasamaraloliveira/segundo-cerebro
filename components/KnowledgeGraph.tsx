@@ -85,11 +85,27 @@ export default function KnowledgeGraph({
 }: KnowledgeGraphProps) {
   const router = useRouter();
   const fgRef = useRef<any>(null);
+  const [graphReady, setGraphReady] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const [hoveredNode, setHoveredNode] = useState<any>(null);
   const hoverStartTime = useRef<number>(0);
   const prevHoveredId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!mounted) return;
+    if (fgRef.current && !graphReady) {
+      setGraphReady(true);
+      return;
+    }
+    const interval = setInterval(() => {
+      if (fgRef.current) {
+        setGraphReady(true);
+        clearInterval(interval);
+      }
+    }, 50);
+    return () => clearInterval(interval);
+  }, [mounted, graphReady]);
 
   // Harmonious simulation parameters (Cosmic Bloom - Constelação Arejada)
   const simulationParams = useMemo(() => ({
@@ -341,7 +357,7 @@ export default function KnowledgeGraph({
 
       fgRef.current.d3ReheatSimulation();
     }
-  }, [mounted, notes.length, graphData, simulationParams]);
+  }, [mounted, graphReady, notes.length, graphData, simulationParams]);
 
   // Camera recenter handler
   const handleResetCamera = useCallback(() => {
@@ -368,7 +384,7 @@ export default function KnowledgeGraph({
 
   // Automatic zoomToFit after nodes bloom and settle
   useEffect(() => {
-    if (!mounted || graphData.nodes.length === 0) return;
+    if (!mounted || !graphReady || graphData.nodes.length === 0) return;
 
     const timer = setTimeout(() => {
       if (fgRef.current) {
@@ -377,7 +393,7 @@ export default function KnowledgeGraph({
     }, 900);
 
     return () => clearTimeout(timer);
-  }, [mounted, graphData.nodes.length]);
+  }, [mounted, graphReady, graphData.nodes.length]);
 
   if (!mounted) return null;
 
@@ -397,6 +413,11 @@ export default function KnowledgeGraph({
 
       <ForceGraph2D
         ref={fgRef}
+        onEngineTick={() => {
+          if (!graphReady && fgRef.current) {
+            setGraphReady(true);
+          }
+        }}
         width={width}
         height={height}
         graphData={graphData}

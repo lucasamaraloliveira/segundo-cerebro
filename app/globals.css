@@ -8,6 +8,7 @@
 }
 
 :root {
+  color-scheme: light;
   --background: #f9f8f6;
   --sidebar-bg: #f2efe9;
   --foreground: #18181b;
@@ -32,6 +33,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: #0a0a0a;
   --sidebar-bg: #111111;
   --foreground: #fcfcfc;
@@ -40,6 +42,29 @@
   --muted: #1a1a1a;
   --muted-foreground: rgba(255, 255, 255, 0.4);
   --border: rgba(255, 255, 255, 0.08);
+}
+
+/* Date and Time Pickers Theming (Brutalist Neural Palette) */
+input[type="datetime-local"],
+input[type="date"],
+input[type="time"] {
+  accent-color: var(--accent);
+}
+
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.85) brightness(1.2);
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
+.dark input[type="date"]::-webkit-calendar-picker-indicator:hover,
+.dark input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  transform: scale(1.1);
 }
 
 /* Dynamic Font Family Mappings for Rich Text Editor */

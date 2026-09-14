@@ -108,6 +108,13 @@ A versão da aplicação é gerenciada dinamicamente e sincronizada:
 
 ## 5. Histórico de Versões & Melhorias
 
+### v1.3.0 (Setembro 2026) - Gestão Inteligente de Tags com IA, Menu Sem Etiquetas, Prazos Suaves & Seletor com Portal
+*   **Menu Lateral "Sem Etiquetas"**: Nova visualização de Inbox/triagem com badge numérico dinâmico `{untaggedCount}`, centralizando notas pendentes de classificação.
+*   **IA de Sugestão Contextual de Tags**: Assistente integrado à modal de tags capaz de ler o conteúdo da nota e sugerir tags, priorizando a reutilização inteligente de tags já existentes no sistema (`[Existente]`) e propondo novas tags conceituais (`[Nova]`).
+*   **Gestão e Unificação Global de Tags**: Busca em tempo real na modal, prevenção rigorosa de duplicatas (case-insensitive) e rotina de varredura e unificação em lote no Firestore.
+*   **Seletor Brutalista de Data & Hora com React Portal**: Componente customizado desacoplado do DOM local e elevado via `createPortal` com `z-[9999]`, eliminando sobreposição pela barra de ferramentas do editor, com cálculo anti-colisão e auto drop-up.
+*   **Sistema Ergonômico de Prazos & Vencimento**: Cores suaves não estouradas (âmbar para prazos próximos e vermelho suave para atrasadas), novo menu "Notas Atrasadas" e botão de adiamento rápido (+1d).
+
 ### v1.2.1 (Setembro 2026) - Correção de Título & Experiência Mobile
 *   **Correção de Visibilidade do Título no Mobile**: Resolução do colapso de altura (`0px`) no textarea de título ao ser montado em containers com `display: none` ou durante animações. Adicionada cota mínima de altura (`min-h-[44px]`) e observação de `activeNote.id`.
 *   **Navegação Direta no Mobile**: Ao tocar no botão flutuante (`+`) ou clonar uma nota, a visualização mobile agora transiciona instantaneamente para a tela do editor (`setMobileView('editor')`), eliminando a permanência na lista.
@@ -143,4 +150,4 @@ A versão da aplicação é gerenciada dinamicamente e sincronizada:
 *   **Botão Sair Foco sumiu**: O botão é renderizado de forma flutuante no `app/page.tsx` apenas quando `isFullscreen` é true. Verifique o Z-index se ele estiver sendo coberto por outros elementos.
 
 ---
-*Documentação atualizada para a versão v1.2.1.*
+*Documentação atualizada para a versão v1.3.0.*

@@ -57,7 +57,8 @@ import {
   Circle,
   Check,
   Clock,
-  Info
+  Info,
+  RefreshCw
 } from 'lucide-react';
 import { APP_VERSION, APP_NAME } from '@/lib/version';
 import { format } from 'date-fns';
@@ -77,6 +78,7 @@ const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), {
 
 const CommandPalette = dynamic(() => import('@/components/CommandPalette'), { ssr: false });
 const AIAssistantModal = dynamic(() => import('@/components/AIAssistantModal'), { ssr: false });
+import BrutalistDateTimePicker from '@/components/BrutalistDateTimePicker';
 
 // Helper to strip HTML for previews
 const stripHtml = (html: string) => {
@@ -86,25 +88,70 @@ const stripHtml = (html: string) => {
 };
 
 
+const normalizeTag = (raw: string): string => {
+  if (!raw) return '';
+  return raw
+    .replace(/^#+/, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-');
+};
+
+const getNoteExpiryStatus = (note: Note): 'overdue' | 'due-soon' | 'normal' => {
+  if (note.isCompleted || !note.expiryDate) return 'normal';
+  const now = Date.now();
+  const expiry = note.expiryDate.toDate ? note.expiryDate.toDate().getTime() : ((note.expiryDate as any).seconds ? (note.expiryDate as any).seconds * 1000 : 0);
+  if (expiry <= 0) return 'normal';
+  if (expiry < now) return 'overdue';
+  const diffHours = (expiry - now) / (1000 * 60 * 60);
+  if (diffHours <= 24) return 'due-soon';
+  return 'normal';
+};
+
 const NoteCard = React.memo(({
   note,
   isActive,
   onClick,
-  onToggleComplete
+  onToggleComplete,
+  onSnooze
 }: {
   note: Note,
   isActive: boolean,
   onClick: () => void,
-  onToggleComplete: (e: React.MouseEvent) => void
+  onToggleComplete: (e: React.MouseEvent) => void,
+  onSnooze?: (e: React.MouseEvent) => void
 }) => {
+  const expiryStatus = getNoteExpiryStatus(note);
+
+  const cardStyle = useMemo(() => {
+    if (note.isCompleted) {
+      return isActive
+        ? 'bg-[var(--muted)] border-[var(--accent)] opacity-60'
+        : 'border-[var(--border)] hover:border-[var(--foreground)]/10 hover:bg-[var(--muted)]/50 opacity-60';
+    }
+    if (expiryStatus === 'overdue') {
+      return isActive
+        ? 'bg-red-500/[0.12] dark:bg-red-500/[0.14] border-red-500 shadow-sm'
+        : 'bg-red-500/[0.05] dark:bg-red-500/[0.07] border-red-500/35 hover:border-red-500/60 hover:bg-red-500/[0.09]';
+    }
+    if (expiryStatus === 'due-soon') {
+      return isActive
+        ? 'bg-amber-500/[0.12] dark:bg-amber-500/[0.14] border-amber-500 shadow-sm'
+        : 'bg-amber-500/[0.05] dark:bg-amber-500/[0.07] border-amber-500/30 hover:border-amber-500/55 hover:bg-amber-500/[0.09]';
+    }
+    return isActive
+      ? 'bg-[var(--muted)] border-[var(--accent)] shadow-sm'
+      : 'border-[var(--border)] hover:border-[var(--foreground)]/10 hover:bg-[var(--muted)]/50';
+  }, [isActive, expiryStatus, note.isCompleted]);
+
   return (
     <motion.div
       layout
       onClick={onClick}
-      className={`p-6 border transition-all cursor-pointer mb-3 rounded-none group ${isActive ? 'bg-[var(--muted)] border-[var(--accent)] shadow-sm' : 'border-[var(--border)] hover:border-[var(--foreground)]/10 hover:bg-[var(--muted)]/50'} ${note.isCompleted ? 'opacity-60' : 'opacity-100'}`}
+      className={`p-6 border transition-all cursor-pointer mb-3 rounded-none group ${cardStyle}`}
     >
       <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <p className="text-[10px] font-bold uppercase tracking-tighter opacity-40 text-[var(--foreground)]">
             {note.updatedAt ? format(note.updatedAt.toDate(), 'dd MMM', { locale: ptBR }) : 'Agora'}
           </p>
@@ -113,10 +160,30 @@ const NoteCard = React.memo(({
               <Clock size={8} /> Temp
             </span>
           )}
+          {expiryStatus === 'overdue' && (
+            <span className="text-[8px] font-mono font-bold uppercase tracking-wider text-red-600 dark:text-red-400 bg-red-500/10 px-1.5 py-0.5 border border-red-500/25 flex items-center gap-1">
+              <AlertTriangle size={8} /> Atrasada
+            </span>
+          )}
+          {expiryStatus === 'due-soon' && (
+            <span className="text-[8px] font-mono font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 border border-amber-500/25 flex items-center gap-1">
+              <Clock size={8} /> Vence em breve
+            </span>
+          )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          {expiryStatus === 'overdue' && onSnooze && (
+            <button
+              onClick={onSnooze}
+              title="Adiar por 1 dia (+24h)"
+              className="text-[9px] font-mono font-bold text-red-600 dark:text-red-400 opacity-60 hover:opacity-100 hover:bg-red-500/15 px-1.5 py-0.5 border border-red-500/20 transition-all cursor-pointer hidden group-hover:inline-block"
+            >
+              +1d
+            </button>
+          )}
           <button
             onClick={onToggleComplete}
+            title={note.isCompleted ? 'Desmarcar' : 'Marcar como concluída'}
             className={`w-5 h-5 border-2 rounded-full flex items-center justify-center transition-all ${note.isCompleted ? 'bg-[#FF4F00] border-[#FF4F00] text-white' : 'border-[var(--border)] hover:border-[#FF4F00] text-transparent'}`}
           >
             {note.isCompleted && <Check size={12} strokeWidth={3} />}
@@ -452,6 +519,39 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
                 </p>
               </div>
             </div>
+            {getNoteExpiryStatus(activeNote) === 'overdue' && (
+              <div className="mb-4 p-3 bg-red-500/[0.07] dark:bg-red-500/[0.09] border border-red-500/30 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-red-600 dark:text-red-400 font-mono text-[11px]">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>
+                    Esta nota está atrasada desde{' '}
+                    {activeNote.expiryDate?.toDate
+                      ? format(activeNote.expiryDate.toDate(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+                      : 'a data estipulada'}
+                    .
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextDay = new Date(Date.now() + 24 * 60 * 60 * 1000);
+                      updateNote(activeNote.id, { expiryDate: Timestamp.fromDate(nextDay) });
+                    }}
+                    className="px-2.5 py-1 text-[10px] font-mono bg-red-500/15 text-red-600 dark:text-red-300 hover:bg-red-500/25 transition-all border border-red-500/30 font-bold uppercase tracking-wider cursor-pointer"
+                  >
+                    Adiar 1 dia
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateNote(activeNote.id, { isCompleted: true })}
+                    className="px-2.5 py-1 text-[10px] font-mono bg-[var(--accent)] text-white hover:opacity-90 transition-all font-bold uppercase tracking-wider cursor-pointer"
+                  >
+                    Marcar Concluída
+                  </button>
+                </div>
+              </div>
+            )}
             <textarea
               ref={titleRef}
               rows={1}
@@ -473,44 +573,22 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
               className="w-full min-h-[44px] text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-sans font-bold tracking-tight leading-tight bg-transparent border-none focus:outline-none mb-0 p-0 placeholder:text-[var(--foreground)]/40 text-[var(--foreground)] resize-none overflow-hidden"
             />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-4 mb-0 pb-3 border-b border-[var(--border)] mt-4 md:mt-6">
-              <div className="space-y-1">
-                <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Lembrete</p>
-                <input
-                  type="datetime-local"
-                  className="w-full bg-[var(--muted)] text-[var(--foreground)] px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold uppercase tracking-normal sm:tracking-wider rounded border-none focus:outline-none"
-                  value={activeNote.reminder ? format(activeNote.reminder.toDate(), "yyyy-MM-dd'T'HH:mm") : ''}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (!val) {
-                      updateNote(activeNote.id, { reminder: null });
-                    } else {
-                      const d = new Date(val);
-                      if (!isNaN(d.getTime())) {
-                        updateNote(activeNote.id, { reminder: Timestamp.fromDate(d) });
-                      }
-                    }
-                  }}
-                />
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Vencimento</p>
-                <input
-                  type="datetime-local"
-                  className="w-full bg-[var(--muted)] text-[var(--foreground)] px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold uppercase tracking-normal sm:tracking-wider rounded border-none focus:outline-none"
-                  value={activeNote.expiryDate ? format(activeNote.expiryDate.toDate(), "yyyy-MM-dd'T'HH:mm") : ''}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (!val) {
-                      updateNote(activeNote.id, { expiryDate: null });
-                    } else {
-                      const d = new Date(val);
-                      if (!isNaN(d.getTime())) {
-                        updateNote(activeNote.id, { expiryDate: Timestamp.fromDate(d) });
-                      }
-                    }
-                  }}
-                />
-              </div>
+              <BrutalistDateTimePicker
+                label="Lembrete"
+                placeholder="Definir lembrete..."
+                value={activeNote.reminder ? activeNote.reminder.toDate() : null}
+                onChange={(d) => {
+                  updateNote(activeNote.id, { reminder: d ? Timestamp.fromDate(d) : null });
+                }}
+              />
+              <BrutalistDateTimePicker
+                label="Vencimento"
+                placeholder="Definir vencimento..."
+                value={activeNote.expiryDate ? activeNote.expiryDate.toDate() : null}
+                onChange={(d) => {
+                  updateNote(activeNote.id, { expiryDate: d ? Timestamp.fromDate(d) : null });
+                }}
+              />
             </div>
           </div>
           <RichTextEditor
@@ -610,12 +688,14 @@ export default function Home() {
   const [lastDeletedNote, setLastDeletedNote] = useState<Note | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mobileView, setMobileView] = useState<'list' | 'editor'>('list');
-  const [view, setView] = useState<'all' | 'favorites' | 'reminders' | 'completed'>('all');
+  const [view, setView] = useState<'all' | 'favorites' | 'reminders' | 'overdue' | 'completed' | 'untagged'>('all');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isTagModalOpen, setIsTagModalOpen] = useState(false);
   const [isMobileTagsModalOpen, setIsMobileTagsModalOpen] = useState(false);
   const [newTagInput, setNewTagInput] = useState('');
   const [tagsToAssign, setTagsToAssign] = useState<string[]>([]);
+  const [isAiSuggestingTags, setIsAiSuggestingTags] = useState(false);
+  const [aiSuggestedTags, setAiSuggestedTags] = useState<Array<{ tag: string; isExisting: boolean }>>([]);
   const [notifiedReminders, setNotifiedReminders] = useState<Set<string>>(new Set());
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isReminderAlertOpen, setIsReminderAlertOpen] = useState(false);
@@ -739,7 +819,12 @@ export default function Home() {
   // Initialize tagsToAssign when modal opens
   useEffect(() => {
     if (isTagModalOpen && activeNote) {
-      setTagsToAssign(activeNote.tags || []);
+      const normalizedCurrent = (activeNote.tags || [])
+        .map(t => normalizeTag(t))
+        .filter(Boolean);
+      setTagsToAssign(Array.from(new Set(normalizedCurrent)));
+      setNewTagInput('');
+      setAiSuggestedTags([]);
     }
   }, [isTagModalOpen, activeNote?.id]);
 
@@ -831,12 +916,175 @@ export default function Home() {
     }
   }, [notes.length > 0]); // Executa quando as notas carregam pela primeira vez
 
-  // Derived state
+  // Derived state (Normalized & Unified)
   const allTags = useMemo(() => {
     const tags = new Set<string>();
-    notes.forEach(note => note.tags?.forEach(tag => tags.add(tag)));
+    notes.forEach(note => {
+      (note.tags || []).forEach(tag => {
+        const norm = normalizeTag(tag);
+        if (norm) tags.add(norm);
+      });
+    });
     return Array.from(tags).sort();
   }, [notes]);
+
+  const tagCountMap = useMemo(() => {
+    const counts: Record<string, number> = {};
+    notes.forEach(note => {
+      (note.tags || []).forEach(tag => {
+        const norm = normalizeTag(tag);
+        if (norm) {
+          counts[norm] = (counts[norm] || 0) + 1;
+        }
+      });
+    });
+    return counts;
+  }, [notes]);
+
+  const filteredAvailableTags = useMemo(() => {
+    const q = normalizeTag(newTagInput);
+    if (!q) return allTags;
+    return allTags.filter(tag => tag.includes(q));
+  }, [allTags, newTagInput]);
+
+  const [isUnifyingTags, setIsUnifyingTags] = useState(false);
+  const [unifyMessage, setUnifyMessage] = useState<string | null>(null);
+
+  const handleUnifyAndCleanAllTags = async () => {
+    if (!user || isUnifyingTags) return;
+    setIsUnifyingTags(true);
+    setUnifyMessage(null);
+    try {
+      let updatedCount = 0;
+      for (const note of notes) {
+        if (!note.tags || note.tags.length === 0) continue;
+        const originalTags = note.tags;
+        const seen = new Set<string>();
+        const unifiedTags: string[] = [];
+
+        for (const t of originalTags) {
+          const norm = normalizeTag(t);
+          if (norm && !seen.has(norm)) {
+            seen.add(norm);
+            unifiedTags.push(norm);
+          }
+        }
+
+        const hasDifference =
+          originalTags.length !== unifiedTags.length ||
+          originalTags.some((t, i) => t !== unifiedTags[i]);
+
+        if (hasDifference) {
+          await updateDoc(doc(db, 'notes', note.id), {
+            tags: unifiedTags,
+            updatedAt: serverTimestamp()
+          });
+          updatedCount++;
+        }
+      }
+
+      if (updatedCount > 0) {
+        setUnifyMessage(`${updatedCount} nota(s) corrigida(s) e tags unificadas!`);
+      } else {
+        setUnifyMessage('Todas as tags já estão perfeitamente unificadas!');
+      }
+      setTimeout(() => setUnifyMessage(null), 5000);
+    } catch (err) {
+      console.error('Erro ao unificar tags:', err);
+      setUnifyMessage('Erro ao unificar tags. Tente novamente.');
+      setTimeout(() => setUnifyMessage(null), 5000);
+    } finally {
+      setIsUnifyingTags(false);
+    }
+  };
+
+  const handleAiSuggestTags = async () => {
+    if (!activeNote || isAiSuggestingTags) return;
+    const cleanContent = stripHtml(activeNote.content || '');
+    const rawText = `${activeNote.title || ''}\n${cleanContent}`.trim();
+    if (!rawText) {
+      alert('Esta nota ainda não possui texto ou conteúdo suficiente para a IA sugerir etiquetas.');
+      return;
+    }
+
+    setIsAiSuggestingTags(true);
+    try {
+      const response = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: `Você é um assistente de taxonomia do sistema de Segundo Cérebro.
+Analise o título e o conteúdo da seguinte nota:
+"""
+${rawText.slice(0, 3000)}
+"""
+
+Dicionário de tags JÁ EXISTENTES no sistema:
+[${allTags.join(', ')}]
+
+Sua missão:
+Sugerir de 2 a 5 tags contextuais e relevantes para categorizar esta nota.
+DIRETRIZES FUNDAMENTAIS:
+1. PRIORIDADE MÁXIMA: Reutilize tags da lista de tags JÁ EXISTENTES acima sempre que o contexto for aplicável, evitando redundâncias ou tags sinônimas desnecessárias.
+2. CRIE UMA TAG NOVA apenas quando o conteúdo trouxer um tópico ou conceito fundamental que nenhuma tag existente represente.
+3. Todas as tags devem ser em letras minúsculas, sem acentos, sem espaços (use traço se composto) e sem o caractere #.
+
+Retorne EXCLUSIVAMENTE um JSON válido no seguinte formato:
+{
+  "existing": ["tag_existente_1", "tag_existente_2"],
+  "new": ["tag_nova_1"]
+}`
+        })
+      });
+
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+
+      let parsed: { existing?: string[]; new?: string[] } = {};
+      try {
+        const cleaned = (data.text || '')
+          .replace(/```json\n?/g, '')
+          .replace(/```\n?/g, '')
+          .trim();
+        parsed = JSON.parse(cleaned);
+      } catch {
+        const tokens = (data.text || '')
+          .split(/[,;\n]+/)
+          .map((t: string) => normalizeTag(t))
+          .filter(Boolean);
+        parsed = {
+          existing: tokens.filter((t: string) => allTags.includes(t)),
+          new: tokens.filter((t: string) => !allTags.includes(t))
+        };
+      }
+
+      const suggestions: Array<{ tag: string; isExisting: boolean }> = [];
+      const seen = new Set<string>();
+
+      (parsed.existing || []).forEach((raw: string) => {
+        const tag = normalizeTag(raw);
+        if (tag && !seen.has(tag) && !tagsToAssign.includes(tag)) {
+          seen.add(tag);
+          suggestions.push({ tag, isExisting: true });
+        }
+      });
+
+      (parsed.new || []).forEach((raw: string) => {
+        const tag = normalizeTag(raw);
+        if (tag && !seen.has(tag) && !tagsToAssign.includes(tag)) {
+          seen.add(tag);
+          suggestions.push({ tag, isExisting: allTags.includes(tag) });
+        }
+      });
+
+      setAiSuggestedTags(suggestions);
+    } catch (err: any) {
+      console.error('Erro ao sugerir tags com IA:', err);
+      alert('Não foi possível gerar sugestões com a IA no momento.');
+    } finally {
+      setIsAiSuggestingTags(false);
+    }
+  };
 
   // Semantic Search Expansion
   useEffect(() => {
@@ -889,10 +1137,20 @@ export default function Home() {
       const matchesView =
         view === 'favorites' ? note.isBookmarked :
           view === 'reminders' ? !!note.reminder :
-            view === 'completed' ? note.isCompleted : true;
+            view === 'overdue' ? getNoteExpiryStatus(note) === 'overdue' :
+              view === 'completed' ? note.isCompleted :
+                view === 'untagged' ? (!note.tags || note.tags.length === 0) : true;
       return matchesSearch && matchesTag && matchesView;
     });
   }, [notes, searchQuery, activeTag, view, isSemanticSearch, semanticKeywords]);
+
+  const overdueCount = useMemo(() => {
+    return notes.filter(n => getNoteExpiryStatus(n) === 'overdue').length;
+  }, [notes]);
+
+  const untaggedCount = useMemo(() => {
+    return notes.filter(n => !n.tags || n.tags.length === 0).length;
+  }, [notes]);
 
   const storageUsage = useMemo(() => {
     const totalBytes = notes.reduce((acc, note) => {
@@ -1508,6 +1766,31 @@ export default function Home() {
                 </button>
                 <button
                   onClick={() => {
+                    setView('untagged');
+                    setActiveTag(null);
+                  }}
+                  className={`w-full flex items-center justify-between px-2 py-2 rounded-none transition-all text-sm font-medium ${
+                    view === 'untagged'
+                      ? 'bg-[var(--muted)] text-[var(--foreground)] border-l-2 border-[var(--accent)]'
+                      : 'text-[var(--foreground)] opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <TagIcon className={`w-4 h-4 ${view === 'untagged' ? 'text-[var(--accent)]' : 'opacity-40'}`} />
+                    Sem Etiquetas
+                  </div>
+                  <span
+                    className={`text-[10px] font-mono px-1.5 py-0.5 rounded-none ${
+                      untaggedCount > 0
+                        ? 'bg-[var(--accent)]/15 text-[var(--accent)] font-bold border border-[var(--accent)]/20'
+                        : 'opacity-60'
+                    }`}
+                  >
+                    {untaggedCount}
+                  </span>
+                </button>
+                <button
+                  onClick={() => {
                     setView('reminders');
                     setActiveTag(null);
                   }}
@@ -1518,6 +1801,35 @@ export default function Home() {
                     Lembretes
                   </div>
                   <span className="text-[10px] opacity-60 font-mono">{notes.filter(n => n.reminder).length}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setView('overdue');
+                    setActiveTag(null);
+                  }}
+                  className={`w-full flex items-center justify-between px-2 py-2 rounded-none transition-all text-sm font-medium ${
+                    view === 'overdue'
+                      ? 'bg-[var(--muted)] text-[var(--foreground)] border-l-2 border-red-500'
+                      : 'text-[var(--foreground)] opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle
+                      className={`w-4 h-4 ${
+                        view === 'overdue' ? 'text-red-500' : 'text-red-500/70'
+                      }`}
+                    />
+                    Notas Atrasadas
+                  </div>
+                  <span
+                    className={`text-[10px] font-mono px-1.5 py-0.5 rounded-none ${
+                      overdueCount > 0
+                        ? 'bg-red-500/15 text-red-600 dark:text-red-400 font-bold border border-red-500/20'
+                        : 'opacity-60'
+                    }`}
+                  >
+                    {overdueCount}
+                  </span>
                 </button>
                 <button
                   onClick={() => {
@@ -1722,11 +2034,22 @@ export default function Home() {
                 e.stopPropagation();
                 updateNote(note.id, { isCompleted: !note.isCompleted });
               }}
+              onSnooze={(e) => {
+                e.stopPropagation();
+                const nextDay = new Date(Date.now() + 24 * 60 * 60 * 1000);
+                updateNote(note.id, { expiryDate: Timestamp.fromDate(nextDay) });
+              }}
             />
           ))}
           {filteredNotes.length === 0 && (
-            <div className="py-20 text-center">
-              <p className="text-sm text-muted-foreground">Nenhuma nota encontrada</p>
+            <div className="py-20 text-center px-4">
+              <p className="text-sm font-sans font-medium text-[var(--foreground)] opacity-50">
+                {view === 'untagged'
+                  ? 'Tudo organizado! Nenhuma nota pendente de etiquetas.'
+                  : view === 'overdue'
+                    ? 'Nenhuma nota atrasada no momento.'
+                    : 'Nenhuma nota encontrada'}
+              </p>
             </div>
           )}
           <div className="h-16 md:hidden"></div> {/* Spacer for mobile navbar */}
@@ -1953,98 +2276,343 @@ export default function Home() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsTagModalOpen(false)}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.96, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-[var(--background)] rounded-none shadow-2xl p-8 max-w-sm w-full border border-[var(--border)] overflow-hidden"
+              exit={{ opacity: 0, scale: 0.96, y: 16 }}
+              className="relative bg-[var(--background)] rounded-none shadow-2xl p-6 sm:p-7 max-w-md w-full border-2 border-[var(--border)] overflow-hidden"
             >
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500" />
+              {/* Neo-brutalist top accent (NO violet/purple!) */}
+              <div className="absolute top-0 left-0 right-0 h-1 bg-[var(--accent)]" />
 
-              <div className="mb-6">
-                <h3 className="text-xl font-sans font-bold mb-2 tracking-tight text-[var(--foreground)]">Nova Etiqueta</h3>
-                <p className="text-xs text-[var(--foreground)]/40 uppercase font-bold tracking-widest">Organize seu pensamento</p>
+              {/* Modal Header */}
+              <div className="flex items-start justify-between gap-4 mb-5 pt-1">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <TagIcon className="w-4 h-4 text-[var(--accent)]" />
+                    <h3 className="text-base sm:text-lg font-sans font-bold tracking-tight text-[var(--foreground)]">
+                      Gerenciar Etiquetas
+                    </h3>
+                  </div>
+                  <p className="text-[10px] text-[var(--foreground)]/50 uppercase font-bold tracking-wider mt-1">
+                    {tagsToAssign.length} etiqueta(s) vinculada(s)
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsTagModalOpen(false)}
+                  className="p-1.5 text-[var(--foreground)]/40 hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors"
+                  aria-label="Fechar modal"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
-              <div className="relative mb-6">
-                <TagIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--foreground)]/30" />
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder="Ex: Projetos, Estudo..."
-                  value={newTagInput}
-                  onChange={(e) => setNewTagInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && newTagInput.trim()) {
-                      const tag = newTagInput.trim();
-                      if (activeNote && !activeNote.tags?.includes(tag)) {
-                        updateNote(activeNote.id, { tags: [...(activeNote.tags || []), tag] });
+              {/* Active Tags Chips (Currently bound to note) */}
+              <div className="mb-4">
+                <div className="text-[9px] uppercase font-bold tracking-widest text-[var(--foreground)]/40 mb-2 flex items-center justify-between">
+                  <span>Etiquetas Vinculadas</span>
+                  {tagsToAssign.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setTagsToAssign([])}
+                      className="text-[9px] font-bold text-red-500/70 hover:text-red-500 uppercase tracking-widest transition-colors"
+                    >
+                      Remover todas
+                    </button>
+                  )}
+                </div>
+                {tagsToAssign.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto custom-scrollbar p-2 bg-[var(--muted)]/30 border border-[var(--border)]">
+                    {tagsToAssign.map(tag => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wider bg-[var(--accent)] text-white shadow-sm"
+                      >
+                        #{tag}
+                        <button
+                          type="button"
+                          onClick={() => setTagsToAssign(prev => prev.filter(t => t !== tag))}
+                          className="hover:bg-black/20 rounded p-0.5 transition-colors leading-none"
+                          title="Remover etiqueta"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-3 border border-dashed border-[var(--border)] bg-[var(--muted)]/10 text-center">
+                    <p className="text-[11px] text-[var(--foreground)]/40 italic">
+                      Nenhuma etiqueta vinculada ainda.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Botão de Sugestão Contextual por IA */}
+              <div className="mb-4">
+                <button
+                  type="button"
+                  onClick={handleAiSuggestTags}
+                  disabled={isAiSuggestingTags}
+                  className="w-full py-2.5 px-3 bg-[var(--accent)]/10 hover:bg-[var(--accent)] text-[var(--accent)] hover:text-white border border-[var(--accent)]/30 hover:border-[var(--accent)] transition-all flex items-center justify-between text-[10px] font-bold uppercase tracking-wider disabled:opacity-50 cursor-pointer shadow-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <Sparkles className={`w-3.5 h-3.5 ${isAiSuggestingTags ? 'animate-spin' : ''}`} />
+                    <span>{isAiSuggestingTags ? 'Analisando nota com IA...' : 'Sugerir Tags com IA'}</span>
+                  </div>
+                  <span className="text-[9px] font-mono font-normal opacity-70 normal-case">
+                    {isAiSuggestingTags ? 'Avaliando contexto...' : 'Reaproveita existentes + novas'}
+                  </span>
+                </button>
+              </div>
+
+              {/* Box de Sugestões da IA */}
+              {aiSuggestedTags.length > 0 && (
+                <div className="mb-4 p-3 bg-[var(--muted)]/40 border-2 border-[var(--accent)]/40 animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-center justify-between text-[9px] uppercase font-bold tracking-widest text-[var(--foreground)]/70 mb-2.5">
+                    <span className="flex items-center gap-1.5 text-[var(--accent)]">
+                      <Sparkles className="w-3 h-3" />
+                      Sugestões da IA ({aiSuggestedTags.length})
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newTags = aiSuggestedTags.map(s => s.tag);
+                          setTagsToAssign(prev => Array.from(new Set([...prev, ...newTags])));
+                          setAiSuggestedTags([]);
+                        }}
+                        className="text-[9px] font-bold uppercase tracking-wider text-[var(--accent)] hover:underline"
+                      >
+                        + Aceitar Todas
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAiSuggestedTags([])}
+                        className="text-[9px] opacity-40 hover:opacity-100 p-0.5"
+                        title="Descartar sugestões"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {aiSuggestedTags.map(item => (
+                      <button
+                        type="button"
+                        key={item.tag}
+                        onClick={() => {
+                          setTagsToAssign(prev => Array.from(new Set([...prev, item.tag])));
+                          setAiSuggestedTags(prev => prev.filter(s => s.tag !== item.tag));
+                        }}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                          item.isExisting
+                            ? 'bg-[var(--background)] text-[var(--foreground)] border-[var(--border)] hover:border-[var(--accent)] hover:bg-[var(--muted)]'
+                            : 'bg-[var(--accent)]/15 text-[var(--accent)] border-dashed border-[var(--accent)] hover:bg-[var(--accent)] hover:text-white'
+                        }`}
+                        title={item.isExisting ? 'Tag já existente no sistema' : 'Nova tag conceitual sugerida pela IA'}
+                      >
+                        <Plus className="w-2.5 h-2.5" />
+                        <span>#{item.tag}</span>
+                        <span className={`text-[8px] px-1 py-0.2 font-sans uppercase font-bold rounded-sm ${
+                          item.isExisting
+                            ? 'bg-[var(--muted)] text-[var(--foreground)]/60'
+                            : 'bg-[var(--accent)] text-white'
+                        }`}>
+                          {item.isExisting ? 'Existente' : 'Nova'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Omni-Input: Search & Create */}
+              <div className="mb-4">
+                <label className="block text-[9px] uppercase font-bold tracking-widest text-[var(--foreground)]/40 mb-1.5">
+                  Buscar ou Adicionar Nova
+                </label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--foreground)]/30" />
+                    <input
+                      autoFocus
+                      type="text"
+                      placeholder="Ex: projeto, estudo, financas..."
+                      value={newTagInput}
+                      onChange={(e) => setNewTagInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const raw = newTagInput.trim();
+                          if (!raw) return;
+                          const rawTokens = raw.split(/[,;\s]+/);
+                          const normalizedTokens = rawTokens
+                            .map(t => normalizeTag(t))
+                            .filter(Boolean);
+                          if (normalizedTokens.length > 0) {
+                            setTagsToAssign(prev => Array.from(new Set([...prev, ...normalizedTokens])));
+                            setNewTagInput('');
+                          }
+                        }
+                      }}
+                      className="w-full bg-[var(--muted)] text-[var(--foreground)] border border-[var(--border)] py-2.5 pl-10 pr-3 text-xs font-mono focus:outline-none focus:border-[var(--accent)] transition-all placeholder:text-[var(--foreground)]/30 placeholder:font-sans"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const raw = newTagInput.trim();
+                      if (!raw) return;
+                      const rawTokens = raw.split(/[,;\s]+/);
+                      const normalizedTokens = rawTokens
+                        .map(t => normalizeTag(t))
+                        .filter(Boolean);
+                      if (normalizedTokens.length > 0) {
+                        setTagsToAssign(prev => Array.from(new Set([...prev, ...normalizedTokens])));
+                        setNewTagInput('');
                       }
-                      setIsTagModalOpen(false);
-                    }
-                  }}
-                  className="w-full bg-[var(--muted)] text-[var(--foreground)] rounded-none py-4 pl-12 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/10 transition-all placeholder:text-[var(--foreground)]/20"
-                />
+                    }}
+                    disabled={!newTagInput.trim()}
+                    className="px-3 py-2.5 bg-[var(--foreground)] text-[var(--background)] disabled:opacity-30 disabled:cursor-not-allowed font-bold text-[10px] uppercase tracking-widest hover:bg-[var(--accent)] hover:text-white transition-colors flex items-center gap-1 shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Adicionar
+                  </button>
+                </div>
               </div>
 
-              {/* Suggestions */}
-              <div className="mb-8">
-                <p className="text-[9px] text-[var(--foreground)]/40 uppercase font-bold tracking-widest mb-3">Selecione ou adicione tags</p>
-                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto custom-scrollbar pr-2">
-                  {allTags
-                    .map(tag => {
-                      const isSelected = tagsToAssign.includes(tag);
+              {/* Suggested / Filtered Tags List */}
+              <div className="mb-5">
+                <div className="flex items-center justify-between text-[9px] uppercase font-bold tracking-widest text-[var(--foreground)]/40 mb-2">
+                  <span>
+                    {newTagInput.trim() ? 'Resultados da Busca' : 'Todas as Etiquetas'} ({filteredAvailableTags.length})
+                  </span>
+                  <span className="text-[8px] font-normal normal-case opacity-60">
+                    Clique para alternar
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto custom-scrollbar p-2 bg-[var(--muted)]/20 border border-[var(--border)]">
+                  {/* If user typed something that doesn't exist yet, offer instant create */}
+                  {(() => {
+                    const typedNorm = normalizeTag(newTagInput);
+                    const alreadyExists = allTags.includes(typedNorm);
+                    const alreadyAssigned = tagsToAssign.includes(typedNorm);
+                    if (typedNorm && !alreadyExists && !alreadyAssigned) {
                       return (
                         <button
-                          key={tag}
+                          type="button"
                           onClick={() => {
-                            if (isSelected) {
-                              setTagsToAssign(prev => prev.filter(t => t !== tag));
-                            } else {
-                              setTagsToAssign(prev => [...prev, tag]);
-                            }
+                            setTagsToAssign(prev => Array.from(new Set([...prev, typedNorm])));
+                            setNewTagInput('');
                           }}
-                          className={`px-2 py-1 text-[10px] font-bold uppercase tracking-widest transition-all border ${isSelected ? 'bg-[var(--accent)] text-white border-[var(--accent)]' : 'bg-[var(--muted)] text-[var(--foreground)] border-transparent hover:border-black/5 hover:bg-[var(--muted)]/80'}`}
+                          className="px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wider bg-[var(--accent)]/15 text-[var(--accent)] border border-dashed border-[var(--accent)] hover:bg-[var(--accent)] hover:text-white transition-all flex items-center gap-1"
                         >
-                          #{tag}
+                          <Plus className="w-3 h-3" />
+                          Criar #{typedNorm}
                         </button>
                       );
-                    })
-                  }
-                  {allTags.length === 0 && (
-                    <p className="text-[9px] opacity-20 italic">Crie sua primeira etiqueta acima</p>
+                    }
+                    return null;
+                  })()}
+
+                  {filteredAvailableTags.map(tag => {
+                    const isSelected = tagsToAssign.includes(tag);
+                    const count = tagCountMap[tag] || 0;
+                    return (
+                      <button
+                        type="button"
+                        key={tag}
+                        onClick={() => {
+                          if (isSelected) {
+                            setTagsToAssign(prev => prev.filter(t => t !== tag));
+                          } else {
+                            setTagsToAssign(prev => [...prev, tag]);
+                          }
+                        }}
+                        className={`px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wider transition-all border flex items-center gap-1.5 ${
+                          isSelected
+                            ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
+                            : 'bg-[var(--background)] text-[var(--foreground)] border-[var(--border)] hover:border-[var(--accent)] hover:bg-[var(--muted)]'
+                        }`}
+                      >
+                        {isSelected && <Check className="w-3 h-3" />}
+                        <span>#{tag}</span>
+                        <span className={`text-[8px] px-1 py-0.2 rounded-full ${isSelected ? 'bg-white/20 text-white' : 'bg-[var(--muted)] text-[var(--foreground)]/50'}`}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+
+                  {filteredAvailableTags.length === 0 && !newTagInput.trim() && (
+                    <p className="text-[10px] opacity-40 italic p-2">Nenhuma etiqueta cadastrada ainda.</p>
+                  )}
+                  {filteredAvailableTags.length === 0 && newTagInput.trim() && !normalizeTag(newTagInput) && (
+                    <p className="text-[10px] opacity-40 italic p-2">Nenhuma etiqueta encontrada.</p>
                   )}
                 </div>
               </div>
 
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setIsTagModalOpen(false)}
-                  className="flex-1 py-4 text-[10px] font-bold uppercase tracking-widest text-[var(--foreground)]/40 hover:text-[var(--foreground)] transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => {
-                    let finalTags = [...tagsToAssign];
-                    if (newTagInput.trim()) {
-                      const newTag = newTagInput.trim();
-                      if (!finalTags.includes(newTag)) {
-                        finalTags.push(newTag);
-                      }
-                    }
+              {/* Fast Unification Status / Notice */}
+              {unifyMessage && (
+                <div className="mb-4 p-2 bg-[var(--accent)]/10 border border-[var(--accent)]/30 text-[10px] font-mono text-[var(--accent)] text-center">
+                  {unifyMessage}
+                </div>
+              )}
 
-                    if (activeNote) {
-                      updateNote(activeNote.id, { tags: finalTags });
-                    }
-                    setIsTagModalOpen(false);
-                  }}
-                  className="flex-1 py-4 bg-[var(--accent)] text-[var(--accent-foreground)] rounded-none font-bold uppercase text-[10px] tracking-widest hover:opacity-90 transition-all shadow-lg shadow-black/5"
+              {/* Action Buttons */}
+              <div className="pt-3 border-t border-[var(--border)] flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={handleUnifyAndCleanAllTags}
+                  disabled={isUnifyingTags}
+                  title="Varre todas as notas e padroniza tags minúsculas e sem duplicatas"
+                  className="px-2.5 py-2 text-[9px] font-bold uppercase tracking-widest text-[var(--foreground)]/60 hover:text-[var(--accent)] border border-transparent hover:border-[var(--border)] transition-colors flex items-center gap-1 disabled:opacity-40"
                 >
-                  Salvar
+                  <RefreshCw className={`w-3 h-3 ${isUnifyingTags ? 'animate-spin text-[var(--accent)]' : ''}`} />
+                  {isUnifyingTags ? 'Unificando...' : 'Unificar Banco'}
                 </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsTagModalOpen(false)}
+                    className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--foreground)]/50 hover:text-[var(--foreground)] transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      let finalTags = [...tagsToAssign];
+                      const raw = newTagInput.trim();
+                      if (raw) {
+                        const rawTokens = raw.split(/[,;\s]+/);
+                        const normalizedTokens = rawTokens
+                          .map(t => normalizeTag(t))
+                          .filter(Boolean);
+                        finalTags = [...finalTags, ...normalizedTokens];
+                      }
+                      const uniqueNormalized = Array.from(new Set(finalTags));
+
+                      if (activeNote) {
+                        updateNote(activeNote.id, { tags: uniqueNormalized });
+                      }
+                      setIsTagModalOpen(false);
+                    }}
+                    className="px-4 py-2 bg-[var(--accent)] text-white font-bold uppercase text-[10px] tracking-widest hover:opacity-90 transition-all shadow-sm flex items-center gap-1.5"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    Salvar
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>
@@ -2251,10 +2819,29 @@ export default function Home() {
                   </section>
 
                   <section className="space-y-6">
-                    <div className="flex items-center gap-3 border-l-4 border-[var(--accent)] pl-4">
-                      <TagIcon className="w-5 h-5 text-[var(--accent)]" />
-                      <h3 className="text-sm font-bold uppercase tracking-widest">Gerenciar Tags</h3>
+                    <div className="flex items-center justify-between border-l-4 border-[var(--accent)] pl-4">
+                      <div className="flex items-center gap-3">
+                        <TagIcon className="w-5 h-5 text-[var(--accent)]" />
+                        <h3 className="text-sm font-bold uppercase tracking-widest">Gerenciar Tags</h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleUnifyAndCleanAllTags}
+                        disabled={isUnifyingTags}
+                        className="px-3 py-1.5 bg-[var(--foreground)] text-[var(--background)] text-[9px] font-bold uppercase tracking-wider hover:bg-[var(--accent)] hover:text-white transition-all flex items-center gap-1.5 disabled:opacity-40"
+                        title="Verificar todas as notas e corrigir tags duplicadas ou com caixas diferentes"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${isUnifyingTags ? 'animate-spin' : ''}`} />
+                        {isUnifyingTags ? 'Unificando...' : 'Unificar Tags Globais'}
+                      </button>
                     </div>
+
+                    {unifyMessage && (
+                      <div className="p-2.5 bg-[var(--accent)]/10 border border-[var(--accent)]/30 text-xs font-mono text-[var(--accent)] flex items-center gap-2">
+                        <Check className="w-4 h-4 shrink-0" />
+                        <span>{unifyMessage}</span>
+                      </div>
+                    )}
 
                     <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto custom-scrollbar pr-2 p-1">
                       {allTags.map(tag => (
@@ -2307,9 +2894,11 @@ export default function Home() {
                       <div className="pt-2 border-t border-[var(--border)] space-y-1.5">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--accent)]">Notas da Atualização ({APP_VERSION})</p>
                         <p className="text-[10px] opacity-70 leading-relaxed">
-                          • Padronização tipográfica moderna e legível (Inter/Sans) em todas as telas.<br />
-                          • Badge de anexo dedicado e contenção anti-overflow no Especialista Neural.<br />
-                          • Retrocompatibilidade total e preservação de layout no histórico.
+                          • <strong>Menu "Sem Etiquetas"</strong>: Inbox e triagem rápida de notas não categorizadas.<br />
+                          • <strong>IA de Sugestão de Tags</strong>: Leitura contextual da nota com reaproveitamento de tags existentes e proposição de novas.<br />
+                          • <strong>Gestão Avançada de Tags</strong>: Busca em tempo real, prevenção de duplicatas e unificação em lote no Firestore.<br />
+                          • <strong>Seletor Brutalista com Portal</strong>: Calendário e relógio desacoplados, imunes a sobreposição da toolbar (`z-[9999]`).<br />
+                          • <strong>Prazos Ergonômicos</strong>: Cores suaves (âmbar/vermelho), menu de Notas Atrasadas e adiamento rápido (+1d).
                         </p>
                       </div>
                       <div className="pt-2 border-t border-[var(--border)] text-[10px] opacity-40 leading-relaxed">
