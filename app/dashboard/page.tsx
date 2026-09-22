@@ -66,6 +66,52 @@ export default function Dashboard() {
     searchInputRef.current?.blur();
   }, []);
 
+  const handleSearchSubmit = useCallback(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return;
+
+    const cleanTag = q.replace(/^#/, '');
+    const isTagSearch = q.startsWith('#');
+    const allTags = Array.from(new Set(notes.flatMap(n => n.tags || [])));
+
+    // 1. Tag match (se prefixado com # ou se houver correspondência de tag)
+    const matchedTag = isTagSearch
+      ? (allTags.find(t => t.toLowerCase() === cleanTag) || allTags.find(t => t.toLowerCase().includes(cleanTag)))
+      : allTags.find(t => t.toLowerCase() === cleanTag);
+
+    if (matchedTag) {
+      setSelectedTag(matchedTag);
+      dismissSearch();
+      return;
+    }
+
+    // 2. Note match
+    // Prioridade a: Título exato
+    let matchedNote = notes.find(n => n.title?.toLowerCase().trim() === cleanTag);
+    // Prioridade b: Título contém
+    if (!matchedNote) {
+      matchedNote = notes.find(n => n.title?.toLowerCase().includes(cleanTag));
+    }
+    // Prioridade c: Tag parcial
+    if (!matchedNote) {
+      const tagWithQuery = allTags.find(t => t.toLowerCase().includes(cleanTag));
+      if (tagWithQuery) {
+        setSelectedTag(tagWithQuery);
+        dismissSearch();
+        return;
+      }
+    }
+    // Prioridade d: Conteúdo contém
+    if (!matchedNote) {
+      matchedNote = notes.find(n => n.content?.toLowerCase().includes(cleanTag));
+    }
+
+    if (matchedNote) {
+      setInspectedNote(matchedNote);
+      dismissSearch();
+    }
+  }, [searchQuery, notes, dismissSearch]);
+
   useEffect(() => {
     const handleOutsideInteraction = (e: Event) => {
       if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
@@ -244,6 +290,12 @@ export default function Dashboard() {
                 value={searchQuery}
                 onFocus={() => setIsSearchFocused(true)}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSearchSubmit();
+                  }
+                }}
                 placeholder={activeFilterMode ? `Filtro: ${activeFilterMode} (Esc para limpar)` : "Buscar no mapa (Ctrl+K)..."}
                 className={`w-full pl-10 pr-10 py-2.5 bg-[var(--background)]/95 backdrop-blur-md border text-xs font-mono text-[var(--foreground)] shadow-[4px_4px_0px_rgba(0,0,0,0.08)] focus:outline-none transition-all placeholder:text-[var(--foreground)]/40 ${
                   activeFilterMode ? 'border-[var(--accent)]' : 'border-[var(--border)] focus:border-[var(--accent)]'

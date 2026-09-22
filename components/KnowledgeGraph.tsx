@@ -383,6 +383,26 @@ export default function KnowledgeGraph({
     }
   }, [searchQuery, graphData.nodes]);
 
+  // Camera smooth zoom & focus when a note is selected (via Search Enter, Spotlight, or external click)
+  useEffect(() => {
+    if (!selectedNoteId || !fgRef.current) return;
+    const targetNode = graphData.nodes.find(n => n.id === selectedNoteId);
+    if (targetNode && typeof targetNode.x === 'number' && typeof targetNode.y === 'number') {
+      fgRef.current.centerAt(targetNode.x, targetNode.y, 600);
+      fgRef.current.zoom(2.4, 600);
+    }
+  }, [selectedNoteId, graphData.nodes]);
+
+  // Camera smooth zoom & focus when a tag is selected
+  useEffect(() => {
+    if (!selectedTag || !fgRef.current) return;
+    const tagNode = graphData.nodes.find(n => n.type === 'tag' && n.tagName === selectedTag);
+    if (tagNode && typeof tagNode.x === 'number' && typeof tagNode.y === 'number') {
+      fgRef.current.centerAt(tagNode.x, tagNode.y, 600);
+      fgRef.current.zoom(1.6, 600);
+    }
+  }, [selectedTag, graphData.nodes]);
+
   // Automatic zoomToFit after nodes bloom and settle
   useEffect(() => {
     if (!mounted || !graphReady || graphData.nodes.length === 0) return;

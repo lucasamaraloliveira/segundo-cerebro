@@ -162,6 +162,19 @@ export default function NeuralMindMap({
     return (groupingMode === 'ai' && aiGroups) ? aiGroups : localTagGroups;
   }, [groupingMode, aiGroups, localTagGroups]);
 
+  // Auto-expandir ramo caso a nota selecionada esteja dentro de um grupo colapsado
+  useEffect(() => {
+    if (!selectedNoteId) return;
+    const parentGroup = activeGroups.find(g => g.notes.some(n => n.id === selectedNoteId));
+    if (parentGroup && collapsedGroups.has(parentGroup.id)) {
+      setCollapsedGroups(prev => {
+        const next = new Set(prev);
+        next.delete(parentGroup.id);
+        return next;
+      });
+    }
+  }, [selectedNoteId, activeGroups, collapsedGroups]);
+
   // Ação de solicitar agrupamento com IA
   const handleAiCluster = async () => {
     if (isAiClustering || notes.length === 0) return;
