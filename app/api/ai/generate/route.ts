@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { runAIWithFallback } from '@/lib/ai-runner';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // 60 seconds
 
@@ -19,27 +19,11 @@ export async function POST(req: Request) {
       }, { status: 500 });
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel(
-      { model: 'gemini-3.1-flash-lite-preview' },
-      { apiVersion: 'v1beta' }
-    );
-
-    try {
-      // Usando o formato de objeto explícito para maior compatibilidade
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      });
-      
-      const response = await result.response;
-      const text = response.text();
-      
-      return NextResponse.json({ text });
-    } catch (apiError: any) {
-      console.error('--- ERRO DETALHADO DA API GEMINI ---');
-      console.error('Mensagem:', apiError.message);
-      throw apiError;
-    }
+    const result = await runAIWithFallback(apiKey, { prompt });
+    return NextResponse.json({
+      text: result.text,
+      meta: result.meta
+    });
   } catch (error: any) {
     console.error('Erro Geral na Rota AI:', error);
     return NextResponse.json({

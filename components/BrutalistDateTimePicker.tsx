@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   format,
@@ -138,25 +138,42 @@ export default function BrutalistDateTimePicker({
     };
   }, [isOpen]);
 
-  // Auto-scroll time columns when switching to 'time' tab
+  // Helper to center an active element inside its scroll container
+  const scrollToCenter = useCallback((container: HTMLElement | null, isSmooth = false) => {
+    if (!container) return;
+    const activeEl = container.querySelector('[data-active="true"]') as HTMLElement;
+    if (!activeEl) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const activeRect = activeEl.getBoundingClientRect();
+
+    const currentRelativeTop = activeRect.top - containerRect.top;
+    const targetRelativeTop = (containerRect.height / 2) - (activeRect.height / 2);
+    const delta = currentRelativeTop - targetRelativeTop;
+
+    container.scrollBy({
+      top: delta,
+      behavior: isSmooth ? 'smooth' : 'instant'
+    });
+  }, []);
+
+  // Auto-scroll time columns when switching to 'time' tab or opening popover
   useEffect(() => {
     if (activeTab === 'time' && isOpen) {
-      setTimeout(() => {
-        if (hourListRef.current) {
-          const activeHourEl = hourListRef.current.querySelector('[data-active="true"]') as HTMLElement;
-          if (activeHourEl) {
-            hourListRef.current.scrollTop = activeHourEl.offsetTop - hourListRef.current.offsetHeight / 2 + activeHourEl.offsetHeight / 2;
-          }
-        }
-        if (minuteListRef.current) {
-          const activeMinEl = minuteListRef.current.querySelector('[data-active="true"]') as HTMLElement;
-          if (activeMinEl) {
-            minuteListRef.current.scrollTop = activeMinEl.offsetTop - minuteListRef.current.offsetHeight / 2 + activeMinEl.offsetHeight / 2;
-          }
-        }
-      }, 50);
+      const t1 = setTimeout(() => {
+        scrollToCenter(hourListRef.current, false);
+        scrollToCenter(minuteListRef.current, false);
+      }, 30);
+      const t2 = setTimeout(() => {
+        scrollToCenter(hourListRef.current, false);
+        scrollToCenter(minuteListRef.current, false);
+      }, 160);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
     }
-  }, [activeTab, isOpen]);
+  }, [activeTab, isOpen, scrollToCenter]);
 
   // Calendar days generation
   const calendarDays = useMemo(() => {
@@ -183,6 +200,9 @@ export default function BrutalistDateTimePicker({
     updated = setMinutes(updated, selectedMinute);
     setSelectedDate(updated);
     onChange(updated);
+    requestAnimationFrame(() => {
+      scrollToCenter(hourListRef.current, true);
+    });
   };
 
   const handleSelectMinute = (m: number) => {
@@ -192,6 +212,9 @@ export default function BrutalistDateTimePicker({
     updated = setMinutes(updated, m);
     setSelectedDate(updated);
     onChange(updated);
+    requestAnimationFrame(() => {
+      scrollToCenter(minuteListRef.current, true);
+    });
   };
 
   const handleSetNow = () => {
@@ -201,6 +224,12 @@ export default function BrutalistDateTimePicker({
     setSelectedHour(getHours(now));
     setSelectedMinute(getMinutes(now));
     onChange(now);
+    if (activeTab === 'time') {
+      requestAnimationFrame(() => {
+        scrollToCenter(hourListRef.current, true);
+        scrollToCenter(minuteListRef.current, true);
+      });
+    }
   };
 
   const handleClear = (e?: React.MouseEvent) => {
@@ -388,9 +417,15 @@ export default function BrutalistDateTimePicker({
                   <span>Minuto</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 h-44">
+                <div className="grid grid-cols-2 gap-2 h-44 relative">
+                  {/* Central alignment guide banner */}
+                  <div
+                    className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-8 pointer-events-none border-y border-[var(--accent)]/30 bg-[var(--accent)]/[0.04]"
+                    aria-hidden="true"
+                  />
+
                   {/* Hours List */}
-                  <div ref={hourListRef} className="overflow-y-auto custom-scrollbar border border-[var(--border)] p-1 space-y-1">
+                  <div ref={hourListRef} className="overflow-y-auto custom-scrollbar border border-[var(--border)] px-1 py-[72px] space-y-1 relative">
                     {hours.map((h) => {
                       const isSelected = selectedHour === h;
                       return (
@@ -412,7 +447,7 @@ export default function BrutalistDateTimePicker({
                   </div>
 
                   {/* Minutes List */}
-                  <div ref={minuteListRef} className="overflow-y-auto custom-scrollbar border border-[var(--border)] p-1 space-y-1">
+                  <div ref={minuteListRef} className="overflow-y-auto custom-scrollbar border border-[var(--border)] px-1 py-[72px] space-y-1 relative">
                     {minutes.map((m) => {
                       const isSelected = selectedMinute === m;
                       return (

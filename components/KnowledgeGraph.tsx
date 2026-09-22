@@ -5,7 +5,8 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { Note } from '@/lib/types';
 import { forceManyBody, forceCollide, forceCenter } from 'd3-force';
-import { Maximize2 } from 'lucide-react';
+import { Maximize2, Brain, Tag, ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), {
   ssr: false,
@@ -525,6 +526,16 @@ export default function KnowledgeGraph({
         d3VelocityDecay={simulationParams.velocityDecay}
         d3AlphaMin={0.005}
         onNodeClick={(node: any) => {
+          if (node.x !== undefined && node.y !== undefined && fgRef.current) {
+            if (node.type === 'tag') {
+              fgRef.current.centerAt(node.x, node.y, 600);
+              fgRef.current.zoom(1.6, 600);
+            } else {
+              fgRef.current.centerAt(node.x, node.y, 600);
+              fgRef.current.zoom(2.4, 600);
+            }
+          }
+
           if (node.type === 'tag') {
             const nextTag = selectedTag === node.tagName ? null : node.tagName;
             onTagSelect?.(nextTag);
@@ -661,9 +672,27 @@ export default function KnowledgeGraph({
             ctx.fillStyle = shouldHighlight ? nodeColor : (isDark ? 'rgba(128, 128, 128, 0.15)' : 'rgba(24, 24, 27, 0.12)');
             ctx.fill();
 
-            if (node.isBookmarked || isSelectedNote) {
-              ctx.strokeStyle = isSelectedNote ? (isDark ? '#FFFFFF' : '#18181b') : '#D97706';
-              ctx.lineWidth = isSelectedNote ? 2 : 1.5;
+            if (isSelectedNote) {
+              // TARGET LOCK: Continuous expanding radar wave
+              const elapsed = (Date.now() % 1200) / 1200;
+              const pulseRadius = nodeR + 6 + elapsed * 26;
+              const pulseOpacity = (1 - elapsed) * 0.75;
+
+              ctx.beginPath();
+              ctx.arc(node.x, node.y, pulseRadius, 0, 2 * Math.PI, false);
+              ctx.strokeStyle = hexToRgba(nodeColor, pulseOpacity);
+              ctx.lineWidth = 2 / globalScale;
+              ctx.stroke();
+
+              // Dual precision brackets
+              ctx.beginPath();
+              ctx.arc(node.x, node.y, nodeR + 5, 0, 2 * Math.PI, false);
+              ctx.strokeStyle = isDark ? '#FFFFFF' : '#000000';
+              ctx.lineWidth = 1.8 / globalScale;
+              ctx.stroke();
+            } else if (node.isBookmarked) {
+              ctx.strokeStyle = '#D97706';
+              ctx.lineWidth = 1.5;
               ctx.stroke();
             }
 
@@ -674,22 +703,25 @@ export default function KnowledgeGraph({
 
             if (showNoteLabel) {
               const noteTextColor = isDark ? '#E5E7EB' : '#18181b';
-              const noteFontSize = Math.max(9, Math.min(13, 11 / globalScale));
-              ctx.font = `${node.isBookmarked ? 'bold ' : ''}${noteFontSize}px Georgia, serif`;
+              // Screen-invariant readable typography:
+              // targetScreenPx / globalScale guarantees text renders at exact targetScreenPx on user monitor
+              const targetScreenPx = isHoveredNode ? 14 : (isSelectedNote ? 13 : 11);
+              const noteFontSize = targetScreenPx / globalScale;
+              ctx.font = `${(node.isBookmarked || isHoveredNode || isSelectedNote) ? 'bold ' : ''}${noteFontSize}px ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
               const textX = node.x;
-              const textY = node.y + nodeR + 5;
+              const textY = node.y + nodeR + (6 / globalScale);
 
-              // 1. Halo contour in background color (Zero black boxes, 100% clean background)
+              // 1. Halo contour in background color (Guarantees zero interference with background links)
               ctx.textAlign = 'center';
               ctx.textBaseline = 'top';
-              ctx.lineWidth = 3 / globalScale;
+              ctx.lineWidth = 4 / globalScale;
               ctx.lineJoin = 'round';
               ctx.strokeStyle = haloStrokeColor;
               ctx.strokeText(label, textX, textY);
 
               // 2. Crisp foreground text
               ctx.fillStyle = shouldHighlight
-                ? (isSearchMatch ? defaultFallback : (node.isBookmarked ? '#D97706' : noteTextColor))
+                ? (isSearchMatch ? defaultFallback : (node.isBookmarked ? '#D97706' : (isHoveredNode ? nodeColor : noteTextColor)))
                 : (isDark ? 'rgba(200, 200, 200, 0.35)' : 'rgba(24, 24, 27, 0.35)');
               ctx.fillText(label, textX, textY);
             }
@@ -697,13 +729,86 @@ export default function KnowledgeGraph({
         }}
       />
 
-      <div className="absolute bottom-10 right-10 pointer-events-none text-right hidden md:block">
-        <div className="space-y-1">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40 text-[var(--foreground)]">Matriz de Constelações</p>
-          <p className="text-sm font-mono font-bold text-[var(--foreground)]">{notes.length} Pensamentos Ativos</p>
-          <div className="w-32 h-[1px] bg-[var(--accent)] ml-auto mt-2"></div>
-        </div>
-      </div>
+      {/* Floating Cognitive Preview HUD Card (Screen-Invariant Readability) */}
+      <AnimatePresence>
+        {hoveredNode && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.96 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+            className="absolute bottom-6 left-6 z-30 pointer-events-none w-[calc(100vw-3rem)] sm:w-80 max-w-sm bg-[var(--background)]/95 backdrop-blur-xl border border-[var(--border)] shadow-[8px_8px_0px_rgba(0,0,0,0.15)] dark:shadow-[8px_8px_0px_rgba(0,0,0,0.4)] p-4 space-y-2 text-[var(--foreground)]"
+          >
+            {hoveredNode.type === 'tag' ? (
+              <>
+                <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
+                  <span className="flex items-center gap-1.5 text-[9px] font-mono font-bold uppercase tracking-widest text-[var(--accent)]">
+                    <Tag className="w-3 h-3" />
+                    <span>Constelação Neural</span>
+                  </span>
+                  <span className="text-[9px] font-mono font-bold opacity-60">
+                    {hoveredNode.count} conexões
+                  </span>
+                </div>
+                <div>
+                  <h4 className="font-sans font-bold text-sm text-[var(--foreground)]">
+                    #{hoveredNode.tagName}
+                  </h4>
+                  <p className="text-[11px] opacity-60 font-sans mt-0.5">
+                    Núcleo temático agrupando {hoveredNode.count} pensamentos correlacionados.
+                  </p>
+                </div>
+                <div className="pt-1 flex items-center gap-1 text-[9px] font-mono text-[var(--accent)] uppercase tracking-wider font-bold">
+                  <span>Clique para aproximar constelação</span>
+                  <ArrowRight className="w-2.5 h-2.5" />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-between border-b border-[var(--border)] pb-1.5">
+                  <span className="flex items-center gap-1.5 text-[9px] font-mono font-bold uppercase tracking-widest text-[var(--accent)]">
+                    <Brain className="w-3 h-3" />
+                    <span>Neurônio Ativo</span>
+                  </span>
+                  {hoveredNode.originalNote?.isBookmarked && (
+                    <span className="text-[9px] font-mono font-bold text-amber-500 uppercase flex items-center gap-1">
+                      ★ Favorita
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <h4 className="font-sans font-bold text-sm text-[var(--foreground)] leading-snug line-clamp-2">
+                    {hoveredNode.name || 'Pensamento Sem Título'}
+                  </h4>
+                  {hoveredNode.originalNote?.content && (
+                    <p className="text-[11px] opacity-65 font-sans line-clamp-2 mt-1 leading-relaxed">
+                      {hoveredNode.originalNote.content.replace(/<[^>]*>/g, '').trim() || 'Sem conteúdo de texto'}
+                    </p>
+                  )}
+                </div>
+                {hoveredNode.tags && hoveredNode.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 pt-0.5">
+                    {hoveredNode.tags.slice(0, 4).map((t: string) => (
+                      <span key={t} className="px-1.5 py-0.5 text-[8px] font-mono bg-[var(--muted)] border border-[var(--border)] opacity-80">
+                        #{t}
+                      </span>
+                    ))}
+                    {hoveredNode.tags.length > 4 && (
+                      <span className="text-[8px] font-mono opacity-40 self-center">
+                        +{hoveredNode.tags.length - 4}
+                      </span>
+                    )}
+                  </div>
+                )}
+                <div className="pt-1 border-t border-[var(--border)] flex items-center justify-between text-[9px] font-mono text-[var(--accent)] uppercase tracking-wider font-bold">
+                  <span>Clique para aproximar e inspecionar</span>
+                  <ArrowRight className="w-2.5 h-2.5" />
+                </div>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

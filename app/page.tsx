@@ -17,7 +17,7 @@ import {
 } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, db, signIn, logOut } from '@/lib/firebase';
-import { Note } from '@/lib/types';
+import { Note, NoteReminder } from '@/lib/types';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Plus,
@@ -233,6 +233,9 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
   const actionsButtonRef = useRef<HTMLButtonElement>(null);
   const [actionsCoords, setActionsCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const localTitleRef = useRef(activeNote.id);
+  const [isAddingReminder, setIsAddingReminder] = useState(false);
+  const [newReminderDate, setNewReminderDate] = useState<Date | null>(null);
+  const [newReminderLabel, setNewReminderLabel] = useState('');
 
   // Auto-close dropdowns when scrolling
   useEffect(() => {
@@ -590,6 +593,129 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
                 }}
               />
             </div>
+
+            {/* Multiple Reminders Stack */}
+            <div className="mt-2 mb-0 pb-3 border-b border-[var(--border)] space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 opacity-60">
+                  <Bell className="w-3 h-3 text-[var(--accent)]" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest font-mono">
+                    Lembretes Adicionais {(activeNote.reminders && activeNote.reminders.length > 0) ? `(${activeNote.reminders.length})` : ''}
+                  </span>
+                </div>
+                {(!activeNote.reminders || activeNote.reminders.length < 5) && !isAddingReminder && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddingReminder(true);
+                      setNewReminderDate(null);
+                      setNewReminderLabel('');
+                    }}
+                    className="text-[9px] font-mono font-bold uppercase tracking-wider text-[var(--accent)] hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Adicionar Lembrete</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Active Reminders Chips */}
+              {activeNote.reminders && activeNote.reminders.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {activeNote.reminders.map((rem: NoteReminder) => {
+                    const formattedDate = rem.date?.toDate
+                      ? format(rem.date.toDate(), "dd/MM 'às' HH:mm", { locale: ptBR })
+                      : '';
+                    return (
+                      <span
+                        key={rem.id}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[var(--muted)] border border-[var(--border)] text-[10px] font-mono text-[var(--foreground)]"
+                      >
+                        <Bell className="w-2.5 h-2.5 text-[var(--accent)]" />
+                        <span className="font-bold">{formattedDate}</span>
+                        {rem.label && (
+                          <span className="opacity-60 text-[9px] font-sans">({rem.label})</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = (activeNote.reminders || []).filter((r: NoteReminder) => r.id !== rem.id);
+                            updateNote(activeNote.id, { reminders: updated });
+                          }}
+                          className="hover:text-red-500 opacity-50 hover:opacity-100 transition-opacity ml-1 cursor-pointer"
+                          title="Remover lembrete"
+                        >
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Form to Add New Reminder */}
+              {isAddingReminder && (
+                <div className="p-2.5 border border-[var(--accent)]/40 bg-[var(--accent)]/[0.02] space-y-2 mt-2">
+                  <div className="flex items-center justify-between text-[10px] font-mono font-bold uppercase">
+                    <span className="text-[var(--accent)]">Novo Lembrete para esta Nota</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingReminder(false)}
+                      className="opacity-50 hover:opacity-100 cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <BrutalistDateTimePicker
+                      label="Data e Hora"
+                      placeholder="Escolher horário..."
+                      value={newReminderDate}
+                      onChange={(d) => setNewReminderDate(d)}
+                    />
+                    <div className="space-y-1">
+                      <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Rótulo / Evento (Opcional)</p>
+                      <input
+                        type="text"
+                        value={newReminderLabel}
+                        onChange={(e) => setNewReminderLabel(e.target.value)}
+                        placeholder="Ex: Prazo pagamento, Follow-up..."
+                        className="w-full bg-[var(--muted)] text-[var(--foreground)] px-2.5 py-1.5 sm:py-2 text-[10px] sm:text-xs font-mono rounded-none border border-[var(--border)] focus:border-[var(--accent)] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingReminder(false)}
+                      className="px-2.5 py-1 text-[9px] font-mono uppercase tracking-wider opacity-60 hover:opacity-100 cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!newReminderDate}
+                      onClick={() => {
+                        if (!newReminderDate) return;
+                        const newRem: NoteReminder = {
+                          id: Math.random().toString(36).substring(2, 10),
+                          date: Timestamp.fromDate(newReminderDate),
+                          label: newReminderLabel.trim() || undefined
+                        };
+                        const currentList = activeNote.reminders || [];
+                        updateNote(activeNote.id, { reminders: [...currentList, newRem] });
+                        setIsAddingReminder(false);
+                        setNewReminderDate(null);
+                        setNewReminderLabel('');
+                      }}
+                      className="px-3 py-1 bg-[var(--accent)] text-white text-[9px] font-mono font-bold uppercase tracking-wider shadow-sm disabled:opacity-30 cursor-pointer"
+                    >
+                      Salvar Lembrete
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
           <RichTextEditor
             content={localContent}
@@ -696,10 +822,12 @@ export default function Home() {
   const [tagsToAssign, setTagsToAssign] = useState<string[]>([]);
   const [isAiSuggestingTags, setIsAiSuggestingTags] = useState(false);
   const [aiSuggestedTags, setAiSuggestedTags] = useState<Array<{ tag: string; isExisting: boolean }>>([]);
+  const aiTagPoolRef = useRef<Map<string, { tag: string; isExisting: boolean }>>(new Map());
   const [notifiedReminders, setNotifiedReminders] = useState<Set<string>>(new Set());
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isReminderAlertOpen, setIsReminderAlertOpen] = useState(false);
   const [currentReminderNote, setCurrentReminderNote] = useState<Note | null>(null);
+  const [currentReminderLabel, setCurrentReminderLabel] = useState<string | null>(null);
   const [isTagDeleteModalOpen, setIsTagDeleteModalOpen] = useState(false);
   const [tagToDelete, setTagToDelete] = useState<{ noteId: string, tag: string } | null>(null);
   const [isGlobalTagDeleteModalOpen, setIsGlobalTagDeleteModalOpen] = useState(false);
@@ -707,6 +835,45 @@ export default function Home() {
   const [showTagUndoToast, setShowTagUndoToast] = useState(false);
   const [lastDeletedTag, setLastDeletedTag] = useState<{ noteId: string, tag: string, affectedNoteIds?: string[] } | null>(null);
   const [alarmType, setAlarmType] = useState<'neural' | 'crystal' | 'pulsar' | 'zen'>('neural');
+  const [aiFallbackToast, setAiFallbackToast] = useState<{
+    modelUsed: string;
+    originalModel: string;
+    reason?: string;
+  } | null>(null);
+
+  const triggerAiFallbackNotice = (meta?: any) => {
+    if (meta?.isFallback) {
+      setAiFallbackToast({
+        modelUsed: meta.modelUsed || 'gemini-3.8-flash',
+        originalModel: meta.originalModel || 'gemini-3.1-flash-lite',
+        reason: meta.reason
+      });
+      setTimeout(() => setAiFallbackToast(null), 7000);
+    }
+  };
+
+  // Listener para eventos globais de fallback de IA (ex: chatbot, assistente, gerador)
+  useEffect(() => {
+    const handleFallbackEvent = (e: any) => {
+      if (e.detail) {
+        triggerAiFallbackNotice(e.detail);
+      }
+    };
+    window.addEventListener('ai-fallback-triggered', handleFallbackEvent);
+    return () => window.removeEventListener('ai-fallback-triggered', handleFallbackEvent);
+  }, []);
+
+  // Listener para abrir nota pelo ID a partir de qualquer componente (ex: notas referenciadas no chat)
+  useEffect(() => {
+    const handleOpenNoteById = (e: any) => {
+      if (e.detail) {
+        setActiveNoteId(e.detail);
+        setMobileView('editor');
+      }
+    };
+    window.addEventListener('open-note-by-id', handleOpenNoteById);
+    return () => window.removeEventListener('open-note-by-id', handleOpenNoteById);
+  }, []);
 
   // Persistência do tipo de alarme
   useEffect(() => {
@@ -770,7 +937,7 @@ export default function Home() {
     const checkReminders = () => {
       const now = new Date();
       notes.forEach(note => {
-        // 1. Handle regular reminders
+        // 1. Handle regular reminders (legacy note.reminder)
         if (note.reminder && !notifiedReminders.has(note.id)) {
           const reminderTime = note.reminder.toDate();
           // Trigger if within the current minute
@@ -784,21 +951,56 @@ export default function Home() {
 
             // Visual feedback (Styled Modal)
             setCurrentReminderNote(note);
+            setCurrentReminderLabel(null);
             setIsReminderAlertOpen(true);
             playNeuralSound();
 
             setNotifiedReminders(prev => new Set(prev).add(note.id));
 
-            // AUTOMATICALLY REMOVE REMOVED (As requested)
+            // AUTOMATICALLY REMOVE (As requested)
             updateNote(note.id, { reminder: null });
           }
         }
 
-        // 2. Handle expiryDate - if note is expired, clear reminder to avoid zombie alerts
-        if (note.expiryDate && note.reminder) {
+        // 1.1 Handle multiple reminders (note.reminders)
+        if (note.reminders && Array.isArray(note.reminders)) {
+          note.reminders.forEach(rem => {
+            const remKey = `${note.id}_${rem.id}`;
+            if (!notifiedReminders.has(remKey) && rem.date?.toDate) {
+              const reminderTime = rem.date.toDate();
+              if (reminderTime <= now && now.getTime() - reminderTime.getTime() < 60000) {
+                const labelText = rem.label || 'Lembrete';
+                if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+                  new Notification(`Lembrete: ${labelText} • ${note.title || 'Nota sem título'}`, {
+                    body: `Evento agendado: ${labelText}`,
+                  });
+                }
+
+                setCurrentReminderNote(note);
+                setCurrentReminderLabel(labelText);
+                setIsReminderAlertOpen(true);
+                playNeuralSound();
+
+                setNotifiedReminders(prev => new Set(prev).add(remKey));
+
+                // Remove only this triggered reminder from note.reminders
+                const remaining = (note.reminders || []).filter(r => r.id !== rem.id);
+                updateNote(note.id, { reminders: remaining });
+              }
+            }
+          });
+        }
+
+        // 2. Handle expiryDate - if note is expired, clear reminders to avoid zombie alerts
+        if (note.expiryDate) {
           const expiryTime = note.expiryDate.toDate();
           if (expiryTime < now) {
-            updateNote(note.id, { reminder: null });
+            if (note.reminder) {
+              updateNote(note.id, { reminder: null });
+            }
+            if (note.reminders && note.reminders.length > 0) {
+              updateNote(note.id, { reminders: [] });
+            }
           }
         }
 
@@ -825,6 +1027,7 @@ export default function Home() {
       setTagsToAssign(Array.from(new Set(normalizedCurrent)));
       setNewTagInput('');
       setAiSuggestedTags([]);
+      aiTagPoolRef.current.clear();
     }
   }, [isTagModalOpen, activeNote?.id]);
 
@@ -1039,6 +1242,9 @@ Retorne EXCLUSIVAMENTE um JSON válido no seguinte formato:
 
       const data = await response.json();
       if (data.error) throw new Error(data.error);
+      if (data.meta?.isFallback) {
+        triggerAiFallbackNotice(data.meta);
+      }
 
       let parsed: { existing?: string[]; new?: string[] } = {};
       try {
@@ -1077,12 +1283,45 @@ Retorne EXCLUSIVAMENTE um JSON válido no seguinte formato:
         }
       });
 
+      suggestions.forEach(item => {
+        aiTagPoolRef.current.set(item.tag, item);
+      });
+
       setAiSuggestedTags(suggestions);
     } catch (err: any) {
       console.error('Erro ao sugerir tags com IA:', err);
       alert('Não foi possível gerar sugestões com a IA no momento.');
     } finally {
       setIsAiSuggestingTags(false);
+    }
+  };
+
+  const handleRemoveAssignedTag = (tagToRemove: string) => {
+    setTagsToAssign(prev => prev.filter(t => t !== tagToRemove));
+    const originalAiTag = aiTagPoolRef.current.get(tagToRemove);
+    if (originalAiTag) {
+      setAiSuggestedTags(prev => {
+        if (prev.some(item => item.tag === tagToRemove)) return prev;
+        return [...prev, originalAiTag];
+      });
+    }
+  };
+
+  const handleRemoveAllAssignedTags = () => {
+    const restoredAiTags: Array<{ tag: string; isExisting: boolean }> = [];
+    tagsToAssign.forEach(tag => {
+      const originalAiTag = aiTagPoolRef.current.get(tag);
+      if (originalAiTag) {
+        restoredAiTags.push(originalAiTag);
+      }
+    });
+    setTagsToAssign([]);
+    if (restoredAiTags.length > 0) {
+      setAiSuggestedTags(prev => {
+        const existingSet = new Set(prev.map(p => p.tag));
+        const toAdd = restoredAiTags.filter(item => !existingSet.has(item.tag));
+        return [...prev, ...toAdd];
+      });
     }
   };
 
@@ -1136,7 +1375,7 @@ Retorne EXCLUSIVAMENTE um JSON válido no seguinte formato:
       const matchesTag = activeTag ? note.tags?.includes(activeTag) : true;
       const matchesView =
         view === 'favorites' ? note.isBookmarked :
-          view === 'reminders' ? !!note.reminder :
+          view === 'reminders' ? (!!note.reminder || (!!note.reminders && note.reminders.length > 0)) :
             view === 'overdue' ? getNoteExpiryStatus(note) === 'overdue' :
               view === 'completed' ? note.isCompleted :
                 view === 'untagged' ? (!note.tags || note.tags.length === 0) : true;
@@ -1202,6 +1441,9 @@ Retorne EXCLUSIVAMENTE um JSON válido no seguinte formato:
       });
       const data = await response.json();
       if (data.error) throw new Error(data.error);
+      if (data.meta?.isFallback) {
+        triggerAiFallbackNotice(data.meta);
+      }
       alert(data.text);
     } catch (e: any) {
       console.error(e);
@@ -1800,7 +2042,9 @@ Retorne EXCLUSIVAMENTE um JSON válido no seguinte formato:
                     <Bell className={`w-4 h-4 ${view === 'reminders' ? 'text-[var(--accent)]' : 'opacity-40'}`} />
                     Lembretes
                   </div>
-                  <span className="text-[10px] opacity-60 font-mono">{notes.filter(n => n.reminder).length}</span>
+                  <span className="text-[10px] opacity-60 font-mono">
+                    {notes.filter(n => n.reminder || (n.reminders && n.reminders.length > 0)).length}
+                  </span>
                 </button>
                 <button
                   onClick={() => {
@@ -2317,7 +2561,7 @@ Retorne EXCLUSIVAMENTE um JSON válido no seguinte formato:
                   {tagsToAssign.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => setTagsToAssign([])}
+                      onClick={handleRemoveAllAssignedTags}
                       className="text-[9px] font-bold text-red-500/70 hover:text-red-500 uppercase tracking-widest transition-colors"
                     >
                       Remover todas
@@ -2334,7 +2578,7 @@ Retorne EXCLUSIVAMENTE um JSON válido no seguinte formato:
                         #{tag}
                         <button
                           type="button"
-                          onClick={() => setTagsToAssign(prev => prev.filter(t => t !== tag))}
+                          onClick={() => handleRemoveAssignedTag(tag)}
                           className="hover:bg-black/20 rounded p-0.5 transition-colors leading-none"
                           title="Remover etiqueta"
                         >
@@ -2410,7 +2654,7 @@ Retorne EXCLUSIVAMENTE um JSON válido no seguinte formato:
                           setTagsToAssign(prev => Array.from(new Set([...prev, item.tag])));
                           setAiSuggestedTags(prev => prev.filter(s => s.tag !== item.tag));
                         }}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wider border transition-all cursor-pointer animate-in fade-in zoom-in-95 duration-200 ${
                           item.isExisting
                             ? 'bg-[var(--background)] text-[var(--foreground)] border-[var(--border)] hover:border-[var(--accent)] hover:bg-[var(--muted)]'
                             : 'bg-[var(--accent)]/15 text-[var(--accent)] border-dashed border-[var(--accent)] hover:bg-[var(--accent)] hover:text-white'
@@ -2720,7 +2964,14 @@ Retorne EXCLUSIVAMENTE um JSON válido no seguinte formato:
                 </div>
 
                 <div className="space-y-2">
-                  <h3 className="text-[10px] uppercase tracking-[0.3em] font-bold text-[var(--accent)]">Alerta Neural</h3>
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-[var(--accent)]">Alerta Neural</span>
+                    {currentReminderLabel && (
+                      <span className="px-2 py-0.5 bg-[var(--accent)]/15 text-[var(--accent)] text-[9px] font-mono font-bold uppercase tracking-wider border border-[var(--accent)]/30">
+                        {currentReminderLabel}
+                      </span>
+                    )}
+                  </div>
                   <h2 className="text-xl font-sans font-semibold text-[var(--foreground)]">{currentReminderNote.title || 'Pensamento Sem Título'}</h2>
                   <p className="text-xs opacity-60 line-clamp-2 max-w-[280px] mx-auto">
                     {((currentReminderNote.content || '').replace(/<[^>]*>/g, '') || 'Este pensamento requer sua atenção agora.').substring(0, 120)}...
@@ -2894,11 +3145,11 @@ Retorne EXCLUSIVAMENTE um JSON válido no seguinte formato:
                       <div className="pt-2 border-t border-[var(--border)] space-y-1.5">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--accent)]">Notas da Atualização ({APP_VERSION})</p>
                         <p className="text-[10px] opacity-70 leading-relaxed">
-                          • <strong>Menu "Sem Etiquetas"</strong>: Inbox e triagem rápida de notas não categorizadas.<br />
-                          • <strong>IA de Sugestão de Tags</strong>: Leitura contextual da nota com reaproveitamento de tags existentes e proposição de novas.<br />
-                          • <strong>Gestão Avançada de Tags</strong>: Busca em tempo real, prevenção de duplicatas e unificação em lote no Firestore.<br />
-                          • <strong>Seletor Brutalista com Portal</strong>: Calendário e relógio desacoplados, imunes a sobreposição da toolbar (`z-[9999]`).<br />
-                          • <strong>Prazos Ergonômicos</strong>: Cores suaves (âmbar/vermelho), menu de Notas Atrasadas e adiamento rápido (+1d).
+                          • <strong>Mapa Mental Neural</strong>: Nova visualização em árvore com agrupamento automático por tags e agrupamento semântico por IA.<br />
+                          • <strong>Múltiplos Lembretes por Nota</strong>: Gestão de múltiplos alertas com rótulos personalizados e disparo sonoro neural.<br />
+                          • <strong>Grafo com Zoom Cinemático & Target Lock</strong>: Feedback tátil com radar pulsante e card HUD de alta legibilidade no hover.<br />
+                          • <strong>Seletor Brutalista Aperfeiçoado</strong>: Alinhamento vertical centralizado e rolagem suave nos seletores de horário.<br />
+                          • <strong>Resiliência de IA (Fallback Dinâmico)</strong>: Transição automática para Gemini 3.8 Flash em alta demanda com notificação transparente.
                         </p>
                       </div>
                       <div className="pt-2 border-t border-[var(--border)] text-[10px] opacity-40 leading-relaxed">
@@ -3020,6 +3271,42 @@ Retorne EXCLUSIVAMENTE um JSON válido no seguinte formato:
               className="flex items-center gap-2 text-accent text-xs font-bold uppercase tracking-widest hover:underline"
             >
               <RotateCcw className="w-3 h-3" /> Desfazer
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* AI FALLBACK TRANSPARENCY TOAST */}
+      <AnimatePresence>
+        {aiFallbackToast && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[130] bg-[#141414] text-white px-5 py-3.5 flex items-center gap-4 shadow-2xl border border-amber-500/40 max-w-[92vw] sm:max-w-md backdrop-blur-md"
+          >
+            <div className="w-8 h-8 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+              <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400">
+                  Alta Demanda na IA
+                </span>
+                <span className="text-[9px] font-mono px-1.5 py-0.5 bg-amber-500/20 text-amber-300 font-bold uppercase">
+                  {aiFallbackToast.modelUsed}
+                </span>
+              </div>
+              <p className="text-[11px] text-white/70 leading-snug mt-0.5">
+                {aiFallbackToast.reason || `Modelo principal sobrecarregado. Alternado automaticamente para ${aiFallbackToast.modelUsed} com menor consumo de tokens.`}
+              </p>
+            </div>
+            <button
+              onClick={() => setAiFallbackToast(null)}
+              className="text-white/40 hover:text-white p-1 transition-colors shrink-0"
+              aria-label="Fechar notificação"
+            >
+              <X className="w-4 h-4" />
             </button>
           </motion.div>
         )}

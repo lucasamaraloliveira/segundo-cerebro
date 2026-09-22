@@ -1,11 +1,19 @@
 import { Timestamp } from 'firebase/firestore';
 
+export interface NoteReminder {
+  id: string;
+  date: Timestamp;
+  label?: string;
+  notified?: boolean;
+}
+
 export interface Note {
   id: string;
   title: string;
   content: string;
   tags: string[];
   reminder?: Timestamp | null;
+  reminders?: NoteReminder[];
   expiryDate?: Timestamp | null;
   isBookmarked: boolean;
   isCompleted?: boolean;

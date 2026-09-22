@@ -5,7 +5,7 @@ import { Note } from '@/lib/types';
 import { db, auth } from '@/lib/firebase';
 import { doc, updateDoc, collection, query, where, onSnapshot, setDoc, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { X, Send, Brain, Loader2, Info, ChevronDown, Paperclip, Copy, Check, History, ArrowLeft, Plus, Trash2, Link2, Globe } from 'lucide-react';
+import { X, Send, Brain, Loader2, Info, ChevronDown, ChevronUp, Paperclip, Copy, Check, History, ArrowLeft, ArrowRight, Plus, Trash2, Link2, Globe, Sparkles, FileText } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -33,6 +33,62 @@ function parseUserMessage(rawContent: string): { attachmentName: string | null; 
 
   return { attachmentName: null, cleanContent: rawContent };
 }
+
+// Subcomponente otimizado para exibir notas referenciadas com visualização colapsável
+// Subcomponente discreto e compacto para exibir notas referenciadas
+const MessageSources = ({ sources }: { sources: Array<{ id: string; title: string }> }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  if (!sources || sources.length === 0) return null;
+
+  const visibleSources = isExpanded ? sources : sources.slice(0, 3);
+  const remainingCount = sources.length - 3;
+
+  const handleOpenNote = (noteId: string) => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('open-note-by-id', { detail: noteId }));
+    }
+  };
+
+  return (
+    <div className="mt-2.5 pt-2 border-t border-[var(--border)]/50">
+      <div className="flex flex-wrap items-center gap-1.5 text-[9px]">
+        <span className="text-[var(--foreground)]/40 font-mono font-medium flex items-center gap-1 mr-0.5 select-none">
+          <FileText className="w-2.5 h-2.5 opacity-60" />
+          Fontes:
+        </span>
+
+        {visibleSources.map((s, idx) => (
+          <button
+            type="button"
+            key={`${s.id}-${idx}`}
+            onClick={() => handleOpenNote(s.id)}
+            title={`Abrir "${s.title || 'Sem título'}"`}
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-black/[0.04] dark:bg-white/[0.06] hover:bg-[#FF4F00]/10 hover:text-[#FF4F00] hover:border-[#FF4F00]/40 border border-black/5 dark:border-white/10 text-[9px] text-[var(--foreground)]/70 transition-colors cursor-pointer truncate max-w-[130px] sm:max-w-[170px]"
+          >
+            <span className="truncate">{s.title || 'Sem título'}</span>
+          </button>
+        ))}
+
+        {sources.length > 3 && (
+          <button
+            type="button"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-[9px] font-mono font-semibold text-[#FF4F00] hover:underline px-1 py-0.5 transition-colors cursor-pointer"
+          >
+            {isExpanded ? 'Recolher' : `+${remainingCount} mais`}
+          </button>
+        )}
+      </div>
+
+      {isExpanded && sources.length > 3 && (
+        <p className="mt-1 text-[8px] font-mono text-[var(--foreground)]/30">
+          {sources.length} notas referenciadas nesta resposta
+        </p>
+      )}
+    </div>
+  );
+};
 
 export default function SpecialistChat() {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -506,10 +562,15 @@ export default function SpecialistChat() {
       const data = await res.json();
 
       if (data.text) {
+        if (data.meta?.isFallback && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('ai-fallback-triggered', { detail: data.meta }));
+        }
+
         const finalMessages = [...newMessages, {
           role: 'assistant',
           content: data.text,
-          sources: data.sources
+          sources: data.sources,
+          meta: data.meta
         }];
         setMessages(finalMessages);
 
@@ -728,14 +789,15 @@ export default function SpecialistChat() {
                               </div>
                             )}
 
-                            {msg.sources && msg.sources.length > 0 && (
-                              <div className="mt-4 pt-2 border-t border-[var(--border)] flex flex-wrap gap-2">
-                                {msg.sources.map((s: { id: string, title: string }) => (
-                                  <span key={s.id} className="text-[9px] font-bold uppercase bg-black text-white px-2 py-0.5">
-                                    {s.title}
-                                  </span>
-                                ))}
+                            {msg.meta?.isFallback && (
+                              <div className="mt-3 flex items-center gap-1.5 text-[9px] font-mono font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-1">
+                                <Sparkles className="w-3 h-3 shrink-0 animate-pulse text-amber-500" />
+                                <span>Respondido via {msg.meta.modelUsed} (Alta demanda no modelo principal)</span>
                               </div>
+                            )}
+
+                            {msg.sources && msg.sources.length > 0 && (
+                              <MessageSources sources={msg.sources} />
                             )}
                           </div>
                         </div>

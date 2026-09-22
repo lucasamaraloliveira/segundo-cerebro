@@ -19,6 +19,10 @@ const KnowledgeGraph = dynamic(() => import('@/components/KnowledgeGraph'), {
 
 const NeuralTimeline = dynamic(() => import('@/components/NeuralTimeline'), { ssr: false });
 const NeuralHeatmap = dynamic(() => import('@/components/NeuralHeatmap'), { ssr: false });
+const NeuralMindMap = dynamic(() => import('@/components/NeuralMindMap'), { 
+  ssr: false,
+  loading: () => <div className="h-full w-full flex items-center justify-center opacity-20">Desenhando Mapa Mental...</div>
+});
 
 export default function Dashboard() {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -26,7 +30,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [dimensions, setDimensions] = useState<{ width: number, height: number } | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<'graph' | 'timeline' | 'heatmap'>('graph');
+  const [activeView, setActiveView] = useState<'graph' | 'mindmap' | 'timeline' | 'heatmap'>('graph');
   const [searchQuery, setSearchQuery] = useState('');
   const [inspectedNote, setInspectedNote] = useState<Note | null>(null);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -195,6 +199,7 @@ export default function Dashboard() {
           <div className="flex gap-2 p-1 bg-[var(--muted)] border border-[var(--border)] shadow-[4px_4px_0px_rgba(0,0,0,0.1)]">
             {[
               { id: 'graph', label: 'Mapa Neural', icon: Layers },
+              { id: 'mindmap', label: 'Mapa Mental', icon: Brain },
               { id: 'timeline', label: 'Linha do Tempo', icon: Clock },
               { id: 'heatmap', label: 'Heatmaps', icon: BarChart3 }
             ].map(tab => (
@@ -228,8 +233,8 @@ export default function Dashboard() {
           Grid System // Lat: 0.00 Lon: 0.00
         </div>
 
-        {/* Spotlight Search Header with Suggestions Dropdown in Graph mode */}
-        {activeView === 'graph' && (
+        {/* Spotlight Search Header with Suggestions Dropdown in Graph and MindMap modes */}
+        {(activeView === 'graph' || activeView === 'mindmap') && (
           <div ref={searchContainerRef} className="absolute top-6 left-1/2 -translate-x-1/2 z-30 w-full max-w-md px-4 pointer-events-auto">
             <div className="relative flex items-center">
               <Search className="absolute left-3.5 w-4 h-4 text-[var(--foreground)] opacity-40 pointer-events-none" />
@@ -442,7 +447,7 @@ export default function Dashboard() {
               </p>
             </div>
           ) : (
-            <div className={`absolute inset-0 ${activeView !== 'graph' ? 'overflow-y-auto custom-scrollbar' : 'overflow-hidden'}`}>
+            <div className={`absolute inset-0 ${activeView !== 'graph' && activeView !== 'mindmap' ? 'overflow-y-auto custom-scrollbar' : 'overflow-hidden'}`}>
               {activeView === 'graph' && dimensions && (
                 <KnowledgeGraph 
                   key={`${dimensions.width}-${dimensions.height}-${notes.length}`}
@@ -463,6 +468,17 @@ export default function Dashboard() {
                   filterMode={activeFilterMode}
                 />
               )}
+              {activeView === 'mindmap' && (
+                <NeuralMindMap
+                  notes={notes}
+                  onSelectNote={(note) => {
+                    setInspectedNote(note);
+                    dismissSearch();
+                  }}
+                  selectedNoteId={inspectedNote?.id}
+                  searchQuery={searchQuery}
+                />
+              )}
               {activeView === 'timeline' && <NeuralTimeline notes={notes} />}
               {activeView === 'heatmap' && <NeuralHeatmap notes={notes} />}
               {!dimensions && activeView === 'graph' && (
@@ -474,7 +490,7 @@ export default function Dashboard() {
 
         {/* Quick Inspector Side Drawer */}
         <AnimatePresence>
-          {activeView === 'graph' && inspectedNote && (
+          {(activeView === 'graph' || activeView === 'mindmap') && inspectedNote && (
             <motion.aside
               initial={{ x: 400, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
