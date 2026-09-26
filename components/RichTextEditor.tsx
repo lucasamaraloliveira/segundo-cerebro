@@ -666,6 +666,11 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
 
       const data = await res.json();
       if (data.text) {
+        // Disparar aviso transparente de fallback se o modelo de contingência tiver sido acionado
+        if (data.meta && data.meta.isFallback && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('ai-fallback-triggered', { detail: data.meta }));
+        }
+
         // Apply formatted text to the editor
         if (editor) {
           editor.chain().focus().insertContent(markdownToHtml(cleanHtmlTags(data.text))).run();
@@ -2296,8 +2301,13 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
               exit={{ scale: 0.95, opacity: 0 }}
               className="relative w-full max-w-2xl bg-[var(--background)] border border-[var(--border)] p-8 shadow-[30px_30px_0px_rgba(0,0,0,0.1)] max-h-[90vh] overflow-y-auto custom-scrollbar"
             >
-              <h3 className="text-xl font-sans font-bold mb-2 tracking-tight">Processar Gravação de Áudio</h3>
-              <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-6">Revise o áudio gravado e selecione o formato do relatório</p>
+              <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                <h3 className="text-xl font-sans font-bold tracking-tight">Processar Gravação de Áudio</h3>
+                <span className="text-[9px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 border border-[#FF4F00]/40 text-[#FF4F00] bg-[#FF4F00]/5 flex items-center gap-1.5 shadow-[2px_2px_0px_rgba(255,79,0,0.1)]">
+                  <Sparkles size={11} /> Motor: Gemini 3.8 Flash
+                </span>
+              </div>
+              <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-6">Revise o áudio gravado e selecione o formato do relatório neural</p>
 
               {/* Styled Audio Player */}
               <div className="bg-[var(--muted)] p-4 border border-[var(--border)] flex items-center justify-between gap-4 mb-6 rounded-none">
@@ -2375,12 +2385,12 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
                   {isProcessingAudio ? (
                     <>
                       <Loader2 size={16} className="animate-spin" />
-                      Processando com Gemini...
+                      Processando com Gemini 3.8 Flash...
                     </>
                   ) : (
                     <>
                       <Sparkles size={16} />
-                      Processar Áudio
+                      Processar com Gemini 3.8 Flash
                     </>
                   )}
                 </button>

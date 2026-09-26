@@ -24,22 +24,24 @@ export async function POST(req: Request) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const base64Data = buffer.toString('base64');
 
-    let promptText = "Transcreva o conteúdo deste arquivo de mídia exatamente como está em português. Retorne apenas o texto transcrito, sem introduções ou comentários.";
+    let promptText = "Você é um transcritor neural de alta precisão. Transcreva o conteúdo deste áudio com fidelidade total em português, aplicando pontuação natural, quebra em parágrafos claros e corrigindo apenas hesitações evidentes. Retorne APENAS o texto transcrito em Markdown, sem introduções ou explicações.";
 
     if (promptType === 'meeting_minutes') {
-      promptText = "Você é um redator profissional. Analise o áudio e gere uma ata de reunião estruturada e formatada em Markdown em português. Identifique os tópicos discutidos, decisões tomadas, participantes mencionados se houver, e itens de ação/compromissos. Retorne APENAS o texto da ata formatada em Markdown, sem comentários, introduções ou explicações adicionais.";
+      promptText = "Você é um redator executivo sênior. Analise o áudio e elabore uma Ata de Reunião profissional estruturada em Markdown em português contendo: # 📋 Ata de Reunião, ## 🎯 Objetivo & Pauta, ## 📌 Tópicos Discutidos, ## ✅ Decisões Tomadas e ## 🚀 Itens de Ação & Compromissos (em formato de checklist com - [ ]). Retorne APENAS a ata formatada, sem introduções ou comentários adicionais.";
     } else if (promptType === 'email') {
-      promptText = "Você é um assistente executivo. Analise o áudio e redija um e-mail profissional e formal em português para o cliente com base nas instruções faladas. Formate com Assunto e Corpo do e-mail em Markdown. Retorne APENAS o texto do e-mail formatado, sem comentários, introduções ou explicações adicionais.";
+      promptText = "Você é um assistente executivo corporativo. Analise o áudio e redija um e-mail profissional, cortês e objetivo em português com base nas instruções e assuntos falados. Formate com **Assunto:** no início, Saudação formal, Contextualização, Proposta/Pontos Principais e Fechamento com despedida executiva. Retorne APENAS o texto do e-mail formatado em Markdown, sem comentários ou introduções adicionais.";
     } else if (promptType === 'summary') {
-      promptText = "Analise o áudio e crie um resumo executivo conciso e estruturado em Markdown em português, destacando os pontos principais discutidos. Retorne APENAS o resumo formatado em Markdown, sem comentários, introduções ou explicações adicionais.";
+      promptText = "Você é um especialista em síntese cognitiva. Analise o áudio e crie um Resumo Executivo conciso e de alto impacto em português em Markdown, estruturado em: ## 💡 Resumo Geral, ## 🔑 Principais Destaques (em tópicos com termos-chave em negrito) e ## 📌 Conclusões. Retorne APENAS o resumo formatado, sem comentários ou introduções adicionais.";
     } else if (promptType === 'tasks') {
-      promptText = "Analise o áudio e extraia apenas os compromissos, tarefas ou action items mencionados. Formate como uma lista de tarefas detalhada em Markdown em português. Retorne APENAS a lista de tarefas, sem comentários, introduções ou explicações adicionais.";
+      promptText = "Você é um assistente de produtividade e gestão de tarefas. Analise o áudio e extraia todos os compromissos, tarefas, prazos e pendências mencionadas. Formate estritamente como uma lista acionável em Markdown em português com caixas de seleção `- [ ] Tarefa (Responsável / Prazo se mencionados)`. Retorne APENAS a lista de tarefas, sem comentários adicionais.";
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const modelsToTry = [PRIMARY_MODEL, FALLBACK_MODEL, EMERGENCY_MODEL];
+    // Para áudio multimodal: 3.8 Flash -> 3.1 Flash Lite -> 3.5 Flash (testados com suporte nativo de áudio)
+    const modelsToTry = [PRIMARY_MODEL, FALLBACK_MODEL, 'gemini-3.5-flash'];
     let lastError: any = null;
     let text = '';
+    let usedModel = PRIMARY_MODEL;
 
     for (let i = 0; i < modelsToTry.length; i++) {
       const modelName = modelsToTry[i];
@@ -74,6 +76,7 @@ export async function POST(req: Request) {
 
         const response = await result.response;
         text = response.text();
+        usedModel = modelName;
         break; // Sucesso
       } catch (err: any) {
         console.warn(`[Transcribe] Falha no modelo ${modelName}:`, err?.message || err);
@@ -88,7 +91,17 @@ export async function POST(req: Request) {
       throw lastError;
     }
 
-    return NextResponse.json({ text });
+    return NextResponse.json({
+      text,
+      meta: {
+        modelUsed: usedModel,
+        isFallback: usedModel !== PRIMARY_MODEL,
+        originalModel: PRIMARY_MODEL,
+        reason: usedModel !== PRIMARY_MODEL
+          ? `Modelo principal (${PRIMARY_MODEL}) em alta demanda. Processado via contingência com ${usedModel}.`
+          : undefined
+      }
+    });
   } catch (error: any) {
     console.error('Transcription Error:', error);
     return NextResponse.json({
