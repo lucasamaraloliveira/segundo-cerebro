@@ -3149,7 +3149,7 @@ Retorne EXCLUSIVAMENTE um JSON válido no seguinte formato:
                           • <strong>Múltiplos Lembretes por Nota</strong>: Gestão de múltiplos alertas com rótulos personalizados e disparo sonoro neural.<br />
                           • <strong>Grafo com Zoom Cinemático & Target Lock</strong>: Feedback tátil com radar pulsante e card HUD de alta legibilidade no hover.<br />
                           • <strong>Seletor Brutalista Aperfeiçoado</strong>: Alinhamento vertical centralizado e rolagem suave nos seletores de horário.<br />
-                          • <strong>Assistente de Áudio & IA 1.4.2 (Gemini 3.8 Flash Multimodal)</strong>: Integração do Gemini 3.8 Flash para transcrição e relatórios de voz (atas executivas, e-mails, resumos e tarefas), com fallback multimodal resiliente e zero overhead de tokens.
+                          • <strong>Assistente de Áudio & IA 1.4.3 (Saída Pura e Foco nos Destaques)</strong>: Eliminação de preâmbulos conversacionais e meta-análises; início direto em tópicos e destaques substantivos em todos os formatos de processamento de áudio.
                         </p>
                       </div>
                       <div className="pt-2 border-t border-[var(--border)] text-[10px] opacity-40 leading-relaxed">
