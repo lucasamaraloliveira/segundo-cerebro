@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { PRIMARY_MODEL, FALLBACK_MODEL, EMERGENCY_MODEL } from '@/lib/ai-runner';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120; // 2 minutes for larger files
@@ -20,13 +21,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Gemini API Key is not configured.' }, { status: 500 });
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    // Use gemini-3.1-flash-lite for faster and efficient transcription & processing
-    const model = genAI.getGenerativeModel(
-      { model: 'gemini-3.1-flash-lite' },
-      { apiVersion: 'v1beta' }
-    );
-
     const buffer = Buffer.from(await file.arrayBuffer());
     const base64Data = buffer.toString('base64');
 
@@ -42,25 +36,57 @@ export async function POST(req: Request) {
       promptText = "Analise o áudio e extraia apenas os compromissos, tarefas ou action items mencionados. Formate como uma lista de tarefas detalhada em Markdown em português. Retorne APENAS a lista de tarefas, sem comentários, introduções ou explicações adicionais.";
     }
 
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              inlineData: {
-                data: base64Data,
-                mimeType: file.type,
-              },
-            },
-            { text: promptText },
-          ],
-        },
-      ],
-    });
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const modelsToTry = [PRIMARY_MODEL, FALLBACK_MODEL, EMERGENCY_MODEL];
+    let lastError: any = null;
+    let text = '';
 
-    const response = await result.response;
-    const text = response.text();
+    for (let i = 0; i < modelsToTry.length; i++) {
+      const modelName = modelsToTry[i];
+      try {
+        const model = genAI.getGenerativeModel(
+          { 
+            model: modelName,
+            generationConfig: {
+              maxOutputTokens: 2048,
+              thinkingConfig: { thinkingBudget: 0 }
+            } as any
+          },
+          { apiVersion: 'v1beta' }
+        );
+
+        const result = await model.generateContent({
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  inlineData: {
+                    data: base64Data,
+                    mimeType: file.type,
+                  },
+                },
+                { text: promptText },
+              ],
+            },
+          ],
+        });
+
+        const response = await result.response;
+        text = response.text();
+        break; // Sucesso
+      } catch (err: any) {
+        console.warn(`[Transcribe] Falha no modelo ${modelName}:`, err?.message || err);
+        lastError = err;
+        if (i < modelsToTry.length - 1) {
+          continue;
+        }
+      }
+    }
+
+    if (!text && lastError) {
+      throw lastError;
+    }
 
     return NextResponse.json({ text });
   } catch (error: any) {

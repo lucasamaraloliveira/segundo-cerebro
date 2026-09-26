@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { runAIWithFallback } from '@/lib/ai-runner';
 
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // 60 seconds for Vercel execution
+
 // Helper para limpar tags HTML para preview de texto denso
 function cleanText(html: string): string {
   if (!html) return '';
@@ -134,7 +137,7 @@ ${query}
       });
     }
 
-    // 6. Executar geração com fallback automático (3.1 Flash Lite -> 3.8 Flash)
+    // 6. Executar geração com fallback automático (3.8 Flash -> 3.1 Flash Lite)
     const aiResult = await runAIWithFallback(apiKey, { contents: contentParts });
     const responseText = aiResult.text || '';
 

@@ -12,9 +12,9 @@ export interface AIGenerationResult {
   meta: AIMetadata;
 }
 
-export const PRIMARY_MODEL = 'gemini-3.1-flash-lite';
-export const FALLBACK_MODEL = 'gemini-3.8-flash';
-export const EMERGENCY_MODEL = 'gemini-1.5-flash';
+export const PRIMARY_MODEL = 'gemini-3.8-flash';
+export const FALLBACK_MODEL = 'gemini-3.1-flash-lite';
+export const EMERGENCY_MODEL = 'gemini-2.5-flash';
 
 /**
  * Detecta se o erro retornado pela API indica alta demanda, sobrecarga ou quota esgotada.
@@ -54,19 +54,32 @@ export interface GenerateOptions {
   apiVersion?: string;
 }
 
+function isApiKeyError(error: any): boolean {
+  if (!error) return false;
+  const msg = (error.message || '').toLowerCase();
+  const status = error.status || error.statusCode || (error.response ? error.response.status : null);
+  return (
+    status === 401 ||
+    status === 403 ||
+    msg.includes('api_key_invalid') ||
+    msg.includes('api key not valid') ||
+    msg.includes('permission_denied')
+  );
+}
+
 /**
- * Executa uma geração de IA priorizando o modelo principal (gemini-3.1-flash-lite).
+ * Executa uma geração de IA priorizando o modelo principal (gemini-3.8-flash) com otimização de tokens.
  * Em caso de alta demanda ou indisponibilidade, aciona automaticamente o modelo
- * alternativo de menor consumo de tokens (gemini-3.8-flash) e, se necessário, o de emergência.
+ * de contingência (gemini-3.1-flash-lite) e, se necessário, o de emergência (gemini-2.5-flash).
  */
 export async function runAIWithFallback(
   apiKey: string,
   options: GenerateOptions
 ): Promise<AIGenerationResult> {
   const modelsToTry = [
-    { id: PRIMARY_MODEL, label: '3.1 Flash Lite' },
-    { id: FALLBACK_MODEL, label: '3.8 Flash' },
-    { id: EMERGENCY_MODEL, label: '1.5 Flash' }
+    { id: PRIMARY_MODEL, label: '3.8 Flash' },
+    { id: FALLBACK_MODEL, label: '3.1 Flash Lite' },
+    { id: EMERGENCY_MODEL, label: '2.5 Flash' }
   ];
 
   const genAI = new GoogleGenerativeAI(apiKey);
@@ -77,8 +90,14 @@ export async function runAIWithFallback(
     const isFallback = i > 0;
 
     try {
+      const mergedConfig = {
+        maxOutputTokens: 2048,
+        thinkingConfig: { thinkingBudget: 0 },
+        ...(options.generationConfig || {})
+      };
+
       const model = genAI.getGenerativeModel(
-        { model: current.id, generationConfig: options.generationConfig },
+        { model: current.id, generationConfig: mergedConfig as any },
         { apiVersion: options.apiVersion || 'v1beta' }
       );
 
@@ -101,7 +120,7 @@ export async function runAIWithFallback(
           isFallback,
           originalModel: PRIMARY_MODEL,
           reason: isFallback
-            ? `Modelo principal (${PRIMARY_MODEL}) em alta demanda. Alternado automaticamente para ${current.id} (${current.label}) para garantir resposta rápida e menor consumo de tokens.`
+            ? `Modelo principal (${PRIMARY_MODEL}) temporariamente instável ou em alta demanda. Alternado automaticamente para ${current.id} (${current.label}) para garantir resposta rápida e menor consumo de tokens.`
             : undefined
         }
       };
@@ -109,18 +128,19 @@ export async function runAIWithFallback(
       console.warn(`[AI Runner] Falha no modelo ${current.id}:`, err?.message || err);
       lastError = err;
 
-      // Se for erro de alta demanda ou se o modelo específico não for encontrado, tenta o próximo
-      const isDemandOrNotFound = isHighDemandError(err) || (err?.message && err.message.toLowerCase().includes('not found'));
+      // Se for problema definitivo de chave/permissão, interrompe sem tentar outros modelos
+      if (isApiKeyError(err)) {
+        throw err;
+      }
 
-      if (i < modelsToTry.length - 1 && isDemandOrNotFound) {
+      // Para qualquer falha de modelo (503 demanda, 429 limite, timeout, 500, etc.), aciona o próximo modelo
+      if (i < modelsToTry.length - 1) {
         console.info(`[AI Runner] Acionando modelo de contingência... Próximo: ${modelsToTry[i + 1].id}`);
         continue;
       }
 
-      // Se não for problema de infraestrutura/demanda (ex: chave de API inválida), interrompe de imediato
-      if (!isDemandOrNotFound) {
-        throw err;
-      }
+      // Se todos os modelos falharem, propaga o erro
+      throw err;
     }
   }
 

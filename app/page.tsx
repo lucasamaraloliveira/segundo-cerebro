@@ -844,8 +844,8 @@ export default function Home() {
   const triggerAiFallbackNotice = (meta?: any) => {
     if (meta?.isFallback) {
       setAiFallbackToast({
-        modelUsed: meta.modelUsed || 'gemini-3.8-flash',
-        originalModel: meta.originalModel || 'gemini-3.1-flash-lite',
+        modelUsed: meta.modelUsed || 'gemini-3.1-flash-lite',
+        originalModel: meta.originalModel || 'gemini-3.8-flash',
         reason: meta.reason
       });
       setTimeout(() => setAiFallbackToast(null), 7000);
@@ -3149,7 +3149,7 @@ Retorne EXCLUSIVAMENTE um JSON válido no seguinte formato:
                           • <strong>Múltiplos Lembretes por Nota</strong>: Gestão de múltiplos alertas com rótulos personalizados e disparo sonoro neural.<br />
                           • <strong>Grafo com Zoom Cinemático & Target Lock</strong>: Feedback tátil com radar pulsante e card HUD de alta legibilidade no hover.<br />
                           • <strong>Seletor Brutalista Aperfeiçoado</strong>: Alinhamento vertical centralizado e rolagem suave nos seletores de horário.<br />
-                          • <strong>Resiliência de IA (Fallback Dinâmico)</strong>: Transição automática para Gemini 3.8 Flash em alta demanda com notificação transparente.
+                          • <strong>Resiliência de IA (Fallback Dinâmico)</strong>: Execução principal no Gemini 3.8 Flash otimizado para economia de tokens, com contingência automática para 3.1 Flash Lite em alta demanda.
                         </p>
                       </div>
                       <div className="pt-2 border-t border-[var(--border)] text-[10px] opacity-40 leading-relaxed">
