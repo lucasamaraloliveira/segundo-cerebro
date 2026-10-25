@@ -845,7 +845,7 @@ export default function Home() {
     if (meta?.isFallback) {
       setAiFallbackToast({
         modelUsed: meta.modelUsed || 'gemini-3.1-flash-lite',
-        originalModel: meta.originalModel || 'gemini-3.8-flash',
+        originalModel: meta.originalModel || 'gemini-3.5-flash-lite',
         reason: meta.reason
       });
       setTimeout(() => setAiFallbackToast(null), 7000);

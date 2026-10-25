@@ -2304,7 +2304,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
               <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                 <h3 className="text-xl font-sans font-bold tracking-tight">Processar Gravação de Áudio</h3>
                 <span className="text-[9px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 border border-[#FF4F00]/40 text-[#FF4F00] bg-[#FF4F00]/5 flex items-center gap-1.5 shadow-[2px_2px_0px_rgba(255,79,0,0.1)]">
-                  <Sparkles size={11} /> Motor: Gemini 3.8 Flash
+                  <Sparkles size={11} /> Motor: Gemini 3.5 Flash Lite
                 </span>
               </div>
               <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-6">Revise o áudio gravado e selecione o formato do relatório neural</p>
@@ -2385,12 +2385,12 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
                   {isProcessingAudio ? (
                     <>
                       <Loader2 size={16} className="animate-spin" />
-                      Processando com Gemini 3.8 Flash...
+                      Processando com Gemini 3.5 Flash Lite...
                     </>
                   ) : (
                     <>
                       <Sparkles size={16} />
-                      Processar com Gemini 3.8 Flash
+                      Processar com Gemini 3.5 Flash Lite
                     </>
                   )}
                 </button>

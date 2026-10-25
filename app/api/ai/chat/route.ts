@@ -137,7 +137,7 @@ ${query}
       });
     }
 
-    // 6. Executar geração com fallback automático (3.8 Flash -> 3.1 Flash Lite)
+    // 6. Executar geração com fallback automático (3.5 Flash Lite -> 3.1 Flash Lite -> 2.5 Flash)
     const aiResult = await runAIWithFallback(apiKey, { contents: contentParts });
     const responseText = aiResult.text || '';
 

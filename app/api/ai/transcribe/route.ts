@@ -79,8 +79,8 @@ export async function POST(req: Request) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    // Para áudio multimodal: 3.8 Flash -> 3.1 Flash Lite -> 3.5 Flash (testados com suporte nativo de áudio)
-    const modelsToTry = [PRIMARY_MODEL, FALLBACK_MODEL, 'gemini-3.5-flash'];
+    // Para áudio multimodal: 3.5 Flash Lite -> 3.1 Flash Lite -> 2.5 Flash (testados com suporte nativo de áudio)
+    const modelsToTry = [PRIMARY_MODEL, FALLBACK_MODEL, EMERGENCY_MODEL];
     let lastError: any = null;
     let text = '';
     let usedModel = PRIMARY_MODEL;
@@ -96,7 +96,7 @@ export async function POST(req: Request) {
               temperature: 0.1,
               topP: 0.8,
               maxOutputTokens: 2048,
-              thinkingConfig: { thinkingBudget: 0 }
+              ...(modelName === 'gemini-2.5-flash' ? { thinkingConfig: { thinkingBudget: 0 } } : {})
             } as any
           },
           { apiVersion: 'v1beta' }

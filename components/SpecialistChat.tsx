@@ -254,7 +254,10 @@ export default function SpecialistChat() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ texts })
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
 
       if (data.embeddings && Array.isArray(data.embeddings)) {
         setIndexProgress(50);
@@ -364,7 +367,10 @@ export default function SpecialistChat() {
         method: 'POST',
         body: formData
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
 
       if (data.text) {
         const finalMessages = [...newMessages, {
@@ -554,12 +560,27 @@ export default function SpecialistChat() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: userMessage,
-          notes,
+          notes: notes.map((n) => ({
+            id: n.id,
+            title: n.title || '',
+            tags: n.tags || [],
+            content: (n.content || '')
+              .replace(/data:[^;]+;base64,[a-zA-Z0-9+/=]+/g, '')
+              .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+              .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+              .replace(/<[^>]+>/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim()
+              .slice(0, 1500)
+          })),
           file: pendingFile,
           urlsContent
         })
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
 
       if (data.text) {
         if (data.meta?.isFallback && typeof window !== 'undefined') {

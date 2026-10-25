@@ -12,7 +12,7 @@ export interface AIGenerationResult {
   meta: AIMetadata;
 }
 
-export const PRIMARY_MODEL = 'gemini-3.8-flash';
+export const PRIMARY_MODEL = 'gemini-3.5-flash-lite';
 export const FALLBACK_MODEL = 'gemini-3.1-flash-lite';
 export const EMERGENCY_MODEL = 'gemini-2.5-flash';
 
@@ -68,7 +68,7 @@ function isApiKeyError(error: any): boolean {
 }
 
 /**
- * Executa uma geração de IA priorizando o modelo principal (gemini-3.8-flash) com otimização de tokens.
+ * Executa uma geração de IA priorizando o modelo principal (gemini-3.5-flash-lite) com otimização de tokens.
  * Em caso de alta demanda ou indisponibilidade, aciona automaticamente o modelo
  * de contingência (gemini-3.1-flash-lite) e, se necessário, o de emergência (gemini-2.5-flash).
  */
@@ -77,7 +77,7 @@ export async function runAIWithFallback(
   options: GenerateOptions
 ): Promise<AIGenerationResult> {
   const modelsToTry = [
-    { id: PRIMARY_MODEL, label: '3.8 Flash' },
+    { id: PRIMARY_MODEL, label: '3.5 Flash Lite' },
     { id: FALLBACK_MODEL, label: '3.1 Flash Lite' },
     { id: EMERGENCY_MODEL, label: '2.5 Flash' }
   ];
@@ -90,9 +90,10 @@ export async function runAIWithFallback(
     const isFallback = i > 0;
 
     try {
+      const supportsThinkingBudget = current.id === 'gemini-2.5-flash';
       const mergedConfig = {
         maxOutputTokens: 2048,
-        thinkingConfig: { thinkingBudget: 0 },
+        ...(supportsThinkingBudget ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
         ...(options.generationConfig || {})
       };
 
