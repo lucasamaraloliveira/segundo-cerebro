@@ -7,7 +7,7 @@
 ## 🎯 Escopo de Aplicação
 - Rota de API: `app/api/ai/transcribe/route.ts`
 - Formatos cobertos: `transcribe`, `meeting_minutes`, `email`, `summary`, `tasks`
-- Modelos suportados: `gemini-3.8-flash` (primário), `gemini-3.1-flash-lite` (fallback), `gemini-3.5-flash` (contingência)
+- Modelos suportados: `gemini-3.5-flash-lite` (primário), `gemini-3.1-flash-lite` (fallback), `gemini-2.5-flash` (contingência)
 
 ---
 

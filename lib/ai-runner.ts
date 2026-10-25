@@ -50,6 +50,7 @@ export function isHighDemandError(error: any): boolean {
 export interface GenerateOptions {
   prompt?: string;
   contents?: any[];
+  systemInstruction?: string;
   generationConfig?: any;
   apiVersion?: string;
 }
@@ -98,7 +99,11 @@ export async function runAIWithFallback(
       };
 
       const model = genAI.getGenerativeModel(
-        { model: current.id, generationConfig: mergedConfig as any },
+        {
+          model: current.id,
+          ...(options.systemInstruction ? { systemInstruction: options.systemInstruction } : {}),
+          generationConfig: mergedConfig as any
+        },
         { apiVersion: options.apiVersion || 'v1beta' }
       );
 

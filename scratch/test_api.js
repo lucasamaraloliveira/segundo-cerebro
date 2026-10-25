@@ -8,7 +8,7 @@ async function test() {
   const genAI = new GoogleGenerativeAI(apiKey);
   
   // Try to generate a simple content to see if API works
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite" });
   const result = await model.generateContent("hi");
   console.log("API Working:", result.response.text());
 }

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { PRIMARY_MODEL, FALLBACK_MODEL, EMERGENCY_MODEL } from '@/lib/ai-runner';
+import { runAIWithFallback } from '@/lib/ai-runner';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120; // 2 minutes for larger files
@@ -78,76 +77,30 @@ export async function POST(req: Request) {
       promptText = "Extraia todos os compromissos, tarefas, prazos e pendências mencionadas no áudio. A resposta DEVE OBRIGATORIAMENTE começar imediatamente com a primeira tarefa `- [ ]`. Formate estritamente como checklist `- [ ] Tarefa (Responsável / Prazo se mencionados)`. Não inclua títulos, introduções, conclusões ou comentários adicionais.";
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    // Para áudio multimodal: 3.5 Flash Lite -> 3.1 Flash Lite -> 2.5 Flash (testados com suporte nativo de áudio)
-    const modelsToTry = [PRIMARY_MODEL, FALLBACK_MODEL, EMERGENCY_MODEL];
-    let lastError: any = null;
-    let text = '';
-    let usedModel = PRIMARY_MODEL;
+    // Executa geração multimodal com a hierarquia unificada (3.5 Flash Lite -> 3.1 Flash Lite -> 2.5 Flash)
+    const aiResult = await runAIWithFallback(apiKey, {
+      systemInstruction: SYSTEM_INSTRUCTION,
+      generationConfig: {
+        temperature: 0.1,
+        topP: 0.8,
+        maxOutputTokens: 2048
+      },
+      contents: [
+        {
+          inlineData: {
+            data: base64Data,
+            mimeType: file.type
+          }
+        },
+        promptText
+      ]
+    });
 
-    for (let i = 0; i < modelsToTry.length; i++) {
-      const modelName = modelsToTry[i];
-      try {
-        const model = genAI.getGenerativeModel(
-          { 
-            model: modelName,
-            systemInstruction: SYSTEM_INSTRUCTION,
-            generationConfig: {
-              temperature: 0.1,
-              topP: 0.8,
-              maxOutputTokens: 2048,
-              ...(modelName === 'gemini-2.5-flash' ? { thinkingConfig: { thinkingBudget: 0 } } : {})
-            } as any
-          },
-          { apiVersion: 'v1beta' }
-        );
-
-        const result = await model.generateContent({
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                {
-                  inlineData: {
-                    data: base64Data,
-                    mimeType: file.type,
-                  },
-                },
-                { text: promptText },
-              ],
-            },
-          ],
-        });
-
-        const response = await result.response;
-        text = response.text();
-        usedModel = modelName;
-        break; // Sucesso
-      } catch (err: any) {
-        console.warn(`[Transcribe] Falha no modelo ${modelName}:`, err?.message || err);
-        lastError = err;
-        if (i < modelsToTry.length - 1) {
-          continue;
-        }
-      }
-    }
-
-    if (!text && lastError) {
-      throw lastError;
-    }
-
-    const cleanedText = cleanConversationalOutput(text);
+    const cleanedText = cleanConversationalOutput(aiResult.text);
 
     return NextResponse.json({
       text: cleanedText,
-      meta: {
-        modelUsed: usedModel,
-        isFallback: usedModel !== PRIMARY_MODEL,
-        originalModel: PRIMARY_MODEL,
-        reason: usedModel !== PRIMARY_MODEL
-          ? `Modelo principal (${PRIMARY_MODEL}) em alta demanda. Processado via contingência com ${usedModel}.`
-          : undefined
-      }
+      meta: aiResult.meta
     });
   } catch (error: any) {
     console.error('Transcription Error:', error);

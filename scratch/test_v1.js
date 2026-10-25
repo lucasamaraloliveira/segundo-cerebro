@@ -9,7 +9,7 @@ async function test() {
   
   // Try v1 instead of v1beta
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }, { apiVersion: 'v1' });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite" }, { apiVersion: 'v1beta' });
     const result = await model.generateContent("hi");
     console.log("v1 API Working:", result.response.text());
   } catch (e) {

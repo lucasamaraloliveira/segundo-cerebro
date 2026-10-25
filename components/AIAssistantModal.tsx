@@ -175,6 +175,9 @@ export default function AIAssistantModal({ isOpen, onClose, content, selectionTe
       const data = await res.json();
 
       if (data.text) {
+        if (data.meta?.isFallback && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('ai-fallback-triggered', { detail: data.meta }));
+        }
         setResult(cleanHtmlTags(data.text));
       } else {
         throw new Error(data.error || 'Falha ao gerar conteúdo');

@@ -195,6 +195,9 @@ export default function NeuralMindMap({
 
       const data = await res.json();
       if (data.groups && Array.isArray(data.groups) && data.groups.length > 0) {
+        if (data.meta?.isFallback && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('ai-fallback-triggered', { detail: data.meta }));
+        }
         setAiClusters(data.groups);
         setGroupingMode('ai');
       } else {
