@@ -8,6 +8,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { X, Send, Brain, Loader2, Info, ChevronDown, ChevronUp, Paperclip, Copy, Check, History, ArrowLeft, ArrowRight, Plus, Trash2, Link2, Globe, Sparkles, FileText } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
+import { extractImagesFromHtml } from '@/lib/image-utils';
 
 // Helper to parse user message and extract attachment metadata if present
 function parseUserMessage(rawContent: string): { attachmentName: string | null; cleanContent: string } {
@@ -133,6 +134,24 @@ export default function SpecialistChat() {
   const [pendingUrls, setPendingUrls] = useState<string[]>([]);
   const [isUrlModalOpen, setIsUrlModalOpen] = useState<boolean>(false);
   const [newUrlInput, setNewUrlInput] = useState<string>('');
+
+  // Active note tracking from main editor
+  const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if ((window as any).__activeNoteId) {
+        setActiveNoteId((window as any).__activeNoteId);
+      }
+      const handleActiveNote = (e: any) => {
+        if (e.detail?.noteId) {
+          setActiveNoteId(e.detail.noteId);
+        }
+      };
+      window.addEventListener('active-note-changed', handleActiveNote);
+      return () => window.removeEventListener('active-note-changed', handleActiveNote);
+    }
+  }, []);
 
   // Resize handler
   useEffect(() => {
@@ -555,11 +574,65 @@ export default function SpecialistChat() {
         }
       }
 
+      // 1. Extração inteligente de imagens: prioridade na nota ativa + notas relevantes (até 3 imagens)
+      const currentOpenNote = activeNoteId ? notes.find((n) => n.id === activeNoteId) : null;
+      let noteImagesToSend: Array<{ noteTitle: string; data: string; mimeType: string; alt?: string }> = [];
+
+      if (currentOpenNote) {
+        const activeExtracted = extractImagesFromHtml(currentOpenNote.content || '');
+        activeExtracted.forEach((img) => {
+          if (noteImagesToSend.length < 3) {
+            noteImagesToSend.push({
+              ...img,
+              noteTitle: currentOpenNote.title || 'Nota Atual',
+            });
+          }
+        });
+      }
+
+      if (noteImagesToSend.length < 3) {
+        const queryLower = userMessage.toLowerCase();
+        const otherNotes = notes.filter((n) => n.id !== activeNoteId && n.title !== '__neural_chat_history__');
+
+        for (const n of otherNotes) {
+          if (noteImagesToSend.length >= 3) break;
+          const titleLower = (n.title || '').toLowerCase();
+          const tagsLower = (n.tags || []).map((t) => t.toLowerCase());
+
+          const isRelevant = titleLower.split(/\s+/).some((word) => word.length > 2 && queryLower.includes(word)) ||
+            tagsLower.some((t) => queryLower.includes(t));
+
+          if (isRelevant) {
+            const extracted = extractImagesFromHtml(n.content || '');
+            for (const img of extracted) {
+              if (noteImagesToSend.length >= 3) break;
+              noteImagesToSend.push({
+                ...img,
+                noteTitle: n.title || 'Nota',
+              });
+            }
+          }
+        }
+      }
+
+      if (currentOpenNote && typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('neural-analysis-start', {
+            detail: {
+              noteId: currentOpenNote.id,
+              hasImages: noteImagesToSend.length > 0,
+            },
+          })
+        );
+      }
+
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: userMessage,
+          activeNoteId,
+          noteImages: noteImagesToSend.slice(0, 3),
           notes: notes.map((n) => ({
             id: n.id,
             title: n.title || '',
@@ -619,6 +692,9 @@ export default function SpecialistChat() {
       setIsLoading(false);
       setPendingFile(null);
       setPendingUrls([]);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('neural-analysis-end'));
+      }
     }
   };
 

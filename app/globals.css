@@ -323,6 +323,29 @@ select option {
   @apply bg-transparent text-inherit p-0 rounded-none text-sm;
 }
 
+/* Tiptap & Prose Image Styles */
+.tiptap img, .prose img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.5rem auto;
+  border: 1px solid var(--border);
+  box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.08);
+  border-radius: 0;
+  cursor: zoom-in;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tiptap img:hover, .prose img:hover {
+  box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.16);
+  transform: translateY(-1px);
+}
+
+.tiptap img.ProseMirror-selectednode {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .bg-dot-matrix {
   background-image: radial-gradient(var(--foreground) 1.2px, transparent 1.2px);
   background-size: 32px 32px;

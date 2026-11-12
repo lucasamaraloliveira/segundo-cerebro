@@ -79,7 +79,7 @@ export const metadata: Metadata = {
   },
 };
 
-import SpecialistChat from '@/components/SpecialistChat';
+import SpecialistChatWrapper from '@/components/SpecialistChatWrapper';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -90,7 +90,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body suppressHydrationWarning className="bg-[#fcfcf9] text-[#1a1a1a] font-sans antialiased">
         {children}
-        <SpecialistChat />
+        <SpecialistChatWrapper />
         <script
           dangerouslySetInnerHTML={{
             __html: `

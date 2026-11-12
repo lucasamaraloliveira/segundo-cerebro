@@ -4,6 +4,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Extension, getHTMLFromFragment } from '@tiptap/core';
 import { useEditor, EditorContent } from '@tiptap/react';
+import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import { Underline } from '@tiptap/extension-underline';
 import { TextStyle } from '@tiptap/extension-text-style';
@@ -21,10 +22,13 @@ import { Markdown } from 'tiptap-markdown';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plugin, PluginKey } from 'prosemirror-state';
 import { Decoration, DecorationSet } from 'prosemirror-view';
+import TiptapImage from '@tiptap/extension-image';
+import { compressImageFile } from '@/lib/image-utils';
 import { 
   Bold, 
   Italic, 
-  Underline as UnderlineIcon, 
+  Underline as UnderlineIcon,
+  Strikethrough, 
   List, 
   ListOrdered, 
   CheckSquare,
@@ -36,6 +40,13 @@ import {
   Undo,
   Redo,
   Link as LinkIcon,
+  Image as ImageIcon,
+  Upload,
+  Globe,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  X,
   Eraser,
   Heading1,
   Heading2,
@@ -57,6 +68,8 @@ import {
   Pause,
   Loader2,
   Volume2,
+  Plus,
+  Minus,
   MoreHorizontal
 } from 'lucide-react';
 
@@ -239,6 +252,14 @@ export const ALIGNMENT_OPTIONS = [
   { label: 'Centro', value: 'center', icon: AlignCenter },
   { label: 'Direita', value: 'right', icon: AlignRight },
   { label: 'Justificado', value: 'justify', icon: AlignJustify },
+];
+
+export const BUBBLE_HIGHLIGHT_COLORS = [
+  { label: 'Amarelo', color: '#fef08a' },
+  { label: 'Verde', color: '#bbf7d0' },
+  { label: 'Azul', color: '#bfdbfe' },
+  { label: 'Rosa', color: '#fbcfe8' },
+  { label: 'Laranja', color: '#fed7aa' },
 ];
 
 // Sub-components moved outside to avoid re-definition and state loss on render
@@ -709,6 +730,71 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
   const [isAiAutocompleteEnabled, setIsAiAutocompleteEnabled] = useState(false);
   const autocompleteTimer = useRef<NodeJS.Timeout | null>(null);
 
+  // Estados e referências para inserção de imagem
+  const [showImageUrlModal, setShowImageUrlModal] = useState(false);
+  const [imageUrlInput, setImageUrlInput] = useState('');
+  const [imageAltInput, setImageAltInput] = useState('');
+  const [isProcessingImage, setIsProcessingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Estados para projeção e visualização de imagem (Lightbox com Zoom)
+  const [previewImage, setPreviewImage] = useState<{ src: string; alt?: string } | null>(null);
+  const [previewZoom, setPreviewZoom] = useState(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
+
+  const handleZoomIn = () => setPreviewZoom((prev) => Math.min(Number((prev + 0.25).toFixed(2)), 4));
+  const handleZoomOut = () => setPreviewZoom((prev) => Math.max(Number((prev - 0.25).toFixed(2)), 0.5));
+  const handleResetZoom = () => {
+    setPreviewZoom(1);
+    setPanOffset({ x: 0, y: 0 });
+  };
+  const handleClosePreview = () => {
+    setPreviewImage(null);
+    setPreviewZoom(1);
+    setPanOffset({ x: 0, y: 0 });
+    setIsPanning(false);
+  };
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const zoomFactor = e.ctrlKey ? 0.08 : 0.18;
+    const delta = e.deltaY < 0 ? zoomFactor : -zoomFactor;
+    setPreviewZoom((prev) => Math.min(Math.max(Number((prev + delta).toFixed(2)), 0.5), 4));
+  };
+
+  // Estados da Toolbar Flutuante ao Selecionar Texto (Bubble Menu)
+  const [bubbleFontOpen, setBubbleFontOpen] = useState(false);
+  const [bubbleSizeOpen, setBubbleSizeOpen] = useState(false);
+  const [bubbleHighlightOpen, setBubbleHighlightOpen] = useState(false);
+  const [bubbleColorOpen, setBubbleColorOpen] = useState(false);
+
+  // Atalhos de teclado no modo de projeção de imagem
+  useEffect(() => {
+    if (!previewImage) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        handleClosePreview();
+      } else if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        handleZoomIn();
+      } else if (e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        handleZoomOut();
+      } else if (e.key === '0') {
+        e.preventDefault();
+        handleResetZoom();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewImage]);
+
   const editor = useEditor({
     extensions: [
       GhostText,
@@ -728,6 +814,13 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
       Highlight.configure({ multicolor: true }),
       Link.configure({
         openOnClick: false,
+      }),
+      TiptapImage.configure({
+        inline: false,
+        allowBase64: true,
+        HTMLAttributes: {
+          class: 'editor-image',
+        },
       }),
       BulletList.configure({
         HTMLAttributes: {
@@ -772,7 +865,107 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
       attributes: {
         class: 'prose prose-sm md:prose-base lg:prose-lg xl:prose-xl dark:prose-invert max-w-none focus:outline-none min-h-[70vh] font-sans pb-40',
       },
+      handleDOMEvents: {
+        click(view, event) {
+          const target = event.target as HTMLElement;
+          if (target && target.tagName === 'IMG') {
+            const img = target as HTMLImageElement;
+            setPreviewImage({
+              src: img.src,
+              alt: img.alt || 'Imagem da nota',
+            });
+            setPreviewZoom(1);
+            setPanOffset({ x: 0, y: 0 });
+            return true;
+          }
+          return false;
+        },
+        drop(view, event) {
+          const files = event.dataTransfer?.files;
+          if (!files || files.length === 0) return false;
+
+          const imageFiles = Array.from(files).filter((f) => f.type.startsWith('image/'));
+          if (imageFiles.length === 0) return false;
+
+          event.preventDefault();
+          const pos = view.posAtCoords({ left: event.clientX, top: event.clientY });
+
+          imageFiles.forEach(async (file) => {
+            try {
+              const base64 = await compressImageFile(file);
+              if (base64 && view.state.schema.nodes.image) {
+                const node = view.state.schema.nodes.image.create({
+                  src: base64,
+                  alt: file.name.replace(/\.[^/.]+$/, '') || 'Imagem',
+                });
+                let tr = view.state.tr;
+                if (pos && typeof pos.pos === 'number') {
+                  tr = tr.insert(pos.pos, node);
+                } else {
+                  tr = tr.replaceSelectionWith(node);
+                }
+                view.dispatch(tr);
+              }
+            } catch (err) {
+              console.error('Erro ao processar imagem arrastada:', err);
+            }
+          });
+
+          return true;
+        },
+      },
       handlePaste(view, event) {
+        // 1. Processar imagens coladas (Ctrl+V / PrintScreen / Imagens na área de transferência)
+        const items = event.clipboardData?.items;
+        const imageFiles: File[] = [];
+
+        if (items && items.length > 0) {
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.type.startsWith('image/')) {
+              const file = item.getAsFile();
+              if (file) imageFiles.push(file);
+            }
+          }
+        }
+
+        if (imageFiles.length === 0 && event.clipboardData?.files?.length) {
+          for (let i = 0; i < event.clipboardData.files.length; i++) {
+            const file = event.clipboardData.files[i];
+            if (file.type.startsWith('image/')) {
+              imageFiles.push(file);
+            }
+          }
+        }
+
+        if (imageFiles.length > 0) {
+          event.preventDefault();
+          imageFiles.forEach(async (file) => {
+            try {
+              const base64 = await compressImageFile(file);
+              if (base64 && view.state.schema.nodes.image) {
+                const now = new Date();
+                const timeFormatted = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}h${String(now.getMinutes()).padStart(2, '0')}m`;
+                let cleanName = file.name ? file.name.replace(/\.[^/.]+$/, '').trim() : '';
+                if (!cleanName || cleanName.toLowerCase() === 'image' || cleanName.toLowerCase() === 'blob' || cleanName.toLowerCase() === 'clipboard') {
+                  cleanName = `PrintScreen_${timeFormatted}`;
+                }
+
+                const node = view.state.schema.nodes.image.create({
+                  src: base64,
+                  alt: cleanName,
+                });
+                const tr = view.state.tr.replaceSelectionWith(node);
+                view.dispatch(tr);
+              }
+            } catch (err) {
+              console.error('Erro ao colar imagem:', err);
+            }
+          });
+          return true;
+        }
+
+        // 2. Fluxo existente de texto/HTML
         const text = event.clipboardData?.getData('text/plain') || '';
         const html = event.clipboardData?.getData('text/html') || '';
         if (!html || html === text) return false;
@@ -781,6 +974,84 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
       },
     },
   });
+
+  const stepFontSize = (direction: 'up' | 'down') => {
+    if (!editor) return;
+    const currentSize = editor.getAttributes('textStyle').fontSize || '16px';
+    const currentIndex = FONT_SIZES.indexOf(currentSize);
+    if (currentIndex === -1) {
+      editor.chain().focus().setFontSize(direction === 'up' ? '18px' : '14px').run();
+      return;
+    }
+    const newIndex = direction === 'up'
+      ? Math.min(FONT_SIZES.length - 1, currentIndex + 1)
+      : Math.max(0, currentIndex - 1);
+    editor.chain().focus().setFontSize(FONT_SIZES[newIndex]).run();
+  };
+
+  useEffect(() => {
+    if (!editor) return;
+    const closeBubblePopovers = () => {
+      setBubbleFontOpen(false);
+      setBubbleSizeOpen(false);
+      setBubbleHighlightOpen(false);
+      setBubbleColorOpen(false);
+    };
+    editor.on('selectionUpdate', closeBubblePopovers);
+    return () => {
+      editor.off('selectionUpdate', closeBubblePopovers);
+    };
+  }, [editor]);
+
+  const handleImageFiles = async (files: File[]) => {
+    if (!editor || files.length === 0) return;
+    setIsProcessingImage(true);
+    try {
+      for (const file of files) {
+        if (file.type.startsWith('image/')) {
+          const base64 = await compressImageFile(file);
+          if (base64) {
+            const now = new Date();
+            const timeFormatted = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}h${String(now.getMinutes()).padStart(2, '0')}m`;
+            let cleanName = file.name ? file.name.replace(/\.[^/.]+$/, '').trim() : '';
+            if (!cleanName || cleanName.toLowerCase() === 'image' || cleanName.toLowerCase() === 'blob') {
+              cleanName = `Imagem_${timeFormatted}`;
+            }
+
+            editor.chain().focus().setImage({
+              src: base64,
+              alt: cleanName,
+            }).run();
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao processar imagem:', err);
+    } finally {
+      setIsProcessingImage(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      handleImageFiles(files);
+    }
+  };
+
+  const handleInsertImageUrl = () => {
+    if (!editor || !imageUrlInput.trim()) return;
+    editor.chain().focus().setImage({
+      src: imageUrlInput.trim(),
+      alt: imageAltInput.trim() || 'Imagem inserida',
+    }).run();
+    setImageUrlInput('');
+    setImageAltInput('');
+    setShowImageUrlModal(false);
+  };
 
   const currentFontFamily = editor?.getAttributes('textStyle')?.fontFamily || 'Inter';
   const currentFont = FONT_OPTIONS.find(f => f.value === currentFontFamily) || FONT_OPTIONS[0];
@@ -792,25 +1063,7 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
     }
   }, [content, editor]);
 
-  // Update editor attributes when font changes
-  useEffect(() => {
-    if (editor) {
-        editor.setOptions({
-          editorProps: {
-            attributes: {
-              class: 'prose prose-sm md:prose-base lg:prose-lg xl:prose-xl dark:prose-invert max-w-none focus:outline-none min-h-[70vh] font-sans pb-40',
-            },
-            handlePaste(view, event) {
-              const text = event.clipboardData?.getData('text/plain') || '';
-              const html = event.clipboardData?.getData('text/html') || '';
-              if (!html || html === text) return false;
-              setPasteModal({ show: true, text, html });
-              return true;
-            },
-          },
-        });
-    }
-  }, [editor]);
+
 
   const handlePasteChoice = (keep: boolean) => {
     if (!editor || !pasteModal) return;
@@ -1247,6 +1500,24 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
                     >
                       <LinkIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                     </ToolbarButton>
+
+                    <CustomSelect 
+                      label="Inserir Imagem"
+                      icon={ImageIcon}
+                      hideLabel={true}
+                      value=""
+                      onChange={(val) => {
+                        if (val === 'upload') {
+                          fileInputRef.current?.click();
+                        } else if (val === 'url') {
+                          setShowImageUrlModal(true);
+                        }
+                      }}
+                      options={[
+                        { label: 'Upload do Computador', value: 'upload', icon: Upload },
+                        { label: 'Inserir Link / URL Web', value: 'url', icon: Globe },
+                      ]}
+                    />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -1438,6 +1709,32 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
                               >
                                 <LinkIcon className="w-3.5 h-3.5" />
                                 <span>Link</span>
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1 mt-1.5">
+                              <button
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  setIsMobileMenuOpen(false);
+                                  fileInputRef.current?.click();
+                                }}
+                                className="py-1.5 text-[9.5px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-[var(--border)] text-[var(--foreground)] bg-[var(--muted)]/40 hover:bg-[var(--muted)] transition-colors rounded-none"
+                                title="Upload de Imagem"
+                              >
+                                <Upload className="w-3 h-3 text-[var(--accent)]" />
+                                <span>Upload Foto</span>
+                              </button>
+                              <button
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  setIsMobileMenuOpen(false);
+                                  setShowImageUrlModal(true);
+                                }}
+                                className="py-1.5 text-[9.5px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-[var(--border)] text-[var(--foreground)] bg-[var(--muted)]/40 hover:bg-[var(--muted)] transition-colors rounded-none"
+                                title="Imagem por URL"
+                              >
+                                <Globe className="w-3 h-3 text-[var(--accent)]" />
+                                <span>Imagem URL</span>
                               </button>
                             </div>
                           </motion.div>
@@ -1788,6 +2085,29 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
                         <span>Link</span>
                       </button>
                     </div>
+
+                    <div className="grid grid-cols-2 gap-1.5 mt-1.5">
+                      <button
+                        onClick={() => {
+                          setIsMobileMenuOpen(false);
+                          fileInputRef.current?.click();
+                        }}
+                        className="py-2 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 border border-[var(--border)] text-[var(--foreground)] bg-[var(--muted)]/40 hover:bg-[var(--muted)] transition-colors rounded-none"
+                      >
+                        <Upload className="w-3.5 h-3.5 text-[var(--accent)]" />
+                        <span>Upload Imagem</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsMobileMenuOpen(false);
+                          setShowImageUrlModal(true);
+                        }}
+                        className="py-2 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 border border-[var(--border)] text-[var(--foreground)] bg-[var(--muted)]/40 hover:bg-[var(--muted)] transition-colors rounded-none"
+                      >
+                        <Globe className="w-3.5 h-3.5 text-[var(--accent)]" />
+                        <span>Imagem URL</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* SEÇÃO: LISTAS */}
@@ -2069,6 +2389,391 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
       )}
 
     <div className="flex-1 px-8 md:px-16 lg:px-24 py-8 relative">
+      {/* Mini-Toolbar Flutuante ao Selecionar Texto (Bubble Menu Brutalista) */}
+      {editor && (
+        <BubbleMenu
+          editor={editor}
+          updateDelay={50}
+          options={{
+            placement: 'top',
+            offset: 8,
+            flip: true,
+            shift: true,
+          }}
+          shouldShow={({ editor, from, to }) => {
+            if (from === to) return false;
+            if (editor.isActive('image')) return false;
+            const selectedText = editor.state.doc.textBetween(from, to, ' ');
+            return selectedText.trim().length > 0;
+          }}
+          className="z-[90]"
+        >
+          <div className="bg-[var(--background)] border-2 border-black dark:border-white/30 shadow-[4px_4px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_rgba(255,255,255,0.25)] p-1.5 flex flex-col gap-1 rounded-none select-none backdrop-blur-md min-w-[280px]">
+            {/* Linha 1: Tipografia, Tamanho e Steppers */}
+            <div className="flex items-center gap-1 border-b border-[var(--border)]/80 pb-1">
+              {/* Seletor de Fonte */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setBubbleFontOpen(!bubbleFontOpen);
+                    setBubbleSizeOpen(false);
+                    setBubbleHighlightOpen(false);
+                    setBubbleColorOpen(false);
+                  }}
+                  className="bg-[var(--muted)] border border-[var(--border)] px-2 py-1 text-[10px] font-mono font-bold flex items-center justify-between gap-1.5 hover:border-[#FF4F00] transition-colors min-w-[95px] max-w-[120px] rounded-none cursor-pointer"
+                  title="Família da Fonte"
+                >
+                  <span className="truncate">
+                    {FONT_OPTIONS.find(f => f.value === editor.getAttributes('textStyle').fontFamily)?.label || 'Inter'}
+                  </span>
+                  <ChevronDown size={11} className={`transition-transform duration-150 ${bubbleFontOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {bubbleFontOpen && (
+                  <div 
+                    className="absolute top-full left-0 mt-1 bg-[var(--background)] border-2 border-black dark:border-white/30 shadow-[4px_4px_0px_rgba(0,0,0,0.15)] p-1 z-[110] w-36 max-h-48 overflow-y-auto custom-scrollbar rounded-none"
+                    onMouseDown={(e) => e.preventDefault()}
+                  >
+                    {FONT_OPTIONS.map((f) => (
+                      <button
+                        key={f.value}
+                        type="button"
+                        onClick={() => {
+                          editor.chain().focus().setFontFamily(f.value).run();
+                          setBubbleFontOpen(false);
+                        }}
+                        className={`w-full text-left px-2 py-1 text-[10px] font-bold block truncate transition-colors ${
+                          editor.getAttributes('textStyle').fontFamily === f.value
+                            ? 'bg-[#FF4F00] text-white'
+                            : 'hover:bg-[var(--muted)] text-[var(--foreground)]'
+                        }`}
+                        style={{ fontFamily: f.fontFamily }}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Seletor de Tamanho */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setBubbleSizeOpen(!bubbleSizeOpen);
+                    setBubbleFontOpen(false);
+                    setBubbleHighlightOpen(false);
+                    setBubbleColorOpen(false);
+                  }}
+                  className="bg-[var(--muted)] border border-[var(--border)] px-2 py-1 text-[10px] font-mono font-bold flex items-center justify-between gap-1 hover:border-[#FF4F00] transition-colors min-w-[46px] rounded-none cursor-pointer"
+                  title="Tamanho da Fonte"
+                >
+                  <span>{(editor.getAttributes('textStyle').fontSize || '16px').replace('px', '')}</span>
+                  <ChevronDown size={11} className={`transition-transform duration-150 ${bubbleSizeOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {bubbleSizeOpen && (
+                  <div 
+                    className="absolute top-full left-0 mt-1 bg-[var(--background)] border-2 border-black dark:border-white/30 shadow-[4px_4px_0px_rgba(0,0,0,0.15)] p-1 z-[110] w-20 max-h-44 overflow-y-auto custom-scrollbar rounded-none"
+                    onMouseDown={(e) => e.preventDefault()}
+                  >
+                    {FONT_SIZES.map((size) => (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => {
+                          editor.chain().focus().setFontSize(size).run();
+                          setBubbleSizeOpen(false);
+                        }}
+                        className={`w-full text-center px-2 py-1 text-[10px] font-mono font-bold block transition-colors ${
+                          (editor.getAttributes('textStyle').fontSize || '16px') === size
+                            ? 'bg-[#FF4F00] text-white'
+                            : 'hover:bg-[var(--muted)] text-[var(--foreground)]'
+                        }`}
+                      >
+                        {size.replace('px', '')}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Steppers: Aumentar / Diminuir Tamanho */}
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  stepFontSize('up');
+                }}
+                className="px-1.5 py-1 text-[10px] font-mono font-bold bg-[var(--muted)] hover:bg-[#FF4F00] hover:text-white border border-[var(--border)] transition-colors flex items-center gap-0.5 cursor-pointer rounded-none group text-[var(--foreground)]"
+                title="Aumentar Fonte (A+)"
+              >
+                <span className="font-serif font-black text-xs leading-none">A</span>
+                <Plus size={9} strokeWidth={3} className="opacity-80 group-hover:opacity-100 group-hover:text-white" />
+              </button>
+
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  stepFontSize('down');
+                }}
+                className="px-1.5 py-1 text-[10px] font-mono font-bold bg-[var(--muted)] hover:bg-[#FF4F00] hover:text-white border border-[var(--border)] transition-colors flex items-center gap-0.5 cursor-pointer rounded-none group text-[var(--foreground)]"
+                title="Diminuir Fonte (A-)"
+              >
+                <span className="font-serif font-black text-xs leading-none">A</span>
+                <Minus size={9} strokeWidth={3} className="opacity-80 group-hover:opacity-100 group-hover:text-white" />
+              </button>
+            </div>
+
+            {/* Linha 2: Estilos Básicos, Cores e Alinhamentos */}
+            <div className="flex items-center gap-0.5 pt-0.5">
+              {/* Negrito */}
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  editor.chain().focus().toggleBold().run();
+                }}
+                className={`w-6 h-6 flex items-center justify-center font-bold text-xs rounded-none cursor-pointer transition-colors ${
+                  editor.isActive('bold')
+                    ? 'bg-[#FF4F00] text-white'
+                    : 'text-[var(--foreground)] hover:bg-[var(--muted)]'
+                }`}
+                title="Negrito (Ctrl+B)"
+              >
+                <Bold size={13} strokeWidth={3} />
+              </button>
+
+              {/* Itálico */}
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  editor.chain().focus().toggleItalic().run();
+                }}
+                className={`w-6 h-6 flex items-center justify-center font-bold text-xs rounded-none cursor-pointer transition-colors ${
+                  editor.isActive('italic')
+                    ? 'bg-[#FF4F00] text-white'
+                    : 'text-[var(--foreground)] hover:bg-[var(--muted)]'
+                }`}
+                title="Itálico (Ctrl+I)"
+              >
+                <Italic size={13} strokeWidth={2.5} />
+              </button>
+
+              {/* Sublinhado */}
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  editor.chain().focus().toggleUnderline().run();
+                }}
+                className={`w-6 h-6 flex items-center justify-center font-bold text-xs rounded-none cursor-pointer transition-colors ${
+                  editor.isActive('underline')
+                    ? 'bg-[#FF4F00] text-white'
+                    : 'text-[var(--foreground)] hover:bg-[var(--muted)]'
+                }`}
+                title="Sublinhado (Ctrl+U)"
+              >
+                <UnderlineIcon size={13} strokeWidth={2.5} />
+              </button>
+
+              {/* Tachado */}
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  editor.chain().focus().toggleStrike().run();
+                }}
+                className={`w-6 h-6 flex items-center justify-center font-bold text-xs rounded-none cursor-pointer transition-colors ${
+                  editor.isActive('strike')
+                    ? 'bg-[#FF4F00] text-white'
+                    : 'text-[var(--foreground)] hover:bg-[var(--muted)]'
+                }`}
+                title="Tachado"
+              >
+                <Strikethrough size={13} strokeWidth={2.5} />
+              </button>
+
+              <div className="w-[1px] h-4 bg-[var(--border)] mx-1" />
+
+              {/* Marca-Texto / Realce */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setBubbleHighlightOpen(!bubbleHighlightOpen);
+                    setBubbleColorOpen(false);
+                    setBubbleFontOpen(false);
+                    setBubbleSizeOpen(false);
+                  }}
+                  className={`w-6 h-6 flex flex-col items-center justify-center rounded-none cursor-pointer transition-colors relative ${
+                    editor.isActive('highlight')
+                      ? 'bg-[var(--muted)] border border-[#FF4F00]'
+                      : 'hover:bg-[var(--muted)]'
+                  }`}
+                  title="Cor de Realce (Marca-Texto)"
+                >
+                  <Highlighter size={12} />
+                  <span className="w-3.5 h-[2.5px] bg-yellow-400 mt-0.5" />
+                </button>
+
+                {bubbleHighlightOpen && (
+                  <div 
+                    className="absolute top-full left-0 mt-1 bg-[var(--background)] border-2 border-black dark:border-white/30 shadow-[4px_4px_0px_rgba(0,0,0,0.15)] p-1.5 z-[110] flex items-center gap-1.5 rounded-none"
+                    onMouseDown={(e) => e.preventDefault()}
+                  >
+                    {BUBBLE_HIGHLIGHT_COLORS.map((h) => (
+                      <button
+                        key={h.color}
+                        type="button"
+                        onClick={() => {
+                          editor.chain().focus().toggleHighlight({ color: h.color }).run();
+                          setBubbleHighlightOpen(false);
+                        }}
+                        style={{ backgroundColor: h.color }}
+                        className="w-5 h-5 border border-black/30 hover:scale-110 transition-transform cursor-pointer"
+                        title={h.label}
+                      />
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        editor.chain().focus().unsetHighlight().run();
+                        setBubbleHighlightOpen(false);
+                      }}
+                      className="text-[9px] font-bold px-1 py-0.5 border border-black/20 text-[var(--foreground)] hover:bg-black hover:text-white transition-colors cursor-pointer"
+                      title="Remover realce"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Cor da Fonte */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setBubbleColorOpen(!bubbleColorOpen);
+                    setBubbleHighlightOpen(false);
+                    setBubbleFontOpen(false);
+                    setBubbleSizeOpen(false);
+                  }}
+                  className="w-6 h-6 flex flex-col items-center justify-center rounded-none cursor-pointer hover:bg-[var(--muted)] transition-colors relative"
+                  title="Cor do Texto"
+                >
+                  <span className="font-serif font-black text-xs leading-none">A</span>
+                  <span 
+                    className="w-3.5 h-[2.5px] mt-0.5"
+                    style={{ backgroundColor: editor.getAttributes('textStyle').color || '#ef4444' }}
+                  />
+                </button>
+
+                {bubbleColorOpen && (
+                  <div 
+                    className="absolute top-full left-0 mt-1 bg-[var(--background)] border-2 border-black dark:border-white/30 shadow-[4px_4px_0px_rgba(0,0,0,0.15)] p-1.5 z-[110] flex items-center gap-1.5 rounded-none"
+                    onMouseDown={(e) => e.preventDefault()}
+                  >
+                    {COLOR_OPTIONS.map((c) => (
+                      <button
+                        key={c.value}
+                        type="button"
+                        onClick={() => {
+                          if (c.value === 'default') {
+                            editor.chain().focus().unsetColor().run();
+                          } else {
+                            editor.chain().focus().setColor(c.value).run();
+                          }
+                          setBubbleColorOpen(false);
+                        }}
+                        style={{ backgroundColor: c.value === 'default' ? '#111827' : c.color }}
+                        className="w-5 h-5 border border-black/30 hover:scale-110 transition-transform cursor-pointer"
+                        title={c.label}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="w-[1px] h-4 bg-[var(--border)] mx-1" />
+
+              {/* Alinhamentos */}
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  editor.chain().focus().setTextAlign('left').run();
+                }}
+                className={`w-6 h-6 flex items-center justify-center rounded-none cursor-pointer transition-colors ${
+                  editor.isActive({ textAlign: 'left' })
+                    ? 'bg-[#FF4F00] text-white'
+                    : 'text-[var(--foreground)] hover:bg-[var(--muted)]'
+                }`}
+                title="Alinhar à Esquerda"
+              >
+                <AlignLeft size={13} />
+              </button>
+
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  editor.chain().focus().setTextAlign('center').run();
+                }}
+                className={`w-6 h-6 flex items-center justify-center rounded-none cursor-pointer transition-colors ${
+                  editor.isActive({ textAlign: 'center' })
+                    ? 'bg-[#FF4F00] text-white'
+                    : 'text-[var(--foreground)] hover:bg-[var(--muted)]'
+                }`}
+                title="Centralizar"
+              >
+                <AlignCenter size={13} />
+              </button>
+
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  editor.chain().focus().setTextAlign('right').run();
+                }}
+                className={`w-6 h-6 flex items-center justify-center rounded-none cursor-pointer transition-colors ${
+                  editor.isActive({ textAlign: 'right' })
+                    ? 'bg-[#FF4F00] text-white'
+                    : 'text-[var(--foreground)] hover:bg-[var(--muted)]'
+                }`}
+                title="Alinhar à Direita"
+              >
+                <AlignRight size={13} />
+              </button>
+
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  editor.chain().focus().setTextAlign('justify').run();
+                }}
+                className={`w-6 h-6 flex items-center justify-center rounded-none cursor-pointer transition-colors ${
+                  editor.isActive({ textAlign: 'justify' })
+                    ? 'bg-[#FF4F00] text-white'
+                    : 'text-[var(--foreground)] hover:bg-[var(--muted)]'
+                }`}
+                title="Justificar"
+              >
+                <AlignJustify size={13} />
+              </button>
+            </div>
+          </div>
+        </BubbleMenu>
+      )}
       <EditorContent editor={editor} />
       
       {/* Neural Suggestion Toast */}
@@ -2440,6 +3145,283 @@ export default function RichTextEditor({ content, onChange, placeholder, isFocus
           </div>
         )}
       </AnimatePresence>
+
+      {/* Input Oculto para Seleção de Arquivos de Imagem */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
+
+      {/* Modal Inserir Imagem por URL */}
+      <AnimatePresence>
+        {showImageUrlModal && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative w-full max-w-md bg-[var(--background)] border border-[var(--border)] p-6 shadow-[12px_12px_0px_rgba(0,0,0,0.15)] rounded-none z-[130]"
+            >
+              <div className="flex items-center justify-between pb-3 mb-4 border-b border-[var(--border)]/20">
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4 text-[var(--accent)]" />
+                  <h4 className="text-sm font-bold uppercase tracking-wider text-[var(--foreground)]">
+                    Inserir Imagem por Link
+                  </h4>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowImageUrlModal(false);
+                    setImageUrlInput('');
+                    setImageAltInput('');
+                  }}
+                  className="text-xs opacity-50 hover:opacity-100 font-mono"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider font-mono font-bold opacity-60 block mb-1.5">
+                    Endereço da Imagem (URL)*
+                  </label>
+                  <input
+                    type="url"
+                    value={imageUrlInput}
+                    onChange={(e) => setImageUrlInput(e.target.value)}
+                    placeholder="https://exemplo.com/imagem.png"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleInsertImageUrl();
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] text-xs text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] rounded-none font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider font-mono font-bold opacity-60 block mb-1.5">
+                    Texto Alternativo / Descrição (Opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={imageAltInput}
+                    onChange={(e) => setImageAltInput(e.target.value)}
+                    placeholder="Descrição da imagem para acessibilidade"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleInsertImageUrl();
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-[var(--muted)]/40 border border-[var(--border)] text-xs text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] rounded-none font-mono"
+                  />
+                </div>
+
+                {imageUrlInput.trim() && (
+                  <div className="mt-3">
+                    <span className="text-[9px] uppercase tracking-wider font-mono opacity-50 block mb-1">Pré-visualização:</span>
+                    <div className="max-h-36 overflow-hidden border border-[var(--border)]/40 bg-[var(--muted)]/20 p-2 flex items-center justify-center">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={imageUrlInput}
+                        alt="Preview"
+                        className="max-h-32 max-w-full object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  disabled={!imageUrlInput.trim()}
+                  onClick={handleInsertImageUrl}
+                  className="flex-1 py-3 bg-[var(--accent)] hover:opacity-90 text-white font-bold uppercase text-[10px] tracking-widest transition-opacity disabled:opacity-40 disabled:pointer-events-none rounded-none shadow-[2px_2px_0px_rgba(0,0,0,0.1)]"
+                >
+                  Inserir na Nota
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowImageUrlModal(false);
+                    setImageUrlInput('');
+                    setImageAltInput('');
+                  }}
+                  className="py-3 px-5 bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] font-bold uppercase text-[10px] tracking-widest transition-colors border border-[var(--border)] rounded-none"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Indicador de Processamento de Imagem */}
+      <AnimatePresence>
+        {isProcessingImage && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="fixed bottom-6 right-6 z-[140] bg-[var(--background)] border border-[var(--border)] px-4 py-2.5 shadow-[4px_4px_0px_rgba(0,0,0,0.15)] flex items-center gap-2.5 text-xs font-mono font-bold uppercase tracking-wider"
+          >
+            <Loader2 className="w-4 h-4 animate-spin text-[var(--accent)]" />
+            <span>Otimizando imagem...</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Lightbox / Projeção de Imagem com Zoom In/Out e Pan */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {previewImage && (
+            <div 
+              className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-md flex flex-col items-center justify-between p-3 sm:p-5 select-none"
+              onClick={handleClosePreview}
+            >
+              {/* Barra Superior de Controles */}
+              <div 
+                className="w-full max-w-4xl flex items-center justify-between z-20 py-1"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-2 truncate max-w-[50%]">
+                  <ImageIcon className="w-4 h-4 text-[var(--accent)] shrink-0" />
+                  <span className="text-xs font-mono font-bold text-white/90 truncate uppercase tracking-wider">
+                    {previewImage.alt || 'Visualização da Imagem'}
+                  </span>
+                </div>
+
+                {/* Dock de Ferramentas de Zoom Brutalista */}
+                <div className="flex items-center gap-1 bg-[#141414] border border-white/20 p-1 shadow-[4px_4px_0px_rgba(0,0,0,0.5)]">
+                  <button
+                    type="button"
+                    onClick={handleZoomOut}
+                    disabled={previewZoom <= 0.5}
+                    title="Zoom Out (-)"
+                    className="w-8 h-8 flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                  >
+                    <ZoomOut className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleResetZoom}
+                    title="Redefinir Zoom (0)"
+                    className="px-2.5 h-8 flex items-center justify-center text-[11px] font-mono font-bold text-white/90 hover:text-[var(--accent)] hover:bg-white/10 transition-colors"
+                  >
+                    {Math.round(previewZoom * 100)}%
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleZoomIn}
+                    disabled={previewZoom >= 4}
+                    title="Zoom In (+)"
+                    className="w-8 h-8 flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                  >
+                    <ZoomIn className="w-4 h-4" />
+                  </button>
+
+                  <div className="w-[1px] h-4 bg-white/20 mx-1" />
+
+                  <button
+                    type="button"
+                    onClick={handleResetZoom}
+                    title="Restaurar Tamanho Original"
+                    className="w-8 h-8 flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleClosePreview}
+                    title="Fechar (Esc)"
+                    className="w-8 h-8 flex items-center justify-center text-white hover:bg-red-600 transition-colors ml-1"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Área Central da Imagem com Projeção e Pan */}
+              <div 
+                className="flex-1 w-full h-full flex items-center justify-center overflow-hidden relative cursor-default my-2"
+                onWheel={handleWheel}
+                onMouseDown={(e) => {
+                  if (previewZoom > 1) {
+                    e.preventDefault();
+                    setIsPanning(true);
+                    dragStartRef.current = { x: e.clientX - panOffset.x, y: e.clientY - panOffset.y };
+                  }
+                }}
+                onMouseMove={(e) => {
+                  if (isPanning && previewZoom > 1) {
+                    e.preventDefault();
+                    setPanOffset({
+                      x: e.clientX - dragStartRef.current.x,
+                      y: e.clientY - dragStartRef.current.y,
+                    });
+                  }
+                }}
+                onMouseUp={() => setIsPanning(false)}
+                onMouseLeave={() => setIsPanning(false)}
+              >
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.8, opacity: 0 }}
+                  transition={{ type: 'spring', damping: 25, stiffness: 320 }}
+                  className="relative flex items-center justify-center"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={previewImage.src}
+                    alt={previewImage.alt || 'Imagem expandida'}
+                    draggable={false}
+                    style={{
+                      transform: `scale(${previewZoom}) translate(${panOffset.x / previewZoom}px, ${panOffset.y / previewZoom}px)`,
+                      cursor: previewZoom > 1 ? (isPanning ? 'grabbing' : 'grab') : 'zoom-in',
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (previewZoom === 1) {
+                        handleZoomIn();
+                      }
+                    }}
+                    className="max-h-[82vh] max-w-[92vw] object-contain shadow-[16px_16px_0px_rgba(0,0,0,0.6)] border border-white/20 transition-transform duration-100 ease-out"
+                  />
+                </motion.div>
+              </div>
+
+              {/* Dica Inferior */}
+              <div className="z-20 text-[10px] font-mono uppercase tracking-widest text-white/50 flex items-center gap-3 py-1">
+                <span>Roda do mouse para zoom</span>
+                <span className="hidden sm:inline">•</span>
+                <span className="hidden sm:inline">Arraste para mover</span>
+                <span className="hidden sm:inline">•</span>
+                <span>ESC para fechar</span>
+              </div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

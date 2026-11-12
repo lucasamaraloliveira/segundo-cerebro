@@ -37,6 +37,7 @@ import {
   Sparkles,
   Printer,
   Maximize2,
+  Minimize2,
   Trash2,
   Calendar,
   Search,
@@ -58,7 +59,8 @@ import {
   Check,
   Clock,
   Info,
-  RefreshCw
+  RefreshCw,
+  Image as ImageIcon
 } from 'lucide-react';
 import { APP_VERSION, APP_NAME } from '@/lib/version';
 import { format } from 'date-fns';
@@ -85,6 +87,89 @@ const stripHtml = (html: string) => {
   if (typeof window === 'undefined') return html;
   const doc = new Range().createContextualFragment(html);
   return doc.textContent || "";
+};
+
+interface NoteContentMetadata {
+  text: string;
+  hasImages: boolean;
+  imageCount: number;
+  firstImageName: string;
+  firstImageSrc?: string;
+  displaySnippet: string;
+}
+
+const getNoteContentMetadata = (html: string): NoteContentMetadata => {
+  if (!html) {
+    return {
+      text: '',
+      hasImages: false,
+      imageCount: 0,
+      firstImageName: '',
+      displaySnippet: 'Sem conteúdo...'
+    };
+  }
+
+  let text = '';
+  let imageCount = 0;
+  let firstImageName = '';
+  let firstImageSrc = '';
+
+  if (typeof window !== 'undefined') {
+    try {
+      const doc = new Range().createContextualFragment(html);
+      text = (doc.textContent || '').trim();
+      const imgs = doc.querySelectorAll('img');
+      imageCount = imgs.length;
+      if (imageCount > 0) {
+        firstImageName = imgs[0].getAttribute('alt') || '';
+        firstImageSrc = imgs[0].getAttribute('src') || '';
+      }
+    } catch {
+      // fallback
+    }
+  }
+
+  if (!imageCount) {
+    const imgMatches = html.match(/<img[^>]*>/gi);
+    if (imgMatches && imgMatches.length > 0) {
+      imageCount = imgMatches.length;
+      const first = imgMatches[0];
+      const altMatch = first.match(/alt=["']([^"']*)["']/i);
+      const srcMatch = first.match(/src=["']([^"']*)["']/i);
+      if (altMatch) firstImageName = altMatch[1];
+      if (srcMatch) firstImageSrc = srcMatch[1];
+    }
+  }
+
+  if (!text) {
+    text = html.replace(/<[^>]*>/g, '').trim();
+  }
+
+  let displaySnippet = '';
+  if (text) {
+    if (imageCount > 0) {
+      const imgLabel = firstImageName || 'Imagem';
+      displaySnippet = `📷 [${imgLabel}] ${text}`;
+    } else {
+      displaySnippet = text;
+    }
+  } else if (imageCount > 0) {
+    const imgLabel = firstImageName || 'Captura de tela';
+    displaySnippet = imageCount > 1 
+      ? `📷 [${imageCount} imagens: ${imgLabel}]`
+      : `📷 [Imagem: ${imgLabel}]`;
+  } else {
+    displaySnippet = 'Sem conteúdo...';
+  }
+
+  return {
+    text,
+    hasImages: imageCount > 0,
+    imageCount,
+    firstImageName,
+    firstImageSrc,
+    displaySnippet
+  };
 };
 
 
@@ -144,6 +229,14 @@ const NoteCard = React.memo(({
       : 'border-[var(--border)] hover:border-[var(--foreground)]/10 hover:bg-[var(--muted)]/50';
   }, [isActive, expiryStatus, note.isCompleted]);
 
+  const contentMeta = React.useMemo(() => getNoteContentMetadata(note.content || ''), [note.content]);
+
+  const displayTitle = (note.title && note.title !== 'Nova Nota')
+    ? note.title
+    : (contentMeta.hasImages
+        ? `📷 ${contentMeta.firstImageName || 'Imagem anexada'}`
+        : (note.title || 'Sem título'));
+
   return (
     <motion.div
       layout
@@ -155,6 +248,14 @@ const NoteCard = React.memo(({
           <p className="text-[10px] font-bold uppercase tracking-tighter opacity-40 text-[var(--foreground)]">
             {note.updatedAt ? format(note.updatedAt.toDate(), 'dd MMM', { locale: ptBR }) : 'Agora'}
           </p>
+          {contentMeta.hasImages && (
+            <span 
+              className="text-[8px] font-mono font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-blue-500/10 px-1.5 py-0.5 border border-blue-500/25 flex items-center gap-1"
+              title={`${contentMeta.imageCount} imagem(ns) na nota`}
+            >
+              <ImageIcon size={9} /> {contentMeta.imageCount > 1 ? `${contentMeta.imageCount} imgs` : (contentMeta.firstImageName || 'Imagem')}
+            </span>
+          )}
           {note.isTemporary && (
             <span className="text-[7px] font-bold bg-[#FF4F00] text-white px-1.5 py-0.5 rounded flex items-center gap-0.5 animate-pulse tracking-widest uppercase">
               <Clock size={8} /> Temp
@@ -192,10 +293,10 @@ const NoteCard = React.memo(({
         </div>
       </div>
       <h3 className={`font-sans font-semibold text-base leading-snug tracking-tight mb-1 line-clamp-3 text-[var(--foreground)] ${note.isCompleted ? 'line-through opacity-40' : ''}`}>
-        {note.title || 'Sem título'}
+        {displayTitle}
       </h3>
       <p className={`text-[13px] opacity-60 line-clamp-2 leading-tight text-[var(--foreground)] ${note.isCompleted ? 'line-through opacity-40' : ''}`}>
-        {stripHtml(note.content) || 'Sem conteúdo...'}
+        {contentMeta.displaySnippet}
       </p>
     </motion.div>
   );
@@ -236,6 +337,26 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
   const [isAddingReminder, setIsAddingReminder] = useState(false);
   const [newReminderDate, setNewReminderDate] = useState<Date | null>(null);
   const [newReminderLabel, setNewReminderLabel] = useState('');
+  const [isNeuralScanning, setIsNeuralScanning] = useState(false);
+
+  useEffect(() => {
+    const handleStartScan = (e: any) => {
+      const scannedId = e.detail?.noteId;
+      if (!scannedId || scannedId === activeNote?.id) {
+        setIsNeuralScanning(true);
+      }
+    };
+    const handleEndScan = () => {
+      setIsNeuralScanning(false);
+    };
+
+    window.addEventListener('neural-analysis-start', handleStartScan);
+    window.addEventListener('neural-analysis-end', handleEndScan);
+    return () => {
+      window.removeEventListener('neural-analysis-start', handleStartScan);
+      window.removeEventListener('neural-analysis-end', handleEndScan);
+    };
+  }, [activeNote?.id]);
 
   // Auto-close dropdowns when scrolling
   useEffect(() => {
@@ -247,6 +368,22 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, [isActionsDropdownOpen, isTempModalOpen]);
+
+  // Escape key to exit focus mode immediately
+  useEffect(() => {
+    if (!isFullscreen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (e.defaultPrevented) return;
+        e.preventDefault();
+        setIsFullscreen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen, setIsFullscreen]);
 
   // Auto-resize title textarea
   React.useLayoutEffect(() => {
@@ -471,7 +608,29 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
         }}
         className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-12 lg:p-20 bg-[var(--muted)]/30 custom-scrollbar"
       >
-        <div className="@container/editor max-w-[850px] mx-auto w-full bg-[var(--background)] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] min-h-[1100px] border border-[var(--border)] overflow-visible relative">
+        <div className={`@container/editor max-w-[850px] mx-auto w-full bg-[var(--background)] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] min-h-[1100px] border transition-all duration-300 overflow-visible relative ${
+          isNeuralScanning 
+            ? 'border-[#FF4F00] ring-2 ring-[#FF4F00]/50 shadow-[0_0_40px_rgba(255,79,0,0.25)]' 
+            : 'border-[var(--border)]'
+        }`}>
+          {/* Efeito Visual de Análise Neural com Visão Ativa */}
+          {isNeuralScanning && (
+            <div className="sticky top-0 z-40 overflow-hidden">
+              <motion.div
+                initial={{ top: '0%' }}
+                animate={{ top: '100%' }}
+                transition={{ repeat: Infinity, duration: 2.2, ease: 'linear' }}
+                className="pointer-events-none absolute left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#FF4F00] to-transparent z-50 shadow-[0_0_15px_#FF4F00]"
+              />
+              <div className="bg-[#FF4F00] text-white px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-widest flex items-center justify-between shadow-lg">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-3.5 h-3.5 animate-spin" />
+                  <span>Especialista Neural: Analisando conteúdo & imagens desta nota...</span>
+                </div>
+                <span className="text-[9px] bg-black/30 px-2 py-0.5 font-bold tracking-wider">VISÃO ATIVA</span>
+              </div>
+            </div>
+          )}
           {activeNote.isTemporary && (
             <div className="bg-[#FF4F00] text-white text-[9px] font-bold uppercase tracking-[0.2em] py-2.5 px-4 text-center animate-pulse border-b border-black/10 flex items-center justify-center gap-2 z-10">
               <Clock className="w-3.5 h-3.5" />
@@ -801,6 +960,13 @@ export default function Home() {
   const [isSemanticLoading, setIsSemanticLoading] = useState(false);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const activeNote = useMemo(() => notes.find(n => n.id === activeNoteId), [notes, activeNoteId]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('active-note-changed', { detail: { noteId: activeNoteId } }));
+      (window as any).__activeNoteId = activeNoteId;
+    }
+  }, [activeNoteId]);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
@@ -813,6 +979,10 @@ export default function Home() {
   const [showUndoToast, setShowUndoToast] = useState(false);
   const [lastDeletedNote, setLastDeletedNote] = useState<Note | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const isFullscreenRef = useRef(isFullscreen);
+  useEffect(() => {
+    isFullscreenRef.current = isFullscreen;
+  }, [isFullscreen]);
   const [mobileView, setMobileView] = useState<'list' | 'editor'>('list');
   const [view, setView] = useState<'all' | 'favorites' | 'reminders' | 'overdue' | 'completed' | 'untagged'>('all');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -1090,7 +1260,9 @@ export default function Home() {
         e.preventDefault();
         setIsCommandPaletteOpen(prev => !prev);
       }
-      if (e.key === 'Escape' && isFullscreen) {
+      if (e.key === 'Escape' && isFullscreenRef.current) {
+        if (e.defaultPrevented) return;
+        e.preventDefault();
         setIsFullscreen(false);
       }
     };
@@ -1947,7 +2119,7 @@ Retorne EXCLUSIVAMENTE um JSON válido no seguinte formato:
           <div className="mb-10 flex items-center justify-between">
             <div>
               <h2 className="font-serif italic text-3xl tracking-tight flex items-center gap-2">
-                Cérebro²
+                {APP_NAME}
               </h2>
               <button
                 onClick={() => setIsSettingsOpen(true)}
@@ -2193,7 +2365,7 @@ Retorne EXCLUSIVAMENTE um JSON válido no seguinte formato:
         {/* Mobile Header for List View */}
         <div className="md:hidden flex items-center justify-between p-5 pb-0 bg-[var(--background)]">
           <div>
-            <h2 className="font-serif italic text-2xl tracking-tight text-[var(--foreground)]">Cérebro²</h2>
+            <h2 className="font-serif italic text-2xl tracking-tight text-[var(--foreground)]">{APP_NAME}</h2>
             <button
               onClick={() => setIsSettingsOpen(true)}
               title="Ver detalhes da versão"

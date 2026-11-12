@@ -42,15 +42,25 @@ export default function CommandPalette({ isOpen, onClose, notes, onAction }: Com
       c.label.toLowerCase().includes(q) || c.description.toLowerCase().includes(q)
     ).map(c => ({ ...c, type: 'command' }));
 
-    const matchedNotes = notes.filter(n =>
-      n.title.toLowerCase().includes(q) || (n.tags && n.tags.some(t => t.toLowerCase().includes(q)))
-    ).slice(0, 5).map(n => ({
-      id: n.id,
-      label: n.title || 'Sem título',
-      description: n.tags?.join(', ') || 'Sem tags',
-      icon: FileText,
-      type: 'note'
-    }));
+    const matchedNotes = notes.filter(n => {
+      const titleMatch = (n.title || '').toLowerCase().includes(q);
+      const tagMatch = n.tags && n.tags.some(t => t.toLowerCase().includes(q));
+      const contentMatch = (n.content || '').toLowerCase().includes(q);
+      return titleMatch || tagMatch || contentMatch;
+    }).slice(0, 5).map(n => {
+      let label = n.title && n.title !== 'Nova Nota' ? n.title : '';
+      if (!label) {
+        const imgMatch = (n.content || '').match(/alt=["']([^"']*)["']/i);
+        label = imgMatch && imgMatch[1] ? `📷 ${imgMatch[1]}` : (n.title || 'Sem título');
+      }
+      return {
+        id: n.id,
+        label,
+        description: n.tags?.join(', ') || 'Sem tags',
+        icon: FileText,
+        type: 'note'
+      };
+    });
 
     return [...matchedCommands, ...matchedNotes];
   }, [query, notes]);

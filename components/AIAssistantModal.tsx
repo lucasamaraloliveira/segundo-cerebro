@@ -10,11 +10,16 @@ import {
   ListChecks, 
   FileText, 
   Tag as TagIcon, 
-  Type,
-  Loader2,
-  Check,
-  RotateCcw,
-  Wrench
+  Type, 
+  Loader2, 
+  Check, 
+  RotateCcw, 
+  Wrench,
+  FileCheck2,
+  Cpu,
+  ArrowLeft,
+  Send,
+  Sparkle
 } from 'lucide-react';
 
 const cleanHtmlTags = (text: string) => {
@@ -76,6 +81,40 @@ const ASSISTANT_OPTIONS = [
     prompt: (text: string) => `Você é um editor profissional. Refine o seguinte texto, corrigindo gramática, pontuação e melhorando a fluidez, mas mantendo o sentido original. Se parecer uma transcrição de áudio, limpe vícios de linguagem. Use apenas formatação Markdown padrão (como **, *, #, -) para qualquer ênfase ou estrutura. NÃO use tags HTML (como <bold>, <h3>, <em>, etc.) sob nenhuma circunstância. Retorne APENAS o texto refinado, sem comentários.\n\nTEXTO:\n${text}`
   },
   {
+    id: 'meeting_minutes',
+    title: 'Ata de Reunião',
+    description: 'Identifica participantes, objetivo, tópicos discutidos, decisões e plano de ação.',
+    icon: FileCheck2,
+    color: 'bg-indigo-600',
+    prompt: (text: string) => `Você é um secretário executivo corporativo de alto nível. Analise detalhadamente o conteúdo fornecido a seguir e elabore uma Ata de Reunião estruturada em Markdown de acordo com o padrão corporativo.
+
+A resposta DEVE OBRIGATORIAMENTE começar com o título "# 📋 Ata de Reunião" e conter exclusivamente as seguintes seções estruturadas:
+
+## 👥 Participantes
+(Identifique todos os participantes, interlocutores ou partes citadas no texto. Caso não haja nomes explícitos, deduza os papéis/cargos mencionados ou registre os envolvidos identificáveis)
+
+## 🎯 Objetivo da Reunião
+(Síntese concisa e objetiva do propósito central, contexto e finalidade do encontro)
+
+## 📌 Tópicos & Pautas Discutidas
+(Detalhamento dos tópicos abordados, debates, argumentos e pontos-chave discutidos durante a reunião)
+
+## ✅ Decisões & Deliberações
+(Decisões consolidadas, acordos firmados, definições e diretrizes estabelecidas)
+
+## 🚀 Plano de Ação & Próximos Passos
+(Lista de tarefas estruturada em formato de checklist com - [ ] Tarefa | Responsável | Prazo quando identificáveis)
+
+Diretrizes:
+- Vá direto ao conteúdo em Markdown.
+- NÃO utilize tags HTML (<bold>, <h3>, etc.).
+- NÃO inclua introduções conversacionais (como "Com certeza", "Aqui está a ata") nem mensagens de encerramento.
+- Retorne APENAS a ata formatada.
+
+TEXTO DA REUNIÃO:
+${text}`
+  },
+  {
     id: 'summarize',
     title: 'Resumo Executivo',
     description: 'Cria um resumo conciso com os pontos mais importantes.',
@@ -135,16 +174,89 @@ ${text}`
     icon: Type,
     color: 'bg-rose-500',
     prompt: (text: string) => `Reescreva o texto abaixo em um tom profissional, direto e elegante (estilo executivo). Use apenas formatação Markdown padrão para ênfase (como **, *). Não use tags HTML. Retorne APENAS o novo texto.\n\nTEXTO:\n${text}`
+  },
+  {
+    id: 'custom',
+    title: 'Habilidade Personalizada',
+    description: 'Defina seu comando ou escolha formatos estratégicos sob demanda.',
+    icon: Cpu,
+    color: 'bg-[#FF4F00]',
+    prompt: () => ''
   }
 ];
 
-export default function AIAssistantModal({ isOpen, onClose, content, selectionText = "", selectionHtml = "", onApply, onAddTags, existingTags = [] }: AIAssistantModalProps) {
+const CUSTOM_SKILL_SUGGESTIONS = [
+  {
+    id: '5w2h',
+    title: 'Matriz 5W2H (Plano de Ação Tático)',
+    description: 'O Quê, Por Quê, Onde, Quando, Quem, Como e Quanto Custa em formato tabular claro.',
+    instruction: 'Transforme o texto em uma Matriz 5W2H completa. Comece com "# 📊 Plano Tático 5W2H". Estruture em tópicos ou tabela Markdown detalhando: 1. O quê (What), 2. Por quê (Why), 3. Onde (Where), 4. Quando (When), 5. Quem (Who), 6. Como (How) e 7. Quanto Custa (How Much).'
+  },
+  {
+    id: 'sop',
+    title: 'Procedimento Operacional Padrão (POP / SOP)',
+    description: 'Guia sequencial passo a passo com pré-requisitos, etapas e critérios de sucesso.',
+    instruction: 'Transforme as anotações em um Procedimento Operacional Padrão (POP / SOP) rigoroso. Comece com "# 📘 Procedimento Operacional Padrão (POP)". Inclua seções: ## 1. Objetivo & Escopo, ## 2. Pré-requisitos & Ferramentas, ## 3. Passo a Passo Sequencial (numerado detalhado), ## 4. Critérios de Aceite/Sucesso e ## 5. Solução de Problemas Comuns.'
+  },
+  {
+    id: 'pitch',
+    title: 'Roteiro de Pitch & Apresentação',
+    description: 'Estruturado com Gancho Inicial, Problema, Solução, Valor Agregado e Call-to-Action.',
+    instruction: 'Converta as ideias desta nota em um roteiro dinâmico e persuasivo de Pitch/Apresentação. Comece com "# 🎤 Roteiro de Pitch Estratégico". Divida em: ## 🎣 Gancho de Abertura (Hook), ## 💥 O Problema Central, ## 💡 A Solução Proposta, ## 💎 Proposta de Valor Única e ## 📣 Chamada para Ação (CTA).'
+  },
+  {
+    id: 'rfc',
+    title: 'RFC Técnico / Arquitetura',
+    description: 'Documento técnico de especificação com proposta, trade-offs, riscos e alternativas.',
+    instruction: 'Estruture o conteúdo como um Request for Comments (RFC) técnico de engenharia de software e arquitetura. Comece com "# 🏗️ RFC Técnico: Especificação & Arquitetura". Inclua: ## 1. Resumo & Contexto, ## 2. Objetivos & Não-Objetivos, ## 3. Arquitetura & Design Proposto, ## 4. Trade-offs & Alternativas Consideradas, ## 5. Riscos & Mitigações.'
+  },
+  {
+    id: 'eisenhower',
+    title: 'Matriz de Eisenhower (Priorização)',
+    description: 'Categoriza em Urgente/Importante, Planejar, Delegar e Eliminar.',
+    instruction: 'Organize todas as atividades, ideias e demandas do texto dentro da Matriz de Decisão de Eisenhower. Comece com "# 🧭 Matriz de Priorização Eisenhower". Distribua em: ## 🔴 1. Urgente & Importante (Fazer Imediatamente), ## 🟡 2. Importante & Não Urgente (Agendar / Planejar), ## 🔵 3. Urgente & Não Importante (Delegar / Automatizar), ## ⚪ 4. Não Urgente & Não Importante (Eliminar).'
+  },
+  {
+    id: 'critical_analysis',
+    title: 'Advogado do Diabo (Análise Crítica)',
+    description: 'Questiona premissas, aponta vulnerabilidades ocultas e riscos não previstos.',
+    instruction: 'Atue como um analista crítico e rigoroso ("Advogado do Diabo"). Comece com "# ⚖️ Análise Crítica & Pontos Cegos". Analise o texto avaliando: ## ⚠️ Suposições Não Validadas, ## 🔍 Fragilidades e Riscos Ocultos, ## ⚡ Piores Cenários Possíveis e ## 🛡️ Recomendações de Contingência.'
+  },
+  {
+    id: 'active_recall',
+    title: 'Flashcards & Memorização Ativa',
+    description: 'Gera pares de Pergunta e Resposta para aprendizado profundo e retenção de longo prazo.',
+    instruction: 'Converta os principais conceitos, dados e fatos desta nota em um conjunto de Flashcards de memorização ativa (Active Recall). Comece com "# 🧠 Flashcards de Estudo & Fixação". Para cada conceito relevante, crie um bloco formatado com "**Pergunta:** ..." seguido por "**Resposta:** ...".'
+  },
+  {
+    id: 'bluf',
+    title: 'Comunicação Executiva BLUF',
+    description: 'Bottom Line Up Front: conclusão e decisão no primeiro parágrafo, dados após.',
+    instruction: 'Reestruture o texto no padrão militar e corporativo BLUF (Bottom Line Up Front). Comece com "# 🎯 Síntese Estratégica (BLUF)". Coloque no primeiro parágrafo a conclusão definitiva, decisão recomendada ou pedido de ação. Em seguida, divida em seções sucintas: ## Contexto Essencial, ## Impacto & Justificativa e ## Próximos Passos Imediatos.'
+  }
+];
+
+export default function AIAssistantModal({ 
+  isOpen, 
+  onClose, 
+  content, 
+  selectionText = "", 
+  selectionHtml = "", 
+  onApply, 
+  onAddTags, 
+  existingTags = [] 
+}: AIAssistantModalProps) {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showApplyOptions, setShowApplyOptions] = useState(false);
   const [scope, setScope] = useState<'selection' | 'full'>('full');
+  
+  // Custom skill mode states
+  const [isCustomMode, setIsCustomMode] = useState(false);
+  const [customPromptInput, setCustomPromptInput] = useState('');
+  const [lastCustomInstruction, setLastCustomInstruction] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -152,10 +264,18 @@ export default function AIAssistantModal({ isOpen, onClose, content, selectionTe
       setResult(null);
       setSelectedOption(null);
       setShowApplyOptions(false);
+      setIsCustomMode(false);
+      setCustomPromptInput('');
+      setLastCustomInstruction(null);
     }
   }, [isOpen, selectionText]);
 
   const handleAction = async (optionId: string) => {
+    if (optionId === 'custom') {
+      setIsCustomMode(true);
+      return;
+    }
+
     const option = ASSISTANT_OPTIONS.find(o => o.id === optionId);
     if (!option) return;
 
@@ -189,6 +309,62 @@ export default function AIAssistantModal({ isOpen, onClose, content, selectionTe
     }
   };
 
+  const handleCustomSkillRun = async (instruction: string) => {
+    if (!instruction.trim()) return;
+
+    setSelectedOption('custom');
+    setLastCustomInstruction(instruction);
+    setIsLoading(true);
+    setError(null);
+    setResult(null);
+
+    const textToProcess = scope === 'selection' ? selectionText : content;
+    const fullPrompt = `Você é uma inteligência artificial especialista em síntese, organização do conhecimento e redação de alta precisão.
+Sua tarefa é processar e formatar o texto fornecido estritamente de acordo com a INSTRUÇÃO DO USUÁRIO.
+
+INSTRUÇÃO DO USUÁRIO:
+${instruction}
+
+DIRETRIZES DE SAÍDA:
+1. Retorne APENAS o conteúdo formatado em Markdown padrão (#, ##, **, *, - [ ], tabelas).
+2. NUNCA use tags HTML (como <bold>, <div>, etc.).
+3. Vá direto ao ponto, sem preâmbulos conversacionais (como "Com certeza", "Aqui está") e sem despedidas.
+4. Mantenha fidelidade e rigor técnico em relação aos dados da nota original.
+
+TEXTO DA NOTA:
+${textToProcess}`;
+
+    try {
+      const res = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: fullPrompt })
+      });
+      const data = await res.json();
+
+      if (data.text) {
+        if (data.meta?.isFallback && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('ai-fallback-triggered', { detail: data.meta }));
+        }
+        setResult(cleanHtmlTags(data.text));
+      } else {
+        throw new Error(data.error || 'Falha ao processar habilidade personalizada');
+      }
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRetry = () => {
+    if (selectedOption === 'custom' && lastCustomInstruction) {
+      handleCustomSkillRun(lastCustomInstruction);
+    } else if (selectedOption) {
+      handleAction(selectedOption);
+    }
+  };
+
   const handleApply = (mode: 'replace' | 'append' | 'tags' | 'selection') => {
     if (!result) return;
     
@@ -211,6 +387,7 @@ export default function AIAssistantModal({ isOpen, onClose, content, selectionTe
     setResult(null);
     setSelectedOption(null);
     setShowApplyOptions(false);
+    setIsCustomMode(false);
   };
 
   return (
@@ -235,7 +412,9 @@ export default function AIAssistantModal({ isOpen, onClose, content, selectionTe
             <div className="p-4 bg-[#FF4F00] text-white border-b-2 border-black flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sparkles size={20} className="animate-pulse" />
-                <h2 className="font-bold uppercase tracking-widest text-sm">Assistente Neural</h2>
+                <h2 className="font-bold uppercase tracking-widest text-sm">
+                  {isCustomMode ? 'Habilidade Neural Personalizada' : 'Assistente Neural'}
+                </h2>
               </div>
               <button onClick={onClose} className="hover:rotate-90 transition-transform duration-200">
                 <X size={20} />
@@ -272,7 +451,9 @@ export default function AIAssistantModal({ isOpen, onClose, content, selectionTe
                   )}
                 </div>
               )}
-              {!result && !isLoading ? (
+
+              {/* View 1: Standard Skills Grid */}
+              {!result && !isLoading && !isCustomMode && (
                 <>
                   <p className="text-xs font-bold uppercase opacity-40 tracking-widest">Selecione uma Habilidade Neural</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -280,29 +461,125 @@ export default function AIAssistantModal({ isOpen, onClose, content, selectionTe
                       <button
                         key={opt.id}
                         onClick={() => handleAction(opt.id)}
-                        className="group flex flex-col text-left p-4 border border-black/5 bg-[var(--muted)] hover:bg-[#FF4F00]/5 transition-all shadow-[4px_4px_0px_rgba(0,0,0,0.1)] hover:translate-y-[-2px] hover:shadow-[4px_6px_0px_rgba(0,0,0,0.15)] active:translate-y-[0px] active:shadow-none"
+                        className={`group flex flex-col text-left p-4 border transition-all shadow-[4px_4px_0px_rgba(0,0,0,0.1)] hover:translate-y-[-2px] hover:shadow-[4px_6px_0px_rgba(0,0,0,0.15)] active:translate-y-[0px] active:shadow-none ${
+                          opt.id === 'custom' 
+                            ? 'border-[#FF4F00]/50 bg-[#FF4F00]/5 hover:bg-[#FF4F00]/10' 
+                            : 'border-black/5 bg-[var(--muted)] hover:bg-[#FF4F00]/5'
+                        }`}
                       >
                         <div className={`w-10 h-10 ${opt.color} text-white flex items-center justify-center border border-black/10 mb-3 shadow-[2px_2px_0px_rgba(0,0,0,0.1)]`}>
                           <opt.icon size={20} />
                         </div>
-                        <h3 className="font-bold text-sm uppercase mb-1">{opt.title}</h3>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <h3 className="font-bold text-sm uppercase">{opt.title}</h3>
+                          {opt.id === 'custom' && (
+                            <span className="text-[9px] font-bold uppercase bg-[#FF4F00] text-white px-1.5 py-0.5 tracking-wider">
+                              Novo
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs opacity-60 leading-relaxed">{opt.description}</p>
                       </button>
                     ))}
                   </div>
                 </>
-              ) : (
+              )}
+
+              {/* View 2: Custom Skill Interactive Subview */}
+              {!result && !isLoading && isCustomMode && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => setIsCustomMode(false)}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--foreground)]/60 hover:text-[#FF4F00] transition-colors"
+                    >
+                      <ArrowLeft size={16} />
+                      Voltar às Habilidades Padrão
+                    </button>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-[#FF4F00] bg-[#FF4F00]/10 px-2 py-1 border border-[#FF4F00]/20">
+                      Modo Avançado
+                    </span>
+                  </div>
+
+                  {/* Free-form Custom Instruction Box */}
+                  <div className="p-4 border-2 border-black dark:border-white/20 bg-[var(--background)] shadow-[4px_4px_0px_rgba(0,0,0,0.1)] space-y-3">
+                    <label className="text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                      <Cpu size={16} className="text-[#FF4F00]" />
+                      Como você deseja formatar esta nota?
+                    </label>
+                    <textarea
+                      value={customPromptInput}
+                      onChange={(e) => setCustomPromptInput(e.target.value)}
+                      placeholder="Ex: Crie um plano de lançamento em 3 fases com prazos estimados, transforme em uma tabela de comparação prós e contras, elabore um FAQ..."
+                      rows={3}
+                      className="w-full p-3 text-xs bg-[var(--muted)] border border-black/10 focus:outline-none focus:border-[#FF4F00] font-sans resize-none leading-relaxed"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                          handleCustomSkillRun(customPromptInput);
+                        }
+                      }}
+                    />
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-[10px] opacity-40 font-bold uppercase">
+                        Ctrl + Enter para enviar
+                      </span>
+                      <button
+                        onClick={() => handleCustomSkillRun(customPromptInput)}
+                        disabled={!customPromptInput.trim()}
+                        className="px-4 py-2 bg-black text-white dark:bg-white dark:text-black font-bold uppercase text-xs tracking-wider flex items-center gap-2 hover:bg-[#FF4F00] dark:hover:bg-[#FF4F00] dark:hover:text-white transition-colors disabled:opacity-40 disabled:pointer-events-none shadow-[2px_2px_0px_rgba(0,0,0,0.1)] active:translate-y-[1px]"
+                      >
+                        <Send size={14} />
+                        Executar Comando
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Curated Strategic Format Suggestions */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkle size={14} className="text-[#FF4F00]" />
+                      <p className="text-xs font-bold uppercase opacity-60 tracking-widest">
+                        Ou escolha um formato neural avançado:
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {CUSTOM_SKILL_SUGGESTIONS.map((sug) => (
+                        <button
+                          key={sug.id}
+                          onClick={() => handleCustomSkillRun(sug.instruction)}
+                          className="group p-3 text-left border border-black/10 bg-[var(--muted)] hover:bg-[#FF4F00]/5 hover:border-[#FF4F00]/40 transition-all shadow-[2px_2px_0px_rgba(0,0,0,0.06)] hover:translate-y-[-1px] active:translate-y-[0px]"
+                        >
+                          <h4 className="font-bold text-xs uppercase text-[var(--foreground)] group-hover:text-[#FF4F00] transition-colors mb-1">
+                            {sug.title}
+                          </h4>
+                          <p className="text-[11px] opacity-60 leading-relaxed font-sans">
+                            {sug.description}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* View 3: Processing and Result Preview */}
+              {(isLoading || result || error) && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-[#FF4F00] animate-pulse" />
                       <p className="text-xs font-bold uppercase tracking-widest">
-                        {isLoading ? 'Processando Sinapses...' : 'Resultado da Análise'}
+                        {isLoading ? 'Processando Sinapses Neurais...' : 'Resultado da Análise'}
                       </p>
                     </div>
                     {!isLoading && (
                       <button 
-                        onClick={() => { setResult(null); setSelectedOption(null); }}
+                        onClick={() => { 
+                          setResult(null); 
+                          setSelectedOption(null); 
+                          setError(null);
+                        }}
                         className="text-[10px] font-bold uppercase underline hover:text-[#FF4F00]"
                       >
                         Voltar
@@ -311,12 +588,14 @@ export default function AIAssistantModal({ isOpen, onClose, content, selectionTe
                   </div>
 
                   {isLoading ? (
-                    <div className="py-20 flex flex-col items-center justify-center gap-4 text-[var(--foreground)] opacity-40">
+                    <div className="py-20 flex flex-col items-center justify-center gap-4 text-[var(--foreground)] opacity-60">
                       <Loader2 size={40} className="animate-spin text-[#FF4F00]" />
-                      <p className="text-xs font-sans font-medium">&quot;Acessando camadas neurais...&quot;</p>
+                      <p className="text-xs font-mono font-medium tracking-wide">
+                        Sintetizando e estruturando conteúdo com IA...
+                      </p>
                     </div>
                   ) : error ? (
-                    <div className="p-4 border-2 border-red-500 bg-red-50 text-red-600 text-sm">
+                    <div className="p-4 border-2 border-red-500 bg-red-50 text-red-600 text-sm font-sans">
                       {error}
                     </div>
                   ) : (
@@ -362,7 +641,7 @@ export default function AIAssistantModal({ isOpen, onClose, content, selectionTe
                         Substituir Trecho Selecionado
                       </button>
                       <button
-                        onClick={() => handleAction(selectedOption!)}
+                        onClick={handleRetry}
                         className="px-4 bg-[var(--muted)] border border-black/5 shadow-[4px_4px_0px_rgba(0,0,0,0.1)] flex items-center justify-center hover:bg-black hover:text-white transition-colors"
                         title="Tentar Novamente"
                       >
@@ -388,7 +667,7 @@ export default function AIAssistantModal({ isOpen, onClose, content, selectionTe
                         {selectedOption === 'tags' ? 'Aplicar Tags' : 'Aplicar na Nota'}
                       </button>
                       <button
-                        onClick={() => handleAction(selectedOption!)}
+                        onClick={handleRetry}
                         className="px-4 bg-[var(--muted)] border border-black/5 shadow-[4px_4px_0px_rgba(0,0,0,0.1)] flex items-center justify-center hover:bg-black hover:text-white transition-colors"
                         title="Tentar Novamente"
                       >

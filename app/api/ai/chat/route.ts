@@ -21,7 +21,7 @@ function cleanText(html: string): string {
 
 export async function POST(req: Request) {
   try {
-    const { query, notes, file, urlsContent } = await req.json();
+    const { query, notes, file, urlsContent, noteImages, activeNoteId } = await req.json();
 
     if (!query || !notes) {
       return NextResponse.json({ error: 'Query and notes are required' }, { status: 400 });
@@ -99,7 +99,9 @@ Tags: ${tagsList || 'Nenhuma'}
 Conteúdo: ${truncated || '(Sem conteúdo textual)'}`;
     }).join('\n\n---\n\n');
 
-    // 5. Prompt otimizado e balanceado
+    // 5. Prompt otimizado e balanceado com suporte à Visão Multimodal
+    const hasVisuals = Array.isArray(noteImages) && noteImages.length > 0;
+
     const prompt = `
 Você é o "Especialista Neural" do sistema Segundo Cérebro. 
 Responda de forma analítica, profissional, direta e fluida com base no acervo de notas do usuário.
@@ -112,7 +114,12 @@ ${masterIndex}
 
 CONTEÚDO DETALHADO DAS NOTAS MAIS RELEVANTES:
 ${detailedContent || '(Nenhum conteúdo específico necessário)'}
-
+${hasVisuals ? `
+CAPACIDADE DE VISÃO MULTIMODAL ATIVA:
+Foram detectadas e anexadas ${noteImages.length} imagem(ns) das notas relevantes para sua visão direta.
+Você é capaz de "ver" diagramas, gráficos, prints, fotos e esquemas visuais contidos nas notas.
+Ao responder, descreva e interprete com naturalidade o que você está vendo nas imagens, integrando os dados visuais (textos nos prints, fluxos, números, ilustrações) ao raciocínio analítico da resposta.
+` : ''}
 ${urlsContent ? `\nCONTEXTO EXTERNO FORNECIDO (LINKS):\n${urlsContent}` : ''}
 
 DIRETRIZES FUNDAMENTAIS:
@@ -127,6 +134,21 @@ ${query}
     `;
 
     let contentParts: any[] = [prompt];
+
+    // Inserir imagens das notas selecionadas para a visão da IA (até 3 imagens)
+    if (hasVisuals) {
+      noteImages.slice(0, 3).forEach((img: any, idx: number) => {
+        if (img.data && img.mimeType) {
+          contentParts.push(`\n[IMAGEM ${idx + 1} DA NOTA "${img.noteTitle || 'Sem título'}"${img.alt ? ` - Legenda: ${img.alt}` : ''}]:`);
+          contentParts.push({
+            inlineData: {
+              data: img.data,
+              mimeType: img.mimeType,
+            }
+          });
+        }
+      });
+    }
 
     if (file && file.data && file.mimeType) {
       contentParts.push({
