@@ -21,7 +21,7 @@ function cleanText(html: string): string {
 
 export async function POST(req: Request) {
   try {
-    const { query, notes, file, urlsContent, noteImages, activeNoteId } = await req.json();
+    const { query, notes, file, urlsContent, noteImages, activeNoteId, mentionedNoteIds } = await req.json();
 
     if (!query || !notes) {
       return NextResponse.json({ error: 'Query and notes are required' }, { status: 400 });
@@ -56,8 +56,21 @@ export async function POST(req: Request) {
       return `- "${n.title || 'Sem título'}" | Tags: ${tagsStr || 'Nenhuma'}`;
     }).join('\n');
 
-    // 4. Seleção Focada de Conteúdo: calcular relevância para injetar texto apenas das notas pertinentes
-    const scoredNotes = allUserNotes.map((n: any) => {
+    // 4. Notas Ancoradas Explicitamente pelo Usuário (@)
+    const mentionedIdsSet = new Set(Array.isArray(mentionedNoteIds) ? mentionedNoteIds : []);
+    const anchoredNotes = allUserNotes.filter((n: any) => mentionedIdsSet.has(n.id));
+    const anchoredContent = anchoredNotes.map((n: any) => {
+      const tagsList = (n.tags || []).map((t: string) => `#${t.replace(/^#+/, '')}`).join(' ');
+      const contentClean = cleanText(n.content || '');
+      const truncated = contentClean.length > 3500 ? `${contentClean.slice(0, 3500)}...` : contentClean;
+      return `[NOTA ANCORADA (@): "${n.title || 'Sem título'}"]
+Tags: ${tagsList || 'Nenhuma'}
+Conteúdo Completo: ${truncated || '(Sem conteúdo textual)'}`;
+    }).join('\n\n---\n\n');
+
+    // 5. Seleção Focada de Conteúdo: calcular relevância para injetar texto apenas das notas pertinentes (excluindo as já ancoradas)
+    const remainingNotes = allUserNotes.filter((n: any) => !mentionedIdsSet.has(n.id));
+    const scoredNotes = remainingNotes.map((n: any) => {
       let score = 0;
       const titleLower = (n.title || '').toLowerCase();
       const tagsLower = (n.tags || []).map((t: string) => t.toLowerCase());
@@ -88,7 +101,7 @@ export async function POST(req: Request) {
 
     const notesToInjectContent = matchingNotes.length > 0 
       ? matchingNotes.slice(0, 10) 
-      : scoredNotes.slice(0, 4);
+      : (anchoredNotes.length > 0 ? [] : scoredNotes.slice(0, 4));
 
     // Formata o conteúdo detalhado apenas para as notas selecionadas (resumo conciso de até 700 chars, sem IDs)
     const detailedContent = notesToInjectContent.map(({ note: n, contentClean }: { note: any; contentClean: string }) => {
@@ -99,11 +112,11 @@ Tags: ${tagsList || 'Nenhuma'}
 Conteúdo: ${truncated || '(Sem conteúdo textual)'}`;
     }).join('\n\n---\n\n');
 
-    // 5. Prompt otimizado e balanceado com suporte à Visão Multimodal
+    // 6. Prompt otimizado e balanceado com suporte à Visão Multimodal e Ancoragem (@)
     const hasVisuals = Array.isArray(noteImages) && noteImages.length > 0;
 
     const prompt = `
-Você é o "Especialista Neural" do sistema Segundo Cérebro. 
+Você é o "Especialista Neural" do sistema Mente+ (Segundo Cérebro). 
 Responda de forma analítica, profissional, direta e fluida com base no acervo de notas do usuário.
 
 INVENTÁRIO DO SEGUNDO CÉREBRO:
@@ -111,9 +124,13 @@ Total de notas catalogadas: ${allUserNotes.length} notas.
 
 ÍNDICE MESTRE DE TODAS AS NOTAS:
 ${masterIndex}
-
-CONTEÚDO DETALHADO DAS NOTAS MAIS RELEVANTES:
-${detailedContent || '(Nenhum conteúdo específico necessário)'}
+${anchoredContent ? `
+📌 NOTAS ANCORADAS EXPLICITAMENTE PELO USUÁRIO (@):
+(PRIORIDADE MÁXIMA: O usuário selecionou e ancorou diretamente a(s) nota(s) abaixo usando "@". Utilize o conteúdo destas notas como referência central da sua resposta.)
+${anchoredContent}
+` : ''}
+CONTEÚDO DETALHADO DAS NOTAS COMPLEMENTARES MAIS RELEVANTES:
+${detailedContent || '(Nenhuma nota complementar adicional necessária)'}
 ${hasVisuals ? `
 CAPACIDADE DE VISÃO MULTIMODAL ATIVA:
 Foram detectadas e anexadas ${noteImages.length} imagem(ns) das notas relevantes para sua visão direta.
@@ -163,8 +180,10 @@ ${query}
     const aiResult = await runAIWithFallback(apiKey, { contents: contentParts });
     const responseText = aiResult.text || '';
 
-    // 7. Mapear fontes relevantes que coincidem com a busca ou foram citadas na resposta
+    // 7. Mapear fontes relevantes que coincidem com a busca, foram ancoradas (@) ou citadas na resposta
     const citedOrMatchingNotes = allUserNotes.filter((n: any) => {
+      if (mentionedIdsSet.has(n.id)) return true;
+
       const title = (n.title || '').toLowerCase();
       const tags = (n.tags || []).map((t: string) => t.toLowerCase());
       
@@ -174,15 +193,21 @@ ${query}
 
       const isCitedInResponse = title.length > 2 && responseText.toLowerCase().includes(title);
 
-      const matchesTokens = tagMatches.length === 0 && queryTokens.some((token: string) => 
+      const matchesTokens = anchoredNotes.length === 0 && tagMatches.length === 0 && queryTokens.some((token: string) => 
         tags.includes(token) || title.includes(token)
       );
 
       return matchesSearchedTag || isCitedInResponse || matchesTokens;
     });
 
-    const finalSources = citedOrMatchingNotes.length > 0 
-      ? citedOrMatchingNotes.slice(0, 35) 
+    // Garantir que notas ancoradas (@) fiquem sempre no topo da lista de fontes
+    const orderedMatches = [
+      ...anchoredNotes,
+      ...citedOrMatchingNotes.filter((n: any) => !mentionedIdsSet.has(n.id))
+    ];
+
+    const finalSources = orderedMatches.length > 0 
+      ? orderedMatches.slice(0, 35) 
       : allUserNotes.slice(0, 10);
 
     return NextResponse.json({

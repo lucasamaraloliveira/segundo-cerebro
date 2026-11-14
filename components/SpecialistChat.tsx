@@ -10,29 +10,61 @@ import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
 import { extractImagesFromHtml } from '@/lib/image-utils';
 
-// Helper to parse user message and extract attachment metadata if present
-function parseUserMessage(rawContent: string): { attachmentName: string | null; cleanContent: string } {
-  if (!rawContent) return { attachmentName: null, cleanContent: '' };
-  
-  // Format 1: "📎 [Anexo: nome_do_arquivo.ext]\n\npergunta..."
-  const matchBracket = rawContent.match(/^📎\s*\[Anexo:\s*(.*?)\](?:\r?\n\r?\n)?([\s\S]*)$/);
+// Helper to resolve display title for a note (including image-only notes)
+function getNoteDisplayTitle(note: Partial<Note>): string {
+  if (note.title && note.title.trim()) return note.title.trim();
+  const content = note.content || '';
+  const imgMatch = content.match(/<img[^>]*alt=["']([^"']+)["'][^>]*>/i);
+  if (imgMatch && imgMatch[1]?.trim() && imgMatch[1].trim().toLowerCase() !== 'image') {
+    return `🖼️ ${imgMatch[1].trim()}`;
+  }
+  if (/<img\b/i.test(content)) return '🖼️ [Imagem Capturada]';
+  return 'Sem título';
+}
+
+// Helper to parse user message and extract attachment and @mentioned notes metadata if present
+function parseUserMessage(rawContent: string): {
+  attachmentName: string | null;
+  mentionedNoteTitles: string[];
+  cleanContent: string;
+} {
+  if (!rawContent) return { attachmentName: null, mentionedNoteTitles: [], cleanContent: '' };
+
+  let text = rawContent;
+  let attachmentName: string | null = null;
+  let mentionedNoteTitles: string[] = [];
+
+  // Extract "📎 [Anexo: nome_do_arquivo.ext]" if present
+  const matchBracket = text.match(/^📎\s*\[Anexo:\s*(.*?)\](?:\r?\n)*([\s\S]*)$/);
   if (matchBracket) {
-    return {
-      attachmentName: matchBracket[1].trim(),
-      cleanContent: matchBracket[2]?.trim() || '',
-    };
+    attachmentName = matchBracket[1].trim();
+    text = matchBracket[2] || '';
+  } else {
+    const matchAttached = text.match(/^📎\s*Anexou arquivo:\s*(.*?)$/);
+    if (matchAttached) {
+      return {
+        attachmentName: matchAttached[1].trim(),
+        mentionedNoteTitles: [],
+        cleanContent: '',
+      };
+    }
   }
 
-  // Format 2: "📎 Anexou arquivo: nome_do_arquivo.ext"
-  const matchAttached = rawContent.match(/^📎\s*Anexou arquivo:\s*(.*?)$/);
-  if (matchAttached) {
-    return {
-      attachmentName: matchAttached[1].trim(),
-      cleanContent: '',
-    };
+  // Extract "📌 [Notas: Título 1 | Título 2]" if present
+  const matchMentioned = text.match(/^📌\s*\[Notas:\s*(.*?)\](?:\r?\n)*([\s\S]*)$/);
+  if (matchMentioned) {
+    mentionedNoteTitles = matchMentioned[1]
+      .split('|')
+      .map((t) => t.trim())
+      .filter(Boolean);
+    text = matchMentioned[2] || '';
   }
 
-  return { attachmentName: null, cleanContent: rawContent };
+  return {
+    attachmentName,
+    mentionedNoteTitles,
+    cleanContent: text.trim(),
+  };
 }
 
 // Subcomponente otimizado para exibir notas referenciadas com visualização colapsável
@@ -134,6 +166,104 @@ export default function SpecialistChat() {
   const [pendingUrls, setPendingUrls] = useState<string[]>([]);
   const [isUrlModalOpen, setIsUrlModalOpen] = useState<boolean>(false);
   const [newUrlInput, setNewUrlInput] = useState<string>('');
+
+  // @ Mention state for anchoring specific notes
+  const [mentionedNotes, setMentionedNotes] = useState<Note[]>([]);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionStartIndex, setMentionStartIndex] = useState<number | null>(null);
+  const [mentionSelectedIndex, setMentionSelectedIndex] = useState<number>(0);
+
+  const normalizeSearch = (str: string) =>
+    str
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+
+  const mentionSuggestions = React.useMemo(() => {
+    if (mentionQuery === null) return [];
+    const normQuery = normalizeSearch(mentionQuery.trim());
+    const available = notes.filter(
+      (n) =>
+        n.title !== '__neural_chat_history__' &&
+        !mentionedNotes.some((m) => m.id === n.id)
+    );
+    if (!normQuery) {
+      return available.slice(0, 6);
+    }
+    return available
+      .filter((n) => {
+        const displayTitle = normalizeSearch(getNoteDisplayTitle(n));
+        const tagsMatch = (n.tags || []).some((t) =>
+          normalizeSearch(t).includes(normQuery)
+        );
+        return displayTitle.includes(normQuery) || tagsMatch;
+      })
+      .slice(0, 6);
+  }, [mentionQuery, notes, mentionedNotes]);
+
+  const updateMentionTriggerFromCursor = (text: string, cursorPos: number) => {
+    const textBeforeCursor = text.slice(0, cursorPos);
+    const match = textBeforeCursor.match(/(?:^|[\s\n])@([^\n@]*)$/);
+    if (match) {
+      const atIndex = textBeforeCursor.lastIndexOf('@');
+      const searchStr = textBeforeCursor.slice(atIndex + 1);
+      setMentionStartIndex(atIndex);
+      setMentionQuery(searchStr);
+      setMentionSelectedIndex(0);
+    } else {
+      setMentionQuery(null);
+      setMentionStartIndex(null);
+    }
+  };
+
+  const handleSelectMention = (note: Note) => {
+    setMentionedNotes((prev) =>
+      prev.some((n) => n.id === note.id) ? prev : [...prev, note]
+    );
+
+    if (mentionStartIndex !== null) {
+      const cursorPos = textareaRef.current?.selectionStart ?? queryText.length;
+      const before = queryText.slice(0, mentionStartIndex);
+      const after = queryText.slice(cursorPos);
+      // Clean up extra space if before ends with space and after starts with space or is empty
+      const nextText =
+        after.length === 0
+          ? before.replace(/\s+$/, (m) => (m.includes('\n') ? '\n' : ''))
+          : before.endsWith(' ') && after.startsWith(' ')
+            ? before + after.slice(1)
+            : before + after;
+
+      setQueryText(nextText);
+
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          const newCursor = Math.min(before.length, nextText.length);
+          textareaRef.current.setSelectionRange(newCursor, newCursor);
+        }
+      }, 0);
+    }
+
+    setMentionQuery(null);
+    setMentionStartIndex(null);
+    setMentionSelectedIndex(0);
+  };
+
+  const handleOpenNoteByIdOrTitle = (noteId?: string, noteTitle?: string) => {
+    if (typeof window === 'undefined') return;
+    if (noteId) {
+      window.dispatchEvent(new CustomEvent('open-note-by-id', { detail: noteId }));
+      return;
+    }
+    if (noteTitle) {
+      const matched = notes.find(
+        (n) => getNoteDisplayTitle(n).toLowerCase() === noteTitle.toLowerCase()
+      );
+      if (matched) {
+        window.dispatchEvent(new CustomEvent('open-note-by-id', { detail: matched.id }));
+      }
+    }
+  };
 
   // Active note tracking from main editor
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
@@ -504,15 +634,41 @@ export default function SpecialistChat() {
   };
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!queryText.trim() || isLoading) return;
+    if ((!queryText.trim() && mentionedNotes.length === 0) || isLoading) return;
 
-    let userMessage = queryText.trim();
+    const currentMentionedNotes = [...mentionedNotes];
+    let rawQuestion = queryText.trim();
+    if (!rawQuestion && currentMentionedNotes.length > 0) {
+      rawQuestion = 'Analise o conteúdo desta(s) nota(s) ancorada(s).';
+    }
+
+    let userMessage = rawQuestion;
+    if (currentMentionedNotes.length > 0) {
+      const titlesStr = currentMentionedNotes
+        .map((n) => getNoteDisplayTitle(n))
+        .join(' | ');
+      userMessage = `📌 [Notas: ${titlesStr}]\n\n${userMessage}`;
+    }
     if (pendingFile) {
       userMessage = `📎 [Anexo: ${pendingFile.name}]\n\n${userMessage}`;
     }
-    setQueryText('');
 
-    const newMessages = [...messages, { role: 'user', content: userMessage }];
+    setQueryText('');
+    setMentionedNotes([]);
+    setMentionQuery(null);
+    setMentionStartIndex(null);
+
+    const newMessages = [
+      ...messages,
+      {
+        role: 'user',
+        content: userMessage,
+        mentionedNotes: currentMentionedNotes.map((n) => ({
+          id: n.id,
+          title: getNoteDisplayTitle(n),
+        })),
+      },
+    ];
     setMessages(newMessages);
     setIsLoading(true);
 
@@ -533,7 +689,7 @@ export default function SpecialistChat() {
           updatedAt: Date.now()
         };
       } else {
-        const title = userMessage.substring(0, 30) + (userMessage.length > 30 ? '...' : '');
+        const title = rawQuestion.substring(0, 30) + (rawQuestion.length > 30 ? '...' : '');
         updatedHistory.push({
           id: currentSessionId,
           title: title,
@@ -574,25 +730,46 @@ export default function SpecialistChat() {
         }
       }
 
-      // 1. Extração inteligente de imagens: prioridade na nota ativa + notas relevantes (até 3 imagens)
+      // 1. Extração inteligente de imagens: prioridade máxima nas notas ancoradas (@) -> nota ativa -> notas relevantes (até 3 imagens)
       const currentOpenNote = activeNoteId ? notes.find((n) => n.id === activeNoteId) : null;
+      const mentionedIdsSet = new Set(currentMentionedNotes.map((n) => n.id));
       let noteImagesToSend: Array<{ noteTitle: string; data: string; mimeType: string; alt?: string }> = [];
 
-      if (currentOpenNote) {
+      // 1a. Imagens das notas ancoradas com @
+      for (const mNote of currentMentionedNotes) {
+        if (noteImagesToSend.length >= 3) break;
+        const mExtracted = extractImagesFromHtml(mNote.content || '');
+        for (const img of mExtracted) {
+          if (noteImagesToSend.length >= 3) break;
+          noteImagesToSend.push({
+            ...img,
+            noteTitle: getNoteDisplayTitle(mNote),
+          });
+        }
+      }
+
+      // 1b. Imagens da nota atualmente aberta no editor (se já não foi extraída via @)
+      if (currentOpenNote && !mentionedIdsSet.has(currentOpenNote.id) && noteImagesToSend.length < 3) {
         const activeExtracted = extractImagesFromHtml(currentOpenNote.content || '');
         activeExtracted.forEach((img) => {
           if (noteImagesToSend.length < 3) {
             noteImagesToSend.push({
               ...img,
-              noteTitle: currentOpenNote.title || 'Nota Atual',
+              noteTitle: getNoteDisplayTitle(currentOpenNote),
             });
           }
         });
       }
 
+      // 1c. Imagens de outras notas relevantes por palavra-chave
       if (noteImagesToSend.length < 3) {
-        const queryLower = userMessage.toLowerCase();
-        const otherNotes = notes.filter((n) => n.id !== activeNoteId && n.title !== '__neural_chat_history__');
+        const queryLower = rawQuestion.toLowerCase();
+        const otherNotes = notes.filter(
+          (n) =>
+            n.id !== activeNoteId &&
+            !mentionedIdsSet.has(n.id) &&
+            n.title !== '__neural_chat_history__'
+        );
 
         for (const n of otherNotes) {
           if (noteImagesToSend.length >= 3) break;
@@ -608,7 +785,7 @@ export default function SpecialistChat() {
               if (noteImagesToSend.length >= 3) break;
               noteImagesToSend.push({
                 ...img,
-                noteTitle: n.title || 'Nota',
+                noteTitle: getNoteDisplayTitle(n),
               });
             }
           }
@@ -630,22 +807,26 @@ export default function SpecialistChat() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          query: userMessage,
+          query: rawQuestion,
           activeNoteId,
+          mentionedNoteIds: currentMentionedNotes.map((n) => n.id),
           noteImages: noteImagesToSend.slice(0, 3),
-          notes: notes.map((n) => ({
-            id: n.id,
-            title: n.title || '',
-            tags: n.tags || [],
-            content: (n.content || '')
-              .replace(/data:[^;]+;base64,[a-zA-Z0-9+/=]+/g, '')
-              .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-              .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-              .replace(/<[^>]+>/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim()
-              .slice(0, 1500)
-          })),
+          notes: notes.map((n) => {
+            const isAnchored = mentionedIdsSet.has(n.id);
+            return {
+              id: n.id,
+              title: getNoteDisplayTitle(n),
+              tags: n.tags || [],
+              content: (n.content || '')
+                .replace(/data:[^;]+;base64,[a-zA-Z0-9+/=]+/g, '')
+                .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+                .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+                .replace(/<[^>]+>/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .slice(0, isAnchored ? 4000 : 1500)
+            };
+          }),
           file: pendingFile,
           urlsContent
         })
@@ -846,9 +1027,9 @@ export default function SpecialistChat() {
 
                       return (
                         <div key={i} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`max-w-[85%] w-fit min-w-0 overflow-hidden border border-black/5 relative group ${
+                          <div className={`max-w-[85%] w-fit min-w-0 overflow-hidden border border-black/5 relative group select-text ${
                             isUser
-                              ? 'bg-[#FF4F00] text-white shadow-[2px_2px_0px_rgba(0,0,0,0.1)] px-3 py-2'
+                              ? 'bg-[#FF4F00] text-white shadow-[2px_2px_0px_rgba(0,0,0,0.1)] px-3 py-2 selection:bg-black selection:text-white [&_*]:selection:bg-black [&_*]:selection:text-white'
                               : 'bg-[var(--muted)] text-[var(--foreground)] shadow-[2px_2px_0px_rgba(0,0,0,0.1)] p-3'
                           }`}>
                             {msg.role === 'assistant' && (
@@ -872,6 +1053,29 @@ export default function SpecialistChat() {
                                     <span className="truncate max-w-[190px] sm:max-w-[280px]">
                                       {parsed.attachmentName}
                                     </span>
+                                  </div>
+                                )}
+                                {parsed?.mentionedNoteTitles && parsed.mentionedNoteTitles.length > 0 && (
+                                  <div className="mb-2 flex flex-wrap gap-1.5">
+                                    {parsed.mentionedNoteTitles.map((mTitle, mIdx) => {
+                                      const matchedRef = msg.mentionedNotes?.[mIdx];
+                                      return (
+                                        <button
+                                          key={mIdx}
+                                          type="button"
+                                          onClick={() =>
+                                            handleOpenNoteByIdOrTitle(matchedRef?.id, mTitle)
+                                          }
+                                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#141414] hover:bg-black border border-white/30 text-white text-[10px] font-mono font-bold rounded-none max-w-full transition-colors cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,0.3)]"
+                                          title={`Abrir nota ancorada: ${mTitle}`}
+                                        >
+                                          <span className="text-[#FF4F00]">@</span>
+                                          <span className="truncate max-w-[180px] sm:max-w-[240px]">
+                                            {mTitle}
+                                          </span>
+                                        </button>
+                                      );
+                                    })}
                                   </div>
                                 )}
                                 {parsed?.cleanContent && (
@@ -916,8 +1120,111 @@ export default function SpecialistChat() {
                     )}
                   </div>
 
-                  <form onSubmit={handleSendMessage} className="p-4 bg-[var(--background)] border-t border-black/10">
+                  <form onSubmit={handleSendMessage} className="relative p-4 bg-[var(--background)] border-t border-black/10">
+                    {/* Popover Brutalista de Autocomplete para Menção de Notas (@) */}
+                    {mentionQuery !== null && (
+                      <div className="absolute bottom-full left-4 right-4 mb-1.5 bg-[#141414] text-white border-2 border-black shadow-[4px_4px_0px_#FF4F00] z-[130] rounded-none overflow-hidden">
+                        <div className="px-3 py-1.5 bg-black border-b border-white/10 flex items-center justify-between text-[9px] font-mono uppercase tracking-wider text-white/60 select-none">
+                          <span className="flex items-center gap-1.5 text-[#FF4F00] font-bold">
+                            <span>@</span> Ancorar Nota
+                          </span>
+                          <span className="hidden sm:inline text-[8px] text-white/40">
+                            ↑↓ Navegar • Enter/Tab Selecionar • Esc
+                          </span>
+                        </div>
+
+                        {mentionSuggestions.length === 0 ? (
+                          <div className="px-3 py-3 text-[11px] font-mono text-white/50 text-center">
+                            Nenhuma nota encontrada para &quot;@{mentionQuery}&quot;
+                          </div>
+                        ) : (
+                          <div className="max-h-[210px] overflow-y-auto divide-y divide-white/5 custom-scrollbar">
+                            {mentionSuggestions.map((sNote, sIdx) => {
+                              const isActive = sIdx === mentionSelectedIndex;
+                              const displayTitle = getNoteDisplayTitle(sNote);
+                              const noteTags = (sNote.tags || []).slice(0, 2);
+
+                              return (
+                                <button
+                                  key={sNote.id}
+                                  type="button"
+                                  onMouseEnter={() => setMentionSelectedIndex(sIdx)}
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    handleSelectMention(sNote);
+                                  }}
+                                  className={`w-full px-3 py-2 text-left flex items-center justify-between gap-2 transition-colors cursor-pointer rounded-none ${
+                                    isActive
+                                      ? 'bg-[#FF4F00] text-white'
+                                      : 'hover:bg-white/10 text-white/85'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <FileText
+                                      size={13}
+                                      className={`shrink-0 ${
+                                        isActive ? 'text-white' : 'text-[#FF4F00]'
+                                      }`}
+                                    />
+                                    <span className="text-xs font-mono font-bold truncate">
+                                      {displayTitle}
+                                    </span>
+                                  </div>
+                                  {noteTags.length > 0 && (
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      {noteTags.map((tag, tIdx) => (
+                                        <span
+                                          key={tIdx}
+                                          className={`px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-tight border ${
+                                            isActive
+                                              ? 'bg-black/25 border-white/30 text-white'
+                                              : 'bg-white/5 border-white/15 text-white/60'
+                                          }`}
+                                        >
+                                          #{tag.replace(/^#+/, '')}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <div className="flex flex-col bg-[var(--muted)] border border-black/10 focus-within:ring-2 focus-within:ring-[#FF4F00] transition-all shadow-[4px_4px_0px_rgba(0,0,0,0.05)]">
+                      {mentionedNotes.length > 0 && (
+                        <div className="px-3 py-2 bg-black/5 dark:bg-white/5 border-b border-black/10 flex flex-wrap items-center gap-1.5 z-10">
+                          <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-[#FF4F00] mr-0.5 select-none">
+                            Ancoradas:
+                          </span>
+                          {mentionedNotes.map((mNote) => (
+                            <div
+                              key={mNote.id}
+                              className="inline-flex items-center gap-1.5 bg-[#141414] text-white border border-black px-2 py-0.5 shadow-[2px_2px_0px_#FF4F00] text-[10px] font-mono font-bold max-w-full rounded-none"
+                            >
+                              <span className="text-[#FF4F00]">@</span>
+                              <span className="truncate max-w-[160px]">
+                                {getNoteDisplayTitle(mNote)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setMentionedNotes((prev) =>
+                                    prev.filter((n) => n.id !== mNote.id)
+                                  )
+                                }
+                                className="text-white/50 hover:text-[#FF4F00] transition-colors ml-0.5 cursor-pointer"
+                                title="Remover nota ancorada"
+                              >
+                                <X size={11} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       {pendingFile && (
                         <div className="px-4 py-2 bg-black/5 dark:bg-white/5 border-b border-black/10 flex justify-between items-center z-10">
                           <span className="text-[10px] font-bold text-[#FF4F00] truncate max-w-[80%] flex items-center gap-1">
@@ -952,14 +1259,64 @@ export default function SpecialistChat() {
                       <textarea
                         ref={textareaRef}
                         value={queryText}
-                        onChange={(e) => setQueryText(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const cursorPos = e.target.selectionStart ?? val.length;
+                          setQueryText(val);
+                          updateMentionTriggerFromCursor(val, cursorPos);
+                        }}
+                        onClick={(e) => {
+                          const target = e.currentTarget;
+                          updateMentionTriggerFromCursor(
+                            target.value,
+                            target.selectionStart ?? target.value.length
+                          );
+                        }}
                         onKeyDown={(e) => {
+                          if (mentionQuery !== null) {
+                            if (e.key === 'ArrowDown' && mentionSuggestions.length > 0) {
+                              e.preventDefault();
+                              setMentionSelectedIndex(
+                                (prev) => (prev + 1) % mentionSuggestions.length
+                              );
+                              return;
+                            }
+                            if (e.key === 'ArrowUp' && mentionSuggestions.length > 0) {
+                              e.preventDefault();
+                              setMentionSelectedIndex(
+                                (prev) =>
+                                  (prev - 1 + mentionSuggestions.length) %
+                                  mentionSuggestions.length
+                              );
+                              return;
+                            }
+                            if (
+                              (e.key === 'Enter' || e.key === 'Tab') &&
+                              mentionSuggestions.length > 0
+                            ) {
+                              e.preventDefault();
+                              const chosen =
+                                mentionSuggestions[mentionSelectedIndex] ||
+                                mentionSuggestions[0];
+                              if (chosen) {
+                                handleSelectMention(chosen);
+                              }
+                              return;
+                            }
+                            if (e.key === 'Escape') {
+                              e.preventDefault();
+                              setMentionQuery(null);
+                              setMentionStartIndex(null);
+                              return;
+                            }
+                          }
+
                           if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
                             handleSendMessage(e as any);
                           }
                         }}
-                        placeholder="Pergunte ao seu cérebro..."
+                        placeholder="Pergunte ao seu cérebro... (Digite @ para ancorar nota)"
                         className="w-full bg-transparent text-[var(--foreground)] p-4 text-sm focus:outline-none placeholder:text-[var(--foreground)]/30 resize-none max-h-[160px] custom-scrollbar min-h-[60px]"
                         rows={1}
                       />
@@ -991,7 +1348,12 @@ export default function SpecialistChat() {
                         </div>
                         <button
                           type="submit"
-                          disabled={isLoading || isIndexing || isUploading || !queryText.trim()}
+                          disabled={
+                            isLoading ||
+                            isIndexing ||
+                            isUploading ||
+                            (!queryText.trim() && mentionedNotes.length === 0)
+                          }
                           className="p-2 bg-black text-white hover:bg-[#FF4F00] hover:text-black disabled:opacity-30 disabled:hover:bg-black disabled:hover:text-white transition-all flex items-center justify-center"
                         >
                           <Send size={18} />
@@ -1083,9 +1445,9 @@ export default function SpecialistChat() {
 
                       return (
                         <div key={i} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`max-w-[85%] w-fit min-w-0 overflow-hidden border border-black/5 relative group ${
+                          <div className={`max-w-[85%] w-fit min-w-0 overflow-hidden border border-black/5 relative group select-text ${
                             isUser
-                              ? 'bg-[#FF4F00]/50 text-white shadow-[2px_2px_0px_rgba(0,0,0,0.1)] px-3 py-2'
+                              ? 'bg-[#FF4F00]/50 text-white shadow-[2px_2px_0px_rgba(0,0,0,0.1)] px-3 py-2 selection:bg-black selection:text-white [&_*]:selection:bg-black [&_*]:selection:text-white'
                               : 'bg-[var(--muted)]/60 text-[var(--foreground)]/70 shadow-[2px_2px_0px_rgba(0,0,0,0.1)] p-3'
                           }`}>
                             {isUser ? (
@@ -1099,6 +1461,29 @@ export default function SpecialistChat() {
                                     <span className="truncate max-w-[190px] sm:max-w-[280px]">
                                       {parsed.attachmentName}
                                     </span>
+                                  </div>
+                                )}
+                                {parsed?.mentionedNoteTitles && parsed.mentionedNoteTitles.length > 0 && (
+                                  <div className="mb-2 flex flex-wrap gap-1.5">
+                                    {parsed.mentionedNoteTitles.map((mTitle, mIdx) => {
+                                      const matchedRef = msg.mentionedNotes?.[mIdx];
+                                      return (
+                                        <button
+                                          key={mIdx}
+                                          type="button"
+                                          onClick={() =>
+                                            handleOpenNoteByIdOrTitle(matchedRef?.id, mTitle)
+                                          }
+                                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#141414] hover:bg-black border border-white/30 text-white text-[10px] font-mono font-bold rounded-none max-w-full transition-colors cursor-pointer"
+                                          title={`Abrir nota ancorada: ${mTitle}`}
+                                        >
+                                          <span className="text-[#FF4F00]">@</span>
+                                          <span className="truncate max-w-[180px] sm:max-w-[240px]">
+                                            {mTitle}
+                                          </span>
+                                        </button>
+                                      );
+                                    })}
                                   </div>
                                 )}
                                 {parsed?.cleanContent && (
