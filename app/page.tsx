@@ -63,6 +63,7 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { APP_VERSION, APP_NAME } from '@/lib/version';
+import { computeNoteNumbersMap } from '@/lib/note-utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import jsPDF from 'jspdf';
@@ -195,12 +196,14 @@ const getNoteExpiryStatus = (note: Note): 'overdue' | 'due-soon' | 'normal' => {
 
 const NoteCard = React.memo(({
   note,
+  noteNumber,
   isActive,
   onClick,
   onToggleComplete,
   onSnooze
 }: {
   note: Note,
+  noteNumber?: number,
   isActive: boolean,
   onClick: () => void,
   onToggleComplete: (e: React.MouseEvent) => void,
@@ -245,6 +248,11 @@ const NoteCard = React.memo(({
     >
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-1.5 flex-wrap">
+          {noteNumber !== undefined && (
+            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-black/10 dark:bg-white/10 text-[var(--foreground)] border border-black/15 dark:border-white/15 leading-none">
+              #{noteNumber}
+            </span>
+          )}
           <p className="text-[10px] font-bold uppercase tracking-tighter opacity-40 text-[var(--foreground)]">
             {note.updatedAt ? format(note.updatedAt.toDate(), 'dd MMM', { locale: ptBR }) : 'Agora'}
           </p>
@@ -324,7 +332,7 @@ const TagButton = React.memo(({
 TagButton.displayName = 'TagButton';
 
 
-const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isAiLoading, handleAiAction, exportAsPDF, deleteNote, cloneNote, setIsFullscreen, setIsTagModalOpen, setNewTagInput, relatedNotes, setActiveNoteId, setIsAIAssistantOpen, backlinks, allNotes, refreshKey, setTagToDelete, setIsTagDeleteModalOpen, onSelectionChange, replaceSelectionContent, onReplaceSelectionComplete, hasSelection }: any) => {
+const ActiveNoteEditor = React.memo(({ activeNote, noteNumber, updateNote, isFullscreen, isAiLoading, handleAiAction, exportAsPDF, deleteNote, cloneNote, setIsFullscreen, setIsTagModalOpen, setNewTagInput, relatedNotes, setActiveNoteId, setIsAIAssistantOpen, backlinks, allNotes, refreshKey, setTagToDelete, setIsTagDeleteModalOpen, onSelectionChange, replaceSelectionContent, onReplaceSelectionComplete, hasSelection }: any) => {
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const [localTitle, setLocalTitle] = useState(activeNote.title || '');
   const [localContent, setLocalContent] = useState(activeNote.content || '');
@@ -675,6 +683,11 @@ const ActiveNoteEditor = React.memo(({ activeNote, updateNote, isFullscreen, isA
                 </div>
               </div>
               <div className="text-right">
+                {noteNumber !== undefined && (
+                  <span className="inline-block mb-1 px-2 py-0.5 bg-black text-white dark:bg-white dark:text-black font-mono text-[10px] font-bold tracking-wider">
+                    NOTA #{noteNumber}
+                  </span>
+                )}
                 <p className="text-[10px] opacity-40 uppercase font-bold tracking-widest">Atualizado em</p>
                 <p className="text-xs font-sans font-medium opacity-70">
                   {activeNote.updatedAt ? format(activeNote.updatedAt.toDate(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : 'Agora'}
@@ -1292,6 +1305,8 @@ export default function Home() {
   }, [notes.length > 0]); // Executa quando as notas carregam pela primeira vez
 
   // Derived state (Normalized & Unified)
+  const noteNumbersMap = useMemo(() => computeNoteNumbersMap(notes), [notes]);
+
   const allTags = useMemo(() => {
     const tags = new Set<string>();
     notes.forEach(note => {
@@ -1530,12 +1545,16 @@ Retorne EXCLUSIVAMENTE um JSON válido no seguinte formato:
   }, [searchQuery, isSemanticSearch]);
 
   const filteredNotes = useMemo(() => {
-    const queryLower = searchQuery.toLowerCase();
+    const queryLower = searchQuery.toLowerCase().trim();
     return notes.filter(note => {
       const titleLower = note.title.toLowerCase();
       const contentLower = note.content.toLowerCase();
+      const noteNum = noteNumbersMap.get(note.id);
+      const numStr = noteNum !== undefined ? String(noteNum) : '';
+      const matchesId = numStr !== '' && (queryLower === `#${numStr}` || queryLower === numStr);
 
       const matchesKeyword =
+        matchesId ||
         titleLower.includes(queryLower) ||
         contentLower.includes(queryLower);
 
@@ -1553,7 +1572,7 @@ Retorne EXCLUSIVAMENTE um JSON válido no seguinte formato:
                 view === 'untagged' ? (!note.tags || note.tags.length === 0) : true;
       return matchesSearch && matchesTag && matchesView;
     });
-  }, [notes, searchQuery, activeTag, view, isSemanticSearch, semanticKeywords]);
+  }, [notes, noteNumbersMap, searchQuery, activeTag, view, isSemanticSearch, semanticKeywords]);
 
   const overdueCount = useMemo(() => {
     return notes.filter(n => getNoteExpiryStatus(n) === 'overdue').length;
@@ -2441,6 +2460,7 @@ Retorne EXCLUSIVAMENTE um JSON válido no seguinte formato:
             <NoteCard
               key={note.id}
               note={note}
+              noteNumber={noteNumbersMap.get(note.id)}
               isActive={activeNoteId === note.id}
               onClick={() => {
                 setActiveNoteId(note.id);
@@ -2519,6 +2539,7 @@ Retorne EXCLUSIVAMENTE um JSON válido no seguinte formato:
             <ActiveNoteEditor
               key={activeNote.id}
               activeNote={activeNote}
+              noteNumber={noteNumbersMap.get(activeNote.id)}
               updateNote={updateNote}
               isFullscreen={isFullscreen}
               isAiLoading={isAiLoading}

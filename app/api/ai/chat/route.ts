@@ -50,10 +50,11 @@ export async function POST(req: Request) {
       .split(/\s+/)
       .filter((t: string) => t.length > 2);
 
-    // 3. Montar o Índice Mestre Compacto de TODAS as notas (ultraleve, sem IDs técnicos)
+    // 3. Montar o Índice Mestre Compacto de TODAS as notas (com numeração sequencial amigável #1, #2...)
     const masterIndex = allUserNotes.map((n: any) => {
       const tagsStr = (n.tags || []).map((t: string) => `#${t.replace(/^#+/, '')}`).join(' ');
-      return `- "${n.title || 'Sem título'}" | Tags: ${tagsStr || 'Nenhuma'}`;
+      const seqLabel = n.seqId !== undefined ? `[#${n.seqId}] ` : '';
+      return `- ${seqLabel}"${n.title || 'Sem título'}" | Tags: ${tagsStr || 'Nenhuma'}`;
     }).join('\n');
 
     // 4. Notas Ancoradas Explicitamente pelo Usuário (@)
@@ -63,7 +64,8 @@ export async function POST(req: Request) {
       const tagsList = (n.tags || []).map((t: string) => `#${t.replace(/^#+/, '')}`).join(' ');
       const contentClean = cleanText(n.content || '');
       const truncated = contentClean.length > 3500 ? `${contentClean.slice(0, 3500)}...` : contentClean;
-      return `[NOTA ANCORADA (@): "${n.title || 'Sem título'}"]
+      const seqLabel = n.seqId !== undefined ? `@#${n.seqId}` : '@';
+      return `[NOTA ANCORADA (${seqLabel}): "${n.title || 'Sem título'}"]
 Tags: ${tagsList || 'Nenhuma'}
 Conteúdo Completo: ${truncated || '(Sem conteúdo textual)'}`;
     }).join('\n\n---\n\n');
@@ -103,11 +105,12 @@ Conteúdo Completo: ${truncated || '(Sem conteúdo textual)'}`;
       ? matchingNotes.slice(0, 10) 
       : (anchoredNotes.length > 0 ? [] : scoredNotes.slice(0, 4));
 
-    // Formata o conteúdo detalhado apenas para as notas selecionadas (resumo conciso de até 700 chars, sem IDs)
+    // Formata o conteúdo detalhado apenas para as notas selecionadas (resumo conciso de até 700 chars)
     const detailedContent = notesToInjectContent.map(({ note: n, contentClean }: { note: any; contentClean: string }) => {
       const tagsList = (n.tags || []).map((t: string) => `#${t.replace(/^#+/, '')}`).join(' ');
       const truncated = contentClean.length > 700 ? `${contentClean.slice(0, 700)}...` : contentClean;
-      return `[NOTA: "${n.title || 'Sem título'}"]
+      const seqLabel = n.seqId !== undefined ? ` #${n.seqId}` : '';
+      return `[NOTA${seqLabel}: "${n.title || 'Sem título'}"]
 Tags: ${tagsList || 'Nenhuma'}
 Conteúdo: ${truncated || '(Sem conteúdo textual)'}`;
     }).join('\n\n---\n\n');
@@ -141,7 +144,7 @@ ${urlsContent ? `\nCONTEXTO EXTERNO FORNECIDO (LINKS):\n${urlsContent}` : ''}
 
 DIRETRIZES FUNDAMENTAIS:
 1. FOCO NA ANÁLISE: Forneça uma análise inteligente, clara e contextualizada da pergunta.
-2. NUNCA EXIBA IDs: Sob nenhuma hipótese exiba identificadores de banco, códigos técnicos ou IDs nas respostas.
+2. NUNCA EXIBA IDs TÉCNICOS DE BANCO: Sob nenhuma hipótese exiba códigos alfanuméricos do banco de dados nas respostas. Você pode citar normalmente a numeração sequencial amigável da nota (ex: #1, #2, #3) e seu título.
 3. NÃO DESPEJE LISTAS CRUAS NO MEIO DA RESPOSTA: Não interrompa o fluxo do texto listando notas ou títulos soltos no meio da explicação. Desenvolva o raciocínio de forma analítica.
 4. QUANTIDADE NO FINAL: Se a pergunta for sobre quantidade, catálogo ou contagem de notas, apresente a sua resposta analítica e, ao final, informe naturalmente o total encontrado (exemplo: "Totalizando X notas identificadas sobre este tema.").
 5. AS FONTES FICAM NO RODAPÉ: A interface gráfica do sistema já exibe automaticamente os botões das notas referenciadas no rodapé da mensagem. Portanto, não é necessário fazer uma listagem manual repetitiva no corpo da resposta.
@@ -213,7 +216,10 @@ ${query}
     return NextResponse.json({
       text: responseText,
       meta: aiResult.meta,
-      sources: finalSources.map((n: any) => ({ id: n.id, title: n.title }))
+      sources: finalSources.map((n: any) => ({
+        id: n.id,
+        title: n.seqId !== undefined ? `#${n.seqId} ${n.title || 'Sem título'}` : n.title
+      }))
     });
 
   } catch (error: any) {

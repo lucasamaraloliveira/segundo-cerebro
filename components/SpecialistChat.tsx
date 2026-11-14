@@ -9,6 +9,7 @@ import { X, Send, Brain, Loader2, Info, ChevronDown, ChevronUp, Paperclip, Copy,
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
 import { extractImagesFromHtml } from '@/lib/image-utils';
+import { computeNoteNumbersMap } from '@/lib/note-utils';
 
 // Helper to resolve display title for a note (including image-only notes)
 function getNoteDisplayTitle(note: Partial<Note>): string {
@@ -173,6 +174,14 @@ export default function SpecialistChat() {
   const [mentionStartIndex, setMentionStartIndex] = useState<number | null>(null);
   const [mentionSelectedIndex, setMentionSelectedIndex] = useState<number>(0);
 
+  const noteNumbersMap = React.useMemo(() => computeNoteNumbersMap(notes), [notes]);
+
+  const formatNoteWithId = (note: Partial<Note>) => {
+    const num = note.id ? noteNumbersMap.get(note.id) : undefined;
+    const title = getNoteDisplayTitle(note);
+    return num !== undefined ? `#${num} ${title}` : title;
+  };
+
   const normalizeSearch = (str: string) =>
     str
       .normalize('NFD')
@@ -182,24 +191,40 @@ export default function SpecialistChat() {
   const mentionSuggestions = React.useMemo(() => {
     if (mentionQuery === null) return [];
     const normQuery = normalizeSearch(mentionQuery.trim());
+    const cleanIdQuery = normQuery.replace(/^#+/, '').trim();
     const available = notes.filter(
       (n) =>
         n.title !== '__neural_chat_history__' &&
         !mentionedNotes.some((m) => m.id === n.id)
     );
     if (!normQuery) {
-      return available.slice(0, 6);
+      return [...available]
+        .sort((a, b) => (noteNumbersMap.get(a.id) ?? 0) - (noteNumbersMap.get(b.id) ?? 0))
+        .slice(0, 8);
     }
-    return available
-      .filter((n) => {
-        const displayTitle = normalizeSearch(getNoteDisplayTitle(n));
-        const tagsMatch = (n.tags || []).some((t) =>
-          normalizeSearch(t).includes(normQuery)
-        );
-        return displayTitle.includes(normQuery) || tagsMatch;
+
+    const matches = available.filter((n) => {
+      const noteNum = noteNumbersMap.get(n.id);
+      const numStr = noteNum !== undefined ? String(noteNum) : '';
+      const idMatch = cleanIdQuery !== '' && (numStr === cleanIdQuery || numStr.startsWith(cleanIdQuery));
+      const displayTitle = normalizeSearch(getNoteDisplayTitle(n));
+      const tagsMatch = (n.tags || []).some((t) =>
+        normalizeSearch(t).includes(normQuery)
+      );
+      return idMatch || displayTitle.includes(normQuery) || tagsMatch;
+    });
+
+    return matches
+      .sort((a, b) => {
+        const aNumStr = String(noteNumbersMap.get(a.id) ?? '');
+        const bNumStr = String(noteNumbersMap.get(b.id) ?? '');
+        const aExact = cleanIdQuery !== '' && aNumStr === cleanIdQuery ? 2 : (cleanIdQuery !== '' && aNumStr.startsWith(cleanIdQuery) ? 1 : 0);
+        const bExact = cleanIdQuery !== '' && bNumStr === cleanIdQuery ? 2 : (cleanIdQuery !== '' && bNumStr.startsWith(cleanIdQuery) ? 1 : 0);
+        if (aExact !== bExact) return bExact - aExact;
+        return (noteNumbersMap.get(a.id) ?? 0) - (noteNumbersMap.get(b.id) ?? 0);
       })
-      .slice(0, 6);
-  }, [mentionQuery, notes, mentionedNotes]);
+      .slice(0, 8);
+  }, [mentionQuery, notes, mentionedNotes, noteNumbersMap]);
 
   const updateMentionTriggerFromCursor = (text: string, cursorPos: number) => {
     const textBeforeCursor = text.slice(0, cursorPos);
@@ -256,9 +281,13 @@ export default function SpecialistChat() {
       return;
     }
     if (noteTitle) {
-      const matched = notes.find(
-        (n) => getNoteDisplayTitle(n).toLowerCase() === noteTitle.toLowerCase()
-      );
+      const numPrefixMatch = noteTitle.match(/^#(\d+)\b/);
+      const matched = notes.find((n) => {
+        if (formatNoteWithId(n).toLowerCase() === noteTitle.toLowerCase()) return true;
+        if (getNoteDisplayTitle(n).toLowerCase() === noteTitle.toLowerCase()) return true;
+        if (numPrefixMatch && noteNumbersMap.get(n.id) === Number(numPrefixMatch[1])) return true;
+        return false;
+      });
       if (matched) {
         window.dispatchEvent(new CustomEvent('open-note-by-id', { detail: matched.id }));
       }
@@ -645,7 +674,7 @@ export default function SpecialistChat() {
     let userMessage = rawQuestion;
     if (currentMentionedNotes.length > 0) {
       const titlesStr = currentMentionedNotes
-        .map((n) => getNoteDisplayTitle(n))
+        .map((n) => formatNoteWithId(n))
         .join(' | ');
       userMessage = `📌 [Notas: ${titlesStr}]\n\n${userMessage}`;
     }
@@ -665,7 +694,7 @@ export default function SpecialistChat() {
         content: userMessage,
         mentionedNotes: currentMentionedNotes.map((n) => ({
           id: n.id,
-          title: getNoteDisplayTitle(n),
+          title: formatNoteWithId(n),
         })),
       },
     ];
@@ -815,6 +844,7 @@ export default function SpecialistChat() {
             const isAnchored = mentionedIdsSet.has(n.id);
             return {
               id: n.id,
+              seqId: noteNumbersMap.get(n.id),
               title: getNoteDisplayTitle(n),
               tags: n.tags || [],
               content: (n.content || '')
@@ -1029,7 +1059,7 @@ export default function SpecialistChat() {
                         <div key={i} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
                           <div className={`max-w-[85%] w-fit min-w-0 overflow-hidden border border-black/5 relative group select-text ${
                             isUser
-                              ? 'bg-[#FF4F00] text-white shadow-[2px_2px_0px_rgba(0,0,0,0.1)] px-3 py-2 selection:bg-black selection:text-white [&_*]:selection:bg-black [&_*]:selection:text-white'
+                              ? 'bg-[#FF4F00]/50 text-white shadow-[2px_2px_0px_rgba(0,0,0,0.1)] px-3 py-2'
                               : 'bg-[var(--muted)] text-[var(--foreground)] shadow-[2px_2px_0px_rgba(0,0,0,0.1)] p-3'
                           }`}>
                             {msg.role === 'assistant' && (
@@ -1126,7 +1156,7 @@ export default function SpecialistChat() {
                       <div className="absolute bottom-full left-4 right-4 mb-1.5 bg-[#141414] text-white border-2 border-black shadow-[4px_4px_0px_#FF4F00] z-[130] rounded-none overflow-hidden">
                         <div className="px-3 py-1.5 bg-black border-b border-white/10 flex items-center justify-between text-[9px] font-mono uppercase tracking-wider text-white/60 select-none">
                           <span className="flex items-center gap-1.5 text-[#FF4F00] font-bold">
-                            <span>@</span> Ancorar Nota
+                            <span>@</span> Ancorar Nota (@1, @#2 ou @Nome)
                           </span>
                           <span className="hidden sm:inline text-[8px] text-white/40">
                             ↑↓ Navegar • Enter/Tab Selecionar • Esc
@@ -1141,6 +1171,7 @@ export default function SpecialistChat() {
                           <div className="max-h-[210px] overflow-y-auto divide-y divide-white/5 custom-scrollbar">
                             {mentionSuggestions.map((sNote, sIdx) => {
                               const isActive = sIdx === mentionSelectedIndex;
+                              const noteNum = noteNumbersMap.get(sNote.id);
                               const displayTitle = getNoteDisplayTitle(sNote);
                               const noteTags = (sNote.tags || []).slice(0, 2);
 
@@ -1160,12 +1191,24 @@ export default function SpecialistChat() {
                                   }`}
                                 >
                                   <div className="flex items-center gap-2 min-w-0">
-                                    <FileText
-                                      size={13}
-                                      className={`shrink-0 ${
-                                        isActive ? 'text-white' : 'text-[#FF4F00]'
-                                      }`}
-                                    />
+                                    {noteNum !== undefined ? (
+                                      <span
+                                        className={`px-1.5 py-0.5 text-[10px] font-mono font-bold border shrink-0 ${
+                                          isActive
+                                            ? 'bg-black text-white border-white/40'
+                                            : 'bg-black/60 text-[#FF4F00] border-[#FF4F00]/40'
+                                        }`}
+                                      >
+                                        #{noteNum}
+                                      </span>
+                                    ) : (
+                                      <FileText
+                                        size={13}
+                                        className={`shrink-0 ${
+                                          isActive ? 'text-white' : 'text-[#FF4F00]'
+                                        }`}
+                                      />
+                                    )}
                                     <span className="text-xs font-mono font-bold truncate">
                                       {displayTitle}
                                     </span>
@@ -1207,7 +1250,7 @@ export default function SpecialistChat() {
                             >
                               <span className="text-[#FF4F00]">@</span>
                               <span className="truncate max-w-[160px]">
-                                {getNoteDisplayTitle(mNote)}
+                                {formatNoteWithId(mNote)}
                               </span>
                               <button
                                 type="button"
@@ -1316,7 +1359,7 @@ export default function SpecialistChat() {
                             handleSendMessage(e as any);
                           }
                         }}
-                        placeholder="Pergunte ao seu cérebro... (Digite @ para ancorar nota)"
+                        placeholder="Pergunte ao seu cérebro... (Digite @1 ou @nome para ancorar nota)"
                         className="w-full bg-transparent text-[var(--foreground)] p-4 text-sm focus:outline-none placeholder:text-[var(--foreground)]/30 resize-none max-h-[160px] custom-scrollbar min-h-[60px]"
                         rows={1}
                       />
@@ -1447,7 +1490,7 @@ export default function SpecialistChat() {
                         <div key={i} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
                           <div className={`max-w-[85%] w-fit min-w-0 overflow-hidden border border-black/5 relative group select-text ${
                             isUser
-                              ? 'bg-[#FF4F00]/50 text-white shadow-[2px_2px_0px_rgba(0,0,0,0.1)] px-3 py-2 selection:bg-black selection:text-white [&_*]:selection:bg-black [&_*]:selection:text-white'
+                              ? 'bg-[#FF4F00]/50 text-white shadow-[2px_2px_0px_rgba(0,0,0,0.1)] px-3 py-2'
                               : 'bg-[var(--muted)]/60 text-[var(--foreground)]/70 shadow-[2px_2px_0px_rgba(0,0,0,0.1)] p-3'
                           }`}>
                             {isUser ? (

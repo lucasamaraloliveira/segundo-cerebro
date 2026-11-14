@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Note } from '@/lib/types';
 import { APP_VERSION } from '@/lib/version';
+import { computeNoteNumbersMap } from '@/lib/note-utils';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -28,6 +29,8 @@ export default function CommandPalette({ isOpen, onClose, notes, onAction }: Com
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
 
+  const noteNumbersMap = useMemo(() => computeNoteNumbersMap(notes), [notes]);
+
   const commands = [
     { id: 'create', icon: Plus, label: 'Nova Nota', description: 'Criar um novo pensamento', shortcut: 'N' },
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard Neural', description: 'Ver mapa de conexões', shortcut: 'D' },
@@ -36,22 +39,30 @@ export default function CommandPalette({ isOpen, onClose, notes, onAction }: Com
   ];
 
   const filteredItems = useMemo(() => {
-    const q = query.toLowerCase();
+    const q = query.toLowerCase().trim();
+    const cleanNumQuery = q.replace(/^#+/, '');
 
     const matchedCommands = commands.filter(c =>
       c.label.toLowerCase().includes(q) || c.description.toLowerCase().includes(q)
     ).map(c => ({ ...c, type: 'command' }));
 
     const matchedNotes = notes.filter(n => {
+      const noteNum = noteNumbersMap.get(n.id);
+      const numStr = noteNum !== undefined ? String(noteNum) : '';
+      const idMatch = numStr !== '' && cleanNumQuery !== '' && (numStr === cleanNumQuery || numStr.startsWith(cleanNumQuery));
       const titleMatch = (n.title || '').toLowerCase().includes(q);
       const tagMatch = n.tags && n.tags.some(t => t.toLowerCase().includes(q));
       const contentMatch = (n.content || '').toLowerCase().includes(q);
-      return titleMatch || tagMatch || contentMatch;
+      return idMatch || titleMatch || tagMatch || contentMatch;
     }).slice(0, 5).map(n => {
+      const noteNum = noteNumbersMap.get(n.id);
       let label = n.title && n.title !== 'Nova Nota' ? n.title : '';
       if (!label) {
         const imgMatch = (n.content || '').match(/alt=["']([^"']*)["']/i);
         label = imgMatch && imgMatch[1] ? `📷 ${imgMatch[1]}` : (n.title || 'Sem título');
+      }
+      if (noteNum !== undefined) {
+        label = `#${noteNum} • ${label}`;
       }
       return {
         id: n.id,
@@ -63,7 +74,7 @@ export default function CommandPalette({ isOpen, onClose, notes, onAction }: Com
     });
 
     return [...matchedCommands, ...matchedNotes];
-  }, [query, notes]);
+  }, [query, notes, noteNumbersMap]);
 
   useEffect(() => {
     setSelectedIndex(0);
